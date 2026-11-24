@@ -77,7 +77,7 @@ def announcements(packet: MdnsPacket) -> list[EwelinkAnnouncement]:
                 encrypted=encrypt is not None and text.equals_ignore_case(encrypt, "true"),
                 iv=entries.get("iv"),
                 data=data,
-                address=_find_address(records, record.name) or ip_address(packet.remote[0]),
+                address=_find_address(records, record.name) or _sender(packet),
                 received_at=packet.received_at,
             )
         )
@@ -121,6 +121,13 @@ def _find_address(records: tuple[DnsResourceRecord, ...], service_name: str) -> 
         (r.address for r in records if r.type == DnsRecordType.A and text.equals_ignore_case(r.name, target)),
         None,
     )
+
+
+def _sender(packet: MdnsPacket) -> IPv4Address | IPv6Address | None:
+    """The sender's address, unless it is this host's own: then the packet is a relay's copy, such as the one that Home
+    Assistant OS's multicast plugin repeats from its ``hassio`` bridge, and the device's address is unknown (decision
+    19)."""
+    return None if packet.from_this_host else ip_address(packet.remote[0])
 
 
 def decrypt(data: str, iv: str, device_key: str) -> str:

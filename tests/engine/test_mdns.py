@@ -225,6 +225,32 @@ async def test_network_changes_rejoin_once_they_settle(network: FakeNetwork, cap
     await _stop(task)
 
 
+async def test_packets_from_this_hosts_own_addresses_are_marked(network: FakeNetwork) -> None:
+    listener = MdnsListener(network.open, network.watch)
+    packets: list[MdnsPacket] = []
+    listener.add_packet_handler(packets.append)
+    task = asyncio.create_task(listener.run())
+    await network.next_open()
+
+    # A relay on this host, such as Home Assistant OS's multicast plugin, repeats packets from one of its addresses.
+    for sender in ("192.0.2.7", "192.0.2.1", "198.51.100.1"):
+        network.deliver(QUERY, (sender, 5353))
+    network.local_addresses = frozenset({"192.0.2.7"})  # the host's address changed, and the socket rejoined
+    network.network_changed()
+    await network.next_open()
+    for sender in ("192.0.2.7", "192.0.2.1"):
+        network.deliver(QUERY, (sender, 5353))
+
+    assert [(packet.remote[0], packet.from_this_host) for packet in packets] == [
+        ("192.0.2.7", False),
+        ("192.0.2.1", True),
+        ("198.51.100.1", True),
+        ("192.0.2.7", True),
+        ("192.0.2.1", False),
+    ]
+    await _stop(task)
+
+
 def test_multicast_interfaces_follow_dotnets_filter() -> None:
     states = [
         InterfaceState("lo", up=True, multicast=False, loopback=True, ipv4=("127.0.0.1",)),
@@ -367,3 +393,35 @@ async def test_the_group_reaches_the_socket_and_its_queries_go_out_from_the_inte
         (False, ("127.0.0.1", port)),
         (True, ("127.0.0.1", port)),
     ]
+
+
+@pytest.mark.usefixtures("socket_enabled")
+async def test_the_transport_knows_this_hosts_addresses_from_the_look_that_chose_its_interfaces(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    looks: list[None] = []
+
+    def states() -> list[InterfaceState]:
+        looks.append(None)
+        return [
+            InterfaceState("lo", up=True, multicast=False, loopback=True, ipv4=("127.0.0.1",)),
+            InterfaceState("eth0", up=True, multicast=True, loopback=False, ipv4=("192.0.2.1",)),
+            InterfaceState("eth1", up=False, multicast=True, loopback=False, ipv4=("198.51.100.1",)),
+        ]
+
+    def open_socket(interfaces: list[str], port: int = mdns.PORT) -> tuple[socket.socket, list[str]]:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.bind(("127.0.0.1", 0))
+        sock.setblocking(False)
+        return sock, interfaces
+
+    monkeypatch.setattr(mdns, "interface_states", states)
+    monkeypatch.setattr(mdns, "open_multicast_socket", open_socket)
+
+    transport = await mdns.open_multicast_transport(lambda data, remote: None, lambda err: None)
+    transport.close()
+    await asyncio.sleep(0)
+
+    assert len(looks) == 1
+    assert transport.interfaces == ["192.0.2.1"]
+    assert transport.local_addresses == {"127.0.0.1", "192.0.2.1", "198.51.100.1"}

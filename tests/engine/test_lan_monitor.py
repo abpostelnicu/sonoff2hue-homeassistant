@@ -132,6 +132,25 @@ async def test_probes_and_every_other_packet_reach_the_tracker(time: VirtualTime
     await stop(task)
 
 
+async def test_a_relays_copy_of_a_press_leaves_the_switchs_address_as_it_was(time: VirtualTime) -> None:
+    lan = Lan(time)
+    task = asyncio.create_task(lan.monitor.run())
+    await lan.network.next_open()
+    await asyncio.sleep(1)
+
+    lan.network.deliver(announcement(DEVICE, 5, "abc", "iv"), SENDER)  # its answer to the query, with its A record
+    # A press, without SRV and A records, then the copy that Home Assistant OS's multicast plugin repeats from its
+    # bridge, one of this host's addresses (decision 19).
+    lan.network.deliver(announcement(DEVICE, 6, "abc", "iv", ip=None), SENDER)
+    lan.network.deliver(announcement(DEVICE, 6, "abc", "iv", ip=None), ("192.0.2.1", 5353))
+
+    device = lan.registry.find(DEVICE)
+    assert device is not None
+    assert (device.address, device.seq, device.last_seen_at) == ("10.0.0.5", 6, time.utc())
+    assert lan.events == [Kind.BASELINE, Kind.PRESS]
+    await stop(task)
+
+
 async def test_a_config_change_makes_a_fresh_tracker_with_the_new_device_keys(time: VirtualTime) -> None:
     lan = Lan(time)
     task = asyncio.create_task(lan.monitor.run())

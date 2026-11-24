@@ -91,11 +91,12 @@ def announcement(
     data: str,
     iv: str | None,
     encrypted: bool = True,
-    ip: str = "10.0.0.5",
+    ip: str | None = "10.0.0.5",
     ttl: int = 4500,
     instance_prefix: str = "eWeLink_",
 ) -> bytes:
-    """A MINIR4M state broadcast: PTR and TXT answers, SRV and A additional records."""
+    """A MINIR4M state broadcast: PTR and TXT answers, SRV and A additional records. Without an ``ip``, it has no SRV
+    and A records, as the update after a press arrives."""
     instance = f"{instance_prefix}{device_id}._ewelink._tcp.local"
     host = f"{instance_prefix}{device_id}.local"
     entries = ["txtvers=1", f"id={device_id}", "type=plug", "apivers=1"]
@@ -110,14 +111,14 @@ def announcement(
             break
         entries.append(f"data{i + 1}={chunk}")
 
-    return (
+    builder = (
         DnsPacketBuilder()
         .answer("_ewelink._tcp.local", DnsRecordType.PTR, name(instance))
         .answer(instance, DnsRecordType.TXT, txt(*entries), ttl, cache_flush=True)
-        .additional(instance, DnsRecordType.SRV, srv(8081, host))
-        .additional(host, DnsRecordType.A, a(ip))
-        .build()
     )
+    if ip is not None:
+        builder.additional(instance, DnsRecordType.SRV, srv(8081, host)).additional(host, DnsRecordType.A, a(ip))
+    return builder.build()
 
 
 def probe(device_id: str, ip: str = "10.0.0.5") -> bytes:
@@ -136,5 +137,7 @@ def probe(device_id: str, ip: str = "10.0.0.5") -> bytes:
     )
 
 
-def to_packet(data: bytes, sender: str = "10.0.0.5", received_at: datetime | None = None) -> MdnsPacket:
-    return MdnsPacket(DnsMessage.parse(data), (sender, 5353), received_at or datetime.now(UTC))
+def to_packet(
+    data: bytes, sender: str = "10.0.0.5", received_at: datetime | None = None, from_this_host: bool = False
+) -> MdnsPacket:
+    return MdnsPacket(DnsMessage.parse(data), (sender, 5353), received_at or datetime.now(UTC), from_this_host)

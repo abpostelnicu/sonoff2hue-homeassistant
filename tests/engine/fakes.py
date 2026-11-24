@@ -8,8 +8,11 @@ from selectors import BaseSelector, SelectorKey
 
 
 class FakeTransport:
-    def __init__(self, interfaces: list[str], failing: set[str] | None = None) -> None:
+    def __init__(
+        self, interfaces: list[str], failing: set[str] | None = None, local_addresses: frozenset[str] | None = None
+    ) -> None:
         self._interfaces = interfaces
+        self._local_addresses = frozenset(interfaces) if local_addresses is None else local_addresses
         self.failing = failing or set()
         self.sent: list[tuple[bytes, str]] = []
         self.closed = False
@@ -17,6 +20,10 @@ class FakeTransport:
     @property
     def interfaces(self) -> list[str]:
         return self._interfaces
+
+    @property
+    def local_addresses(self) -> frozenset[str]:
+        return self._local_addresses
 
     def send(self, data: bytes, interface: str) -> None:
         if interface in self.failing:
@@ -33,6 +40,7 @@ class FakeNetwork:
     def __init__(self) -> None:
         self.failures: list[OSError] = []
         self.transports: list[FakeTransport] = []
+        self.local_addresses: frozenset[str] | None = None  # the next transport's; by default its interfaces'
         self.opened = asyncio.Event()
         self.deliver: Callable[[bytes, tuple[str, int]], None] = lambda data, remote: None
         self.fail: Callable[[OSError], None] = lambda err: None
@@ -45,7 +53,7 @@ class FakeNetwork:
         if self.failures:
             raise self.failures.pop(0)
         self.deliver, self.fail = on_datagram, on_error
-        transport = FakeTransport(["192.0.2.1", "198.51.100.1"], failing={"198.51.100.1"})
+        transport = FakeTransport(["192.0.2.1", "198.51.100.1"], {"198.51.100.1"}, self.local_addresses)
         self.transports.append(transport)
         self.opened.set()
         return transport

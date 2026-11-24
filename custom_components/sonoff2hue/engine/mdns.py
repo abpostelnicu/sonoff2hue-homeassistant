@@ -48,13 +48,20 @@ class MdnsPacket:
     message: DnsMessage
     remote: tuple[str, int]
     received_at: datetime
+    from_this_host: bool = False
+    """Whether the sender is one of this host's own addresses: a packet this host sent, or a copy that a relay on it
+    repeats, such as Home Assistant OS's multicast plugin from its ``hassio`` bridge (decision 19)."""
 
 
 class MulticastTransport(Protocol):
-    """An open mDNS socket: the interfaces it joined, and sending on one of them."""
+    """An open mDNS socket: the interfaces it joined, this host's own addresses, and sending on one of them."""
 
     @property
     def interfaces(self) -> list[str]: ...
+
+    @property
+    def local_addresses(self) -> frozenset[str]:
+        """The IPv4 addresses of all of this host's interfaces when the socket opened."""
 
     def send(self, data: bytes, interface: str) -> None:
         """Sends a multicast packet out of ``interface``; raises ``OSError``."""
@@ -196,7 +203,9 @@ class MdnsListener:
             _LOGGER.log(TRACE, "Ignoring malformed mDNS packet from %s:%s: %s", remote[0], remote[1], err)
             return
 
-        packet = MdnsPacket(message, remote, self._clock())
+        transport = self._transport
+        from_this_host = transport is not None and remote[0] in transport.local_addresses
+        packet = MdnsPacket(message, remote, self._clock(), from_this_host)
         for handler in list(self._handlers):
             try:
                 handler(packet)
@@ -238,14 +247,25 @@ class _DatagramProtocol(asyncio.DatagramProtocol):
 
 
 class _SocketTransport:
-    def __init__(self, sock: socket.socket, transport: asyncio.BaseTransport, interfaces: list[str]) -> None:
+    def __init__(
+        self,
+        sock: socket.socket,
+        transport: asyncio.BaseTransport,
+        interfaces: list[str],
+        local_addresses: frozenset[str],
+    ) -> None:
         self._sock = sock
         self._transport = transport
         self._interfaces = interfaces
+        self._local_addresses = local_addresses
 
     @property
     def interfaces(self) -> list[str]:
         return self._interfaces
+
+    @property
+    def local_addresses(self) -> frozenset[str]:
+        return self._local_addresses
 
     def send(self, data: bytes, interface: str) -> None:
         self._sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(interface))
@@ -256,16 +276,17 @@ class _SocketTransport:
 
 
 async def open_multicast_transport(on_datagram: DatagramHandler, on_error: ErrorHandler) -> MulticastTransport:
-    """Opens the mDNS socket and joins the group on every interface that :func:`multicast_interfaces` lists."""
+    """Opens the mDNS socket and joins the group on every interface that :func:`multicast_interfaces` lists. The same
+    look at the interfaces gives this host's own addresses."""
     loop = asyncio.get_running_loop()
-    interfaces = await loop.run_in_executor(None, multicast_interfaces)
-    sock, joined = open_multicast_socket(interfaces, PORT)
+    states = await loop.run_in_executor(None, interface_states)
+    sock, joined = open_multicast_socket(multicast_interfaces(states), PORT)
     try:
         transport, _ = await loop.create_datagram_endpoint(lambda: _DatagramProtocol(on_datagram, on_error), sock=sock)
     except BaseException:
         sock.close()
         raise
-    return _SocketTransport(sock, transport, joined)
+    return _SocketTransport(sock, transport, joined, local_addresses(states))
 
 
 def open_multicast_socket(interfaces: list[str], port: int = PORT) -> tuple[socket.socket, list[str]]:
@@ -343,6 +364,11 @@ def multicast_interfaces(states: list[InterfaceState] | None = None) -> list[str
                 if not address.startswith("127.") and address not in addresses:
                     addresses.append(address)
     return addresses
+
+
+def local_addresses(states: list[InterfaceState]) -> frozenset[str]:
+    """The IPv4 addresses of all of the interfaces, whatever their state: this host's own addresses."""
+    return frozenset(address for state in states for address in state.ipv4)
 
 
 def interface_states() -> list[InterfaceState]:

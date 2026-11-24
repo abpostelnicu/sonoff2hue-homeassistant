@@ -2,7 +2,9 @@
 
 import base64
 from datetime import UTC, datetime
+import importlib.util
 from ipaddress import IPv4Address
+from pathlib import Path
 
 import pytest
 
@@ -83,6 +85,35 @@ def test_announcements_falls_back_to_the_instance_name_and_the_sender() -> None:
     assert parsed.encrypted
     assert parsed.iv is None
     assert parsed.device_type is None
+
+
+def test_announcements_take_no_address_from_a_copy_that_this_host_relays() -> None:
+    # The update after a press has no SRV and A records. Home Assistant OS's multicast plugin repeats it from its own
+    # bridge, whose address is this host's (decision 19), so the copy doesn't say where the switch is.
+    press = announcement_packet(DEVICE, 6, "abc", IV, ip=None)
+
+    (relayed,) = ewelink.announcements(to_packet(press, sender="192.0.2.1", from_this_host=True))
+    (direct,) = ewelink.announcements(to_packet(press, sender="192.0.2.7"))
+
+    assert relayed.address is None
+    assert (relayed.device_id, relayed.seq) == (DEVICE, 6)
+    assert direct.address == IPv4Address("192.0.2.7")
+
+
+def test_the_simulated_switch_on_this_host_keeps_its_a_records_address() -> None:
+    # tools/send-ewelink-announcements.py, the .NET app's simulated switch, sends from this host with TTL 0, with SRV
+    # and A records.
+    path = Path(__file__).parents[2] / "tools" / "send-ewelink-announcements.py"
+    spec = importlib.util.spec_from_file_location("send_ewelink_announcements", path)
+    assert spec is not None
+    assert spec.loader is not None
+    simulator = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(simulator)
+    packet = to_packet(simulator.announcement(DEVICE, 5, "192.0.2.10"), "192.0.2.1", from_this_host=True)
+
+    (parsed,) = ewelink.announcements(packet)
+
+    assert (parsed.seq, parsed.address) == (5, IPv4Address("192.0.2.10"))
 
 
 def test_announcements_skips_instances_without_an_id() -> None:
