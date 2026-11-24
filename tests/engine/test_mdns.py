@@ -4,8 +4,11 @@ import asyncio
 from collections.abc import Awaitable, Callable
 import errno
 import logging
+import select
 import socket
 import struct
+import sys
+from time import monotonic
 
 import ifaddr
 import pytest
@@ -14,10 +17,11 @@ from custom_components.sonoff2hue.engine import mdns
 from custom_components.sonoff2hue.engine.dns import DnsRecordType
 from custom_components.sonoff2hue.engine.mdns import InterfaceState, MdnsListener, MdnsPacket
 
-from .fakes import FakeNetwork
+from .fakes import FakeNetwork, until
 from .packets import announcement
 
 QUERY = bytes((0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0)) + b"\x08_ewelink\x04_tcp\x05local\x00" + bytes((0, 12, 0, 1))
+ON_LINUX = pytest.mark.skipif(sys.platform != "linux", reason="the socket is bound to the group on Linux only")
 
 
 @pytest.fixture
@@ -273,6 +277,7 @@ def test_open_multicast_socket_shares_the_port_and_joins_what_it_can(caplog: pyt
     second, _ = mdns.open_multicast_socket(["127.0.0.1"], port)
     try:
         assert joined == ["127.0.0.1"]
+        assert first.getsockname() == ("224.0.0.251" if sys.platform == "linux" else "0.0.0.0", port)  # noqa: S104
         assert first.getsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR)
         assert first.getsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT)
         assert first.getsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL) == 255
@@ -286,3 +291,79 @@ def test_open_multicast_socket_shares_the_port_and_joins_what_it_can(caplog: pyt
 
     with pytest.raises(OSError, match="Network is down"):
         mdns.open_multicast_socket(["192.0.2.123"], port)
+
+
+def _wildcard_socket() -> socket.socket:
+    """A socket as python-zeroconf opens it when Home Assistant has only its default adapter and no IPv6: on every
+    address, sharing the port (Research findings). Here on a free port."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+    sock.bind(("0.0.0.0", 0))  # noqa: S104
+    return sock
+
+
+def _count_datagrams(sockets: dict[str, socket.socket], expected: int) -> dict[str, int]:
+    """How many datagrams each socket got, once they got ``expected`` together, or after 5 s."""
+    counts = dict.fromkeys(sockets, 0)
+    names = {sock: name for name, sock in sockets.items()}
+    deadline = monotonic() + 5
+    while sum(counts.values()) < expected and monotonic() < deadline:
+        readable, _, _ = select.select(list(sockets.values()), [], [], 0.1)
+        for sock in readable:
+            sock.recv(9000)
+            counts[names[sock]] += 1
+    return counts
+
+
+@ON_LINUX
+@pytest.mark.usefixtures("socket_enabled")
+def test_unicast_to_the_port_reaches_a_wildcard_socket_and_never_the_engines() -> None:
+    with _wildcard_socket() as wildcard:
+        port = wildcard.getsockname()[1]
+        engine, _ = mdns.open_multicast_socket(["127.0.0.1"], port)
+        with engine:
+            # From 64 ports: Linux spreads unicast over the SO_REUSEPORT sockets bound to the same address by the
+            # sender's address and port, so a second socket on 0.0.0.0 would get about half of them.
+            for _ in range(64):
+                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sender:
+                    sender.sendto(b"a unicast reply", ("127.0.0.1", port))
+            counts = _count_datagrams({"wildcard": wildcard, "engine": engine}, 64)
+
+    assert counts == {"wildcard": 64, "engine": 0}
+
+
+@ON_LINUX
+@pytest.mark.usefixtures("socket_enabled")
+async def test_the_group_reaches_the_socket_and_its_queries_go_out_from_the_interface(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    loop = asyncio.get_running_loop()
+    # The loopback interface stands in for the LAN, which the engine never joins on its own; nothing sent on it leaves
+    # this host.
+    lo = InterfaceState("lo", up=True, multicast=True, loopback=True, ipv4=("127.0.0.1",))
+    monkeypatch.setattr(mdns, "interface_states", lambda: [lo])
+    monkeypatch.setattr(mdns, "multicast_interfaces", lambda states=None: ["127.0.0.1"])
+    packets: list[MdnsPacket] = []
+    with _wildcard_socket() as other:
+        port = other.getsockname()[1]
+        monkeypatch.setattr(mdns, "PORT", port)
+        other.setblocking(False)
+        other.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton("127.0.0.1"))
+        listener = MdnsListener(network_watcher=lambda on_change: lambda: None)
+        listener.add_packet_handler(packets.append)
+        task = asyncio.create_task(listener.run())
+        await until(lambda: listener.is_open)
+
+        listener.query("_ewelink._tcp.local", DnsRecordType.PTR)
+        query, sender = await asyncio.wait_for(loop.sock_recvfrom(other, 9000), 5)
+        other.sendto(announcement("1000abcdef", 5, "{}", None, encrypted=False), (mdns.MULTICAST_ADDRESS, port))
+        await until(lambda: len(packets) == 2)
+        await _stop(task)
+
+    # The query comes from the interface's address, not from the group's, and loops back to the engine's socket too.
+    assert (query, sender) == (QUERY, ("127.0.0.1", port))
+    assert [(packet.message.is_response, packet.remote) for packet in packets] == [
+        (False, ("127.0.0.1", port)),
+        (True, ("127.0.0.1", port)),
+    ]

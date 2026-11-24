@@ -2,9 +2,10 @@
 
 A port of the .NET app's ``Mdns/MdnsListener.cs`` and of the parts of .NET's ``NetworkInterface`` and ``NetworkChange``
 it relies on. It shares UDP 5353 through SO_REUSEADDR and SO_REUSEPORT, so it sees every multicast announcement on the
-LAN, including the unsolicited TXT updates of eWeLink devices. The only packets it sends are the queries its users ask
-for. One listener can serve several users: each adds a packet handler and a callback that runs whenever the socket was
-(re)created, as each had a listener of its own in the .NET app.
+LAN, including the unsolicited TXT updates of eWeLink devices. On Linux it is bound to the group, so that it receives
+multicast only (decision 19). The only packets it sends are the queries its users ask for. One listener can serve
+several users: each adds a packet handler and a callback that runs whenever the socket was (re)created, as each had a
+listener of its own in the .NET app.
 """
 
 import array
@@ -32,6 +33,12 @@ MULTICAST_ADDRESS = "224.0.0.251"
 PORT = 5353
 RETRY_DELAY = 5.0
 NETWORK_CHANGE_DEBOUNCE = 3.0
+
+BIND_ADDRESS = MULTICAST_ADDRESS if sys.platform == "linux" else "0.0.0.0"  # noqa: S104 - see below
+"""The socket's own address. On Linux, the group: the socket then receives multicast only, so it never takes a unicast
+reply meant for another responder that shares the port, such as Home Assistant's zeroconf, and its queries still go out
+from the address of the interface they are sent on. macOS refuses to send from a socket bound to a multicast address
+(EADDRNOTAVAIL), so elsewhere it is every address, as in the .NET app (decision 19)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -252,7 +259,7 @@ async def open_multicast_transport(on_datagram: DatagramHandler, on_error: Error
     """Opens the mDNS socket and joins the group on every interface that :func:`multicast_interfaces` lists."""
     loop = asyncio.get_running_loop()
     interfaces = await loop.run_in_executor(None, multicast_interfaces)
-    sock, joined = open_multicast_socket(interfaces)
+    sock, joined = open_multicast_socket(interfaces, PORT)
     try:
         transport, _ = await loop.create_datagram_endpoint(lambda: _DatagramProtocol(on_datagram, on_error), sock=sock)
     except BaseException:
@@ -263,8 +270,8 @@ async def open_multicast_transport(on_datagram: DatagramHandler, on_error: Error
 
 def open_multicast_socket(interfaces: list[str], port: int = PORT) -> tuple[socket.socket, list[str]]:
     """A non-blocking UDP socket on ``port`` that shares it (SO_REUSEADDR and SO_REUSEPORT, which .NET's ReuseAddress
-    sets on Unix) and joined 224.0.0.251 on as many of ``interfaces`` as possible, with the ones it joined. Raises
-    ``OSError`` "Network is down" when it joined none."""
+    sets on Unix), bound to :data:`BIND_ADDRESS`, and joined 224.0.0.251 on as many of ``interfaces`` as possible, with
+    the ones it joined. Raises ``OSError`` "Network is down" when it joined none."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     try:
         joined = _configure(sock, interfaces, port)
@@ -282,7 +289,7 @@ def _configure(sock: socket.socket, interfaces: list[str], port: int) -> list[st
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     if hasattr(socket, "SO_REUSEPORT"):
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-    sock.bind(("0.0.0.0", port))  # noqa: S104 - mDNS arrives on every interface
+    sock.bind((BIND_ADDRESS, port))
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 255)
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 1)
     sock.setblocking(False)
