@@ -79,7 +79,9 @@ The user's choices, made on 2026-11-23 when the plan was approved:
   agent's unfinished edits. Agents working in parallel each use their own git worktree under `.worktrees/` (add it to
   `.git/info/exclude`) and their own branch.
 - Push new commits to a branch, open a pull request and wait for the checks. Then merge by fast-forwarding `main`
-  (`git push origin <sha>:main`), which keeps the commit hashes; GitHub then marks the pull request as merged.
+  (`git push origin <sha>:main`), which keeps the commit hashes; GitHub then marks the pull request as merged. A
+  ruleset on `main` (id 28003079) requires *Lint*, *Test* and *All commits pass*; repository admins can bypass it. It
+  matches the checks by their job names, so rename such a job only together with the ruleset.
 - CI (`.github/workflows/ci.yml`) runs *Lint* (ruff, the formatter, mypy) and *Test* (pytest with coverage) on `main`
   and on the merge result of each pull request. *Commits* (`commits.yml`) checks every commit of a pull request on its
   own: the message rules and `git diff --check`, then `scripts/check` per commit, summed up by *All commits pass*. Both
@@ -302,6 +304,7 @@ The eWeLink LAN protocol and the Hue API, from the .NET app's research (public s
 | 10 | `hue_address.py` ports `HueBridgeAddress` with the parts of `Uri`, `IPAddress.TryParse` and invariant `IdnMapping` it relies on, function by function and on UTF-16 code units, instead of approximating them with `ipaddress` and Python's IDNA codec | The address is typed by the user, stored, and used for every request. The oracle's first 285 addresses showed that Python's libraries differ in a dozen places (`0x`, `+1.1.1.1`, `@bridge`, zones, `::ffff:` forms, case, IDNA 2003); the literal port matched all of them on its first run |
 | 11 | The engine's `pair` asks for a key every 2 s until 60 s have passed, as `HuePairing` does, reports each attempt that didn't pair (`on_attempt`), and ends with the web UI's message, not the command line's | The setup flow replaces the web UI's pairing page, whose message it shows while waiting |
 | 12 | `tools/fake_hue` ports the .NET app's fake bridge, with its ids, endpoints, answers, messages and settings, and adds `Fault`s (a status, body or delay for matching requests) for tests. `tests/hue.py` runs it on 127.0.0.1 over HTTPS with a certificate made at every start, and a manual clock | The client is tested over real HTTPS with a pinned certificate, which the .NET tests did in memory. Development and end-to-end CI need the same bridge without hardware |
+| 13 | From 2026-11-24 the remaining work runs in parallel, one agent per task: each works in its own git worktree, `.worktrees/<task>` (in `.git/info/exclude`), on its own branch from `main`, and opens a pull request without merging it. The coordinating session reviews the pull requests, merges them by fast-forwarding `main` one at a time, and asks the others to rebase. Decision numbers are reserved per task: 14 the runner, 15 the YAML import, 16 the Home Assistant skeleton, 17 the LAN monitor and device registry, 18 development tooling, 19 the mDNS spike. In shared files each agent changes only its own lines (its table rows, its verification entry, its status item); the oracle's fixture is regenerated after a rebase, never merged by hand | The user asked to split the work across agents working in parallel. Separate worktrees let them build, test and commit at the same time without picking up each other's edits, as in the .NET repository's decision 30 |
 
 ## Record keeping
 
@@ -356,12 +359,15 @@ The eWeLink LAN protocol and the Hue API, from the .NET app's research (public s
   case, each outcome of a pairing attempt, the pairing loop, device types, mDNS and the cloud with .NET's failure
   handling). A full run showed the mDNS listener's started callbacks cancelled in a set's order, once in a few dozen
   runs; they are now cancelled in the order they started, a fix squashed into the listener's commit.
+- 2026-11-24: after the first green runs on `main` (71d226a, 77da7d5), ruleset 28003079 "main: require CI and per-commit
+  checks" was created like the .NET repository's: *Lint*, *Test* and *All commits pass*, an admin bypass.
+  `gh api repos/abpostelnicu/sonoff2hue-homeassistant/rules/branches/main` lists the three checks.
 
 ## Status
 
 - [x] Repository started: the license, this memory, the tools (`scripts/setup`, `scripts/check`) and the commit checks
-- [ ] CI: lint, tests and per-commit checks (done, first green on #1); hassfest and HACS validation once the manifest
-  exists; a ruleset on `main` once the checks have passed there
+- [ ] CI: lint, tests and per-commit checks, required for `main` by ruleset 28003079 (done); hassfest and HACS
+  validation once the manifest exists, then required too
 - [ ] mDNS spike on the user's Home Assistant OS: own UDP 5353 socket next to Home Assistant's zeroconf
 - [ ] Engine port with its tests: DNS, eWeLink with press detection, the mDNS listener, the Hue client and pairing,
   the fake Hue bridge (done), runner, YAML import
