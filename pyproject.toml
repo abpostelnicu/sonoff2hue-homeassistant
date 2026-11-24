@@ -4,7 +4,10 @@
 [tool.ruff]
 target-version = "py314"
 line-length = 120
-extend-exclude = [".dev"]
+# The simulated wall switch is the .NET repository's script, copied unchanged so that both simulate it the same way.
+# force-exclude keeps editors that pass a file's path from linting or reformatting it.
+extend-exclude = [".dev", "tools/send-ewelink-announcements.py"]
+force-exclude = true
 
 [tool.ruff.lint]
 select = [
@@ -60,6 +63,7 @@ known-first-party = ["custom_components", "tests", "tools"]
 [tool.mypy]
 python_version = "3.14"
 files = ["custom_components", "tools"]
+exclude = ['^tools/send-ewelink-announcements\.py$'] # unchanged from the .NET repository, without annotations
 mypy_path = "."
 explicit_package_bases = true
 strict = true

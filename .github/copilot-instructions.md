@@ -110,6 +110,7 @@ HTML and browser code are not.
 | `tools/fake_hue` | The fake Hue bridge, a port of the .NET app's `tests/local/FakeHue` (decision 12): `bridge.py` (state, `Fault`s), `server.py` (endpoints, HTTPS, certificate), `__main__.py` (`python -m tools.fake_hue`, settings `FAKE_HUE_BIND`, `FAKE_HUE_PORT`, `FAKE_HUE_LINK_BUTTON`) |
 | `tools/dotnet_oracle` | The generator of those fixtures: a .NET 10 console app (`Program.cs`, `Engine.cs`) that references the app's `Sonoff2Hue.csproj`, the cases it evaluates (`engine_cases.py`) and `generate.sh` |
 | `tools/js_oracle` | The generator of `tests/engine/fixtures/js_picker.json` (decision 20): `oracle.mjs` runs the .NET app's web UI modules `targets.js` and `format.js` in Node on the cases of `picker_cases.py`, and records JavaScript's `trim()` and `toLowerCase()` for every code point; `generate.sh` |
+| `tools/send-ewelink-announcements.py` | The simulated wall switch: the .NET repository's `.github/scripts/send-ewelink-announcements.py`, copied unchanged, so both repositories simulate presses the same way. ruff (with `force-exclude`) and mypy leave it out, as they would ask for changes to it |
 | `scripts` | `setup` (the virtual environment) and `check` (lint, formatting, types, tests) |
 | `.github/scripts` | `check-commits.sh` (the .NET repository's, unchanged) and `test-each-commit.sh` |
 | `.github/workflows` | `ci.yml` (*Lint*, *Test*) and `commits.yml` (per-commit checks, *All commits pass*) |
