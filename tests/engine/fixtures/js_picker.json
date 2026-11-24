@@ -2812,5 +2812,36 @@
   ["a;b",["a;b"]],
   ["a，b",["a，b"]],
   [" a ,​b​",["a","​b​"]]
+ ],
+ "sameId": [
+  ["1000abcdef","1000ABCDEF",true],
+  ["1000abcdef"," 1000abcdef",false],
+  ["1000abcdef",null,false],
+  [null,null,true],
+  ["",null,true],
+  [null,"",true],
+  ["1000K99","1000k99",true],
+  ["1000İ","1000i̇",true],
+  ["1000İ","1000i",false],
+  ["abcΣ","abcς",true],
+  ["abcΣ","abcσ",false],
+  ["abcς","abcσ",false],
+  ["ẞ","ß",true],
+  ["µ","μ",false],
+  ["Ａ","ａ",true]
+ ],
+ "switchLabel": [
+  [null,"Switch"],
+  [{},"Switch"],
+  [{"name":null,"deviceId":null},"Switch"],
+  [{"name":"Hall","deviceId":"1000abcdef"},"Hall"],
+  [{"name":" Hall　","deviceId":"1000abcdef"},"Hall"],
+  [{"name":"  ","deviceId":"1000abcdef"},"1000abcdef"],
+  [{"name":"﻿","deviceId":"1000abcdef"},"1000abcdef"],
+  [{"name":"","deviceId":"1000abcdef"},""],
+  [{"name":"","deviceId":""},"Switch"],
+  [{"name":null,"deviceId":"1000abcdef"},"1000abcdef"],
+  [{"deviceId":"1000abcdef"},"1000abcdef"],
+  [{"name":"Hall"},"Hall"]
  ]
 }

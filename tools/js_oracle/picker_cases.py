@@ -1,5 +1,6 @@
-"""Builds the inputs of tests/engine/fixtures/js_picker.json: edge cases for the switch editor's picker that the .NET app's
-own web UI modules then evaluate (oracle.mjs). Run by tools/js_oracle/generate.sh; see README.md.
+"""Builds the inputs of tests/engine/fixtures/js_picker.json: edge cases for the switch editor's picker and the helpers
+it uses, which the .NET app's own web UI modules then evaluate (oracle.mjs). Run by tools/js_oracle/generate.sh; see
+README.md.
 """
 
 from itertools import chain, combinations
@@ -461,6 +462,41 @@ SPLIT_LIST = [
 ]
 
 
+# format.js: sameId compares device ids without trimming; switchLabel trims the name.
+SAME_ID = [
+    ["1000abcdef", "1000ABCDEF"],
+    ["1000abcdef", " 1000abcdef"],
+    ["1000abcdef", None],
+    [None, None],
+    ["", None],
+    [None, ""],
+    ["1000\u212a99", "1000k99"],
+    ["1000\u0130", "1000i\u0307"],
+    ["1000\u0130", "1000i"],
+    ["abc\u03a3", "abc\u03c2"],
+    ["abc\u03a3", "abc\u03c3"],
+    ["abc\u03c2", "abc\u03c3"],
+    ["\u1e9e", "\u00df"],
+    ["\u00b5", "\u03bc"],
+    ["\uff21", "\uff41"],
+]
+
+SWITCH_LABEL = [
+    None,
+    {},
+    {"name": None, "deviceId": None},
+    {"name": "Hall", "deviceId": "1000abcdef"},
+    {"name": " Hall\u3000", "deviceId": "1000abcdef"},
+    {"name": "  ", "deviceId": "1000abcdef"},
+    {"name": "\ufeff", "deviceId": "1000abcdef"},
+    {"name": "\u0085", "deviceId": "1000abcdef"},
+    {"name": "", "deviceId": ""},
+    {"name": None, "deviceId": "1000abcdef"},
+    {"deviceId": "1000abcdef"},
+    {"name": "Hall"},
+]
+
+
 def main() -> None:
     cases = {
         "trim": TRIM,
@@ -471,6 +507,8 @@ def main() -> None:
         "encode": ENCODE_LISTS,
         "selection": selection_scenarios(),
         "splitList": SPLIT_LIST,
+        "sameId": SAME_ID,
+        "switchLabel": SWITCH_LABEL,
     }
     out = Path(sys.argv[1])
     # ASCII with escapes, so that lone surrogates reach JavaScript as they are.

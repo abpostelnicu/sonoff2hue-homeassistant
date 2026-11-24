@@ -1,5 +1,6 @@
-// Evaluates picker_cases.py's cases with the .NET app's own web UI module targets.js, and JavaScript's string rules for
-// every code point, and writes tests/engine/fixtures/js_picker.json. Run from the repository root through generate.sh.
+// Evaluates picker_cases.py's cases with the .NET app's own web UI modules targets.js and format.js, and JavaScript's
+// string rules for every code point, and writes tests/engine/fixtures/js_picker.json. Run from the repository root
+// through generate.sh.
 // Usage: node tools/js_oracle/oracle.mjs <checkout of abpostelnicu/sonoff2hue> <cases.json> <output.json> <app version>
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -13,6 +14,7 @@ if (!appVersion) {
 
 const ui = join(checkout, 'src', 'Sonoff2Hue.Frontend', 'wwwroot', 'js');
 const targets = await import(pathToFileURL(join(ui, 'targets.js')).href);
+const format = await import(pathToFileURL(join(ui, 'format.js')).href);
 const cases = JSON.parse(readFileSync(casesPath, 'utf8'));
 
 // String.prototype.trim and toLowerCase for every code point.
@@ -96,6 +98,8 @@ const output = {
   })),
   selection: cases.selection.map(selectionCase),
   splitList: cases.splitList.map((text) => [text, targets.splitList(text)]),
+  sameId: cases.sameId.map(([a, b]) => [a, b, format.sameId(a, b)]),
+  switchLabel: cases.switchLabel.map((sw) => [sw, format.switchLabel(sw)]),
 };
 
 // One case per line: arrays of objects or arrays get a line per element, and objects that hold such arrays a line per
