@@ -1,0 +1,9 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "description": "This development version of sonoff2hue can't pair a Hue bridge or map switches yet. Submitting adds the integration, which then does nothing until a later version."
+      }
+    }
+  }
+}

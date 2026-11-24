@@ -90,10 +90,11 @@ The user's choices, made on 2026-11-23 when the plan was approved:
 
 | Folder | Contents |
 |--------|----------|
-| `custom_components/sonoff2hue` | The integration |
+| `custom_components/sonoff2hue` | The integration (decision 16): `manifest.json`; `const.py` (`DOMAIN`); `__init__.py`, which sets up and unloads the config entry and declares `Sonoff2HueConfigEntry`, whose `runtime_data` is `Sonoff2HueData`; `config_flow.py`, the setup flow; `translations/en.json`, its strings (custom integrations ship no `strings.json`) |
 | `custom_components/sonoff2hue/engine` | Ports of the .NET engine, without Home Assistant imports. `text.py` holds the .NET string and number rules (trim, ordinal case-insensitive comparison and ordering, `ToLowerInvariant`, `TryParse`). `dns.py` is `Mdns/DnsMessage.cs`; `mdns.py` is `Mdns/MdnsListener.cs` with the parts of .NET's `NetworkInterface` and `NetworkChange` it uses; `ewelink.py` is `Ewelink/EwelinkAnnouncement.cs` and `EwelinkCrypto.cs`; `press.py` is `Ewelink/PressDetector.cs` and `SwitchTracker.cs`; `config.py` is the model of `Configuration/AppConfig.cs`; `jsonnode.py` reads JSON as System.Text.Json's `JsonNode` does. `hue_address.py` is `Hue/HueBridgeAddress.cs` with the parts of .NET's `Uri`, `IPAddress` and `IdnMapping` it relies on; `hue_client.py` is `Hue/HueClient.cs`, `HueTls.cs` and `HueModels.cs`; `hue_setup.py` is `Hue/HueBridgeSetup.cs` with the pairing loop of `Web/Management/HuePairing.cs`; `errors.py` holds `UnexpectedError` (decision 9). `targets.py` is `Bridge/TargetResolver.cs`; `toggler.py` is `Bridge/HueToggler.cs`; `runner.py` is `Bridge/Sonoff2HueRunner.cs` and `IRunnerObserver.cs` (decision 14) |
 | `tests/engine` | Tests of the engine, ported from the .NET tests. `packets.py` builds raw DNS packets and MINIR4M broadcasts (the .NET tests' `TestPackets.cs`) and `MdnsPacket`s; `fakes.py` has fake multicast transports for `MdnsListener` |
 | `tests` | `hue.py` runs the fake Hue bridge on 127.0.0.1 with a manual clock (the .NET tests' `FakeHueTestHost`), and has `InMemoryBridge`, which answers and records requests without sockets (the .NET tests' `FakeHttpHandler`); `conftest.py` has its fixtures, `fake_hue` and `fake_hue_pressed`, which enable sockets |
+| `tests` (the integration) | `test_init.py` and `test_config_flow.py` run the integration in Home Assistant, with pytest-homeassistant's `hass` fixture and `MockConfigEntry` |
 | `tests/tools` | Tests of the fake Hue bridge (the .NET app's `Sonoff2Hue.FakeHue.Tests`) |
 | `tests/engine/fixtures` | `dotnet_text.json` and `dotnet_engine.json`, made by `tools/dotnet_oracle` from .NET and from the .NET app's own code (decision 7) |
 | `tools/fake_hue` | The fake Hue bridge, a port of the .NET app's `tests/local/FakeHue` (decision 12): `bridge.py` (state, `Fault`s), `server.py` (endpoints, HTTPS, certificate), `__main__.py` (`python -m tools.fake_hue`, settings `FAKE_HUE_BIND`, `FAKE_HUE_PORT`, `FAKE_HUE_LINK_BUTTON`) |
@@ -182,6 +183,37 @@ Home Assistant 2026.11, checked on 2026-11-23 and 2026-11-24 in the developer do
     `initiate_flow`.
 - **Libraries.** `homeassistant` 2026.11.3 requires aiohttp 3.14.5, cryptography 50.0.2, PyYAML 6.0.3, ifaddr 0.2.0 and
   zeroconf 0.152.0 itself, so the manifest needs no `requirements`. voluptuous 0.16.0 is installed with it.
+- **Dependencies and schemas** (the skeleton, decision 16; checked on 2026-11-24 in the installed 2026.11.3):
+  - `ifaddr` and `yarl` are requirements of the `homeassistant` package too, so the engine needs no `network`
+    dependency; core integrations list `network` because they call its API (`async_get_adapters`). Home Assistant sets
+    up `network` and `zeroconf` in stage 0 of its start, before any config entry, so `after_dependencies` couldn't
+    change the order either. python-zeroconf binds UDP 5353 with SO_REUSEADDR and SO_REUSEPORT, as the engine's
+    socket does.
+  - Home Assistant 2026.11 itself imports no voluptuous: its schemas are `probatio` 0.13.0, a requirement of
+    `homeassistant` with voluptuous's API, and flows serialize `data_schema` with `probatio.to_field_list`.
+    voluptuous 0.16.0 comes only with annotatedyaml and hass-nabucasa.
+  - `ConfigEntry[_DataT]` is generic, and `runtime_data` has its type.
+  - With `single_config_entry`, Home Assistant aborts a flow that starts while the entry exists, or that finishes after
+    another one added it, with `single_instance_allowed` in its own translation domain (`homeassistant`), so the
+    integration needs no string for it. A flow that adds the entry also aborts the others in progress.
+  - pytest-homeassistant 2026.11.3 has no check that flows' strings exist; core's `check_translations` fixture isn't
+    part of it.
+- **hassfest** (2026.11.3; read in core's `script/hassfest` and `packages/hassfest` and run from a checkout of that tag
+  on 2026-11-24):
+  - `home-assistant/actions/hassfest@master` (its `2026.11.0` tag is the same) runs the image
+    `ghcr.io/home-assistant/hassfest`, which core builds for every beta and stable release; `latest` was 2026.11.3. It
+    validates each `custom_components/*/manifest.json` with `--action validate`. Warnings don't fail it.
+  - The manifest of a custom integration: `domain`, `name`, `codeowners`, `iot_class`, `documentation` over https and
+    not on home-assistant.io, and `version` (an error without it), with the keys sorted as domain, name, then
+    alphabetical. `categories` (one to three, the primary first, such as `lighting` or `lighting.lighting_systems`) and
+    `connectivity` are optional; values that `homeassistant/strings.json` doesn't define only warn. A requirement that
+    Home Assistant itself depends on is an error: "Requirement … is a dependency of Home Assistant itself and must not
+    be listed in the manifest of a custom integration."
+  - `translations/en.json` is checked against the strings schema: no URLs, HTML or leading and trailing spaces.
+    `config_flow: true` needs `config_flow.py`, `async_setup` needs a `CONFIG_SCHEMA` (a warning for custom
+    integrations), registered services need `services.yaml`, and an import of `homeassistant.components.<x>` needs
+    `<x>` in `dependencies` or `after_dependencies`. The quality scale and `integration_type` checks are for core
+    only. Brand images aren't checked.
 - **HTTP.** aiohttp's `TCPConnector` closes idle connections after 15 s by default (`keepalive_timeout`), and Home
   Assistant's shared connector (`HomeAssistantTCPConnector`) keeps that default. A 45 s keep-alive therefore needs a
   connector of its own, with a longer `keepalive_timeout`, to keep the TLS connection to the bridge warm.
@@ -310,6 +342,7 @@ The eWeLink LAN protocol and the Hue API, from the .NET app's research (public s
 | 12 | `tools/fake_hue` ports the .NET app's fake bridge, with its ids, endpoints, answers, messages and settings, and adds `Fault`s (a status, body or delay for matching requests) for tests. `tests/hue.py` runs it on 127.0.0.1 over HTTPS with a certificate made at every start, and a manual clock | The client is tested over real HTTPS with a pinned certificate, which the .NET tests did in memory. Development and end-to-end CI need the same bridge without hardware |
 | 13 | From 2026-11-24 the remaining work runs in parallel, one agent per task: each works in its own git worktree, `.worktrees/<task>` (in `.git/info/exclude`), on its own branch from `main`, and opens a pull request without merging it. The coordinating session reviews the pull requests, merges them by fast-forwarding `main` one at a time, and asks the others to rebase. Decision numbers are reserved per task: 14 the runner, 15 the YAML import, 16 the Home Assistant skeleton, 17 the LAN monitor and device registry, 18 development tooling, 19 the mDNS spike. In shared files each agent changes only its own lines (its table rows, its verification entry, its status item); the oracle's fixture is regenerated after a rebase, never merged by hand | The user asked to split the work across agents working in parallel. Separate worktrees let them build, test and commit at the same time without picking up each other's edits, as in the .NET repository's decision 30 |
 | 14 | `engine/runner.py` ports `Sonoff2HueRunner` and `IRunnerObserver` on asyncio. The observer is a base class, `RunnerObserver`, whose methods do nothing, like the C# interface's default methods; one that raises is logged and ignored. The runner opens no socket: `run(listener)` adds a packet handler and a started callback to the config entry's `MdnsListener` (decision 8) and sends the keep-alive at once. When cancelled, it removes the handler and cancels the keep-alive and the toggles first, then awaits the started callback's remover and them, as cancelling the .NET runner's token stops everything before anything is awaited. Toggles are tasks behind a per-switch `asyncio.Lock`, which queues in order like `SemaphoreSlim`. `stop_toggles()` stands for the token that the .NET tests pass to `HandlePacket`, and `when_toggles_complete()` waits with `asyncio.wait`, so cancelling the wait doesn't stop them. The age of a press is measured with an injected clock (`datetime.now(UTC)` by default), the time a toggle took with `time.perf_counter`, as with .NET's `Stopwatch`. `resolve_bindings` takes a logger, as the .NET method does. Deliberate differences: "Listening for wall switch presses." drops "Press Ctrl+C to stop.", and a toggle starts on the event loop's next turn instead of inside `HandlePacket`, which can change only the order of the log lines of one packet | The listener is shared, and the runner has to stop and start again, as the supervisor restarts it, while the LAN monitor goes on. Python has no cancellation tokens, and `asyncio.gather` would cancel the toggles when its caller is cancelled, where .NET's `WhenAll` doesn't. The injected clock tests the 5 s rule without waiting |
+| 16 | The Home Assistant skeleton. `manifest.json`: domain and name `sonoff2hue`, version 1.0.0, `codeowners` @abpostelnicu, `config_flow`, `single_config_entry`, `integration_type` hub, `iot_class` local_push, `categories` `plugs_switches` (the MINIR4Ms, the primary one) and `lighting.lighting_systems` (Hue, as the core `hue` integration has it), `connectivity` `network`, and this repository's `documentation` and `issue_tracker`; no `requirements`, `dependencies` or `after_dependencies`. `__init__.py` sets up and unloads the entry and declares `type Sonoff2HueConfigEntry = ConfigEntry[Sonoff2HueData]`; `Sonoff2HueData` is an empty placeholder until the runtime. `config_flow.py` has one `user` step that adds the entry, a placeholder for the setup flow. `translations/en.json` holds every string; no `icons.json` while nothing has an icon. The package imports Home Assistant at module level, as integrations do, so importing an engine module imports Home Assistant first (0.3 s, 1.3 s cold); the tests and the tools already run in `.venv`, which has it | It installs and loads in Home Assistant 2026.11 and passes hassfest, which the Marketplace requires (Research findings). aiohttp, cryptography, PyYAML, ifaddr and yarl come with Home Assistant itself, and hassfest rejects such a requirement; the engine calls neither the `network` nor the `zeroconf` integration, which Home Assistant sets up before any config entry anyway. A hub: one bridge, and the switches as its subentries. local_push: presses arrive as broadcasts. The categories and connectivity place it in the Marketplace and the integration list. The engine itself still imports nothing from Home Assistant (decision 3) |
 
 ## Record keeping
 
@@ -386,6 +419,16 @@ The eWeLink LAN protocol and the Hue API, from the .NET app's research (public s
   restart, a keep-alive that waits first, reporting every ping, no guard around the observer) failed the matching
   tests. The parity row "Queries" was right: the runner, the LAN monitor and Hue discovery all wait 0, 1 and 2 s before
   their first three queries (`new[] { 0, 1000, 2000 }`), which go out at 0, 1 and 3 s.
+- 2026-11-24: the Home Assistant skeleton (decision 16).
+  - `tests/test_init.py` and `tests/test_config_flow.py` pass in Home Assistant 2026.11.3. The entry sets up, holds a
+    `Sonoff2HueData` and unloads. The `user` step shows its form, whose description Home Assistant loads from
+    `translations/en.json`, and adds the entry, which loads. A flow started while the entry exists aborts with
+    `single_instance_allowed`. Without `single_config_entry`, or without `en.json`, the matching test fails.
+  - hassfest 2026.11.3, run as its image runs it (from a sparse checkout of core at that tag, in a Python 3.14
+    environment with core's `requirements.txt` and `packages/hassfest`, without pymicro-vad, pyspeex-noise and
+    PyTurboJPEG, which have no wheel for this machine and which hassfest doesn't import), passes: no errors and no
+    warnings. On a copy of the integration it reported a core dependency in `requirements`, unsorted manifest keys and
+    a URL in a string as errors, and an unknown category as a warning.
 
 ## Status
 
