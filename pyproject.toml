@@ -59,7 +59,7 @@ known-first-party = ["custom_components", "tests", "tools"]
 
 [tool.mypy]
 python_version = "3.14"
-files = ["custom_components"]
+files = ["custom_components", "tools"]
 mypy_path = "."
 explicit_package_bases = true
 strict = true

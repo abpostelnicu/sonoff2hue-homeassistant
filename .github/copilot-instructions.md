@@ -91,6 +91,8 @@ The user's choices, made on 2026-11-23 when the plan was approved:
 | `custom_components/sonoff2hue` | The integration |
 | `custom_components/sonoff2hue/engine` | Ports of the .NET engine, without Home Assistant imports. `text.py` holds the .NET string and number rules (trim, ordinal case-insensitive comparison, `ToLowerInvariant`, `TryParse`). `dns.py` is `Mdns/DnsMessage.cs`; `mdns.py` has `MdnsPacket` (`Mdns/MdnsListener.cs`); `ewelink.py` is `Ewelink/EwelinkAnnouncement.cs` and `EwelinkCrypto.cs`; `press.py` is `Ewelink/PressDetector.cs` and `SwitchTracker.cs`; `config.py` is the model of `Configuration/AppConfig.cs`; `jsonnode.py` reads JSON as System.Text.Json's `JsonNode` does |
 | `tests/engine` | Tests of the engine, ported from the .NET tests. `packets.py` builds raw DNS packets and MINIR4M broadcasts (the .NET tests' `TestPackets.cs`) and `MdnsPacket`s |
+| `tests/engine/fixtures` | `dotnet_text.json` and `dotnet_engine.json`, made by `tools/dotnet_oracle` from .NET and from the .NET app's own code (decision 7) |
+| `tools/dotnet_oracle` | The generator of those fixtures: a .NET 10 console app (`Program.cs`, `Engine.cs`) that references the app's `Sonoff2Hue.csproj`, the cases it evaluates (`engine_cases.py`) and `generate.sh` |
 | `scripts` | `setup` (the virtual environment) and `check` (lint, formatting, types, tests) |
 | `.github/scripts` | `check-commits.sh` (the .NET repository's, unchanged) and `test-each-commit.sh` |
 | `.github/workflows` | `ci.yml` (*Lint*, *Test*) and `commits.yml` (per-commit checks, *All commits pass*) |
@@ -177,6 +179,31 @@ Home Assistant 2026.11, checked on 2026-11-23 and 2026-11-24 in the developer do
   `aiohttp.Fingerprint` takes a SHA-256 digest of the leaf certificate's DER (`getpeercert(binary_form=True)`), the
   value the .NET app pins (`GetRawCertData`). It turns off certificate validation and checks the digest instead.
 
+.NET's own rules, which the port follows (measured on 2026-11-24 with .NET 10.0.15 and invariant globalization, as the
+app runs; `tools/dotnet_oracle` keeps them as fixtures):
+
+- `char.IsWhiteSpace`, which `Trim()` and `IsNullOrWhiteSpace` use, is true for 25 characters: U+0009-U+000D, U+0020,
+  U+0085, U+00A0, U+1680, U+2000-U+200A, U+2028, U+2029, U+202F, U+205F and U+3000. Python's `isspace()` also counts
+  U+001C-U+001F.
+- `ToUpperInvariant` maps one character to one character. It leaves U+0131 (dotless i) and U+017F (long s), which
+  Python maps to ASCII, and maps 27 Greek letters with ypogegrammeni that Python only maps to several characters.
+  `ToLowerInvariant` agrees with Python's one-to-one mappings, and leaves 'İ'. `OrdinalIgnoreCase` compares the
+  `ToUpperInvariant` of both sides, also for surrogate pairs, so 'ı' doesn't match 'i' and "eWeLınk" isn't "ewelink".
+- `long.TryParse` takes white space U+0009-U+000D and U+0020 around an optional sign and ASCII digits, and ignores
+  trailing NUL characters; `1_0`, Arabic-Indic digits and a no-break space fail.
+- `Convert.FromBase64String` skips spaces, tabs, CR and LF, and accepts non-zero bits after the last character.
+- `JsonNode.Parse` rejects `NaN` and `Infinity`, leading zeros, comments, trailing commas, a byte order mark, a NUL after
+  the value, and more than 64 levels. An object with a duplicate key, or a string with a lone surrogate escape, parses,
+  but reading it throws: `ArgumentException` "An item with the same key has already been added. Key: a (Parameter
+  'key')", or `InvalidOperationException` "Cannot read incomplete UTF-16 JSON text as string with missing low
+  surrogate." for a lone high surrogate, and "Cannot read invalid UTF-16 JSON text as string. Invalid surrogate value:
+  '0xDC00'." for a lone low one. `ToJsonString` writes numbers as written and escapes strings as `JavaScriptEncoder.Default`
+  does: everything outside printable ASCII and the characters `"&'+<>`` ` as `\uXXXX`.
+- `JsonNode.DeepEquals` compares numbers by exact value (`1`, `1.0` and `1e0` are equal; `1` and `1.0000000000000001`
+  aren't), objects without regard to order, and never `true` with `1`. Before it unescapes a string, it compares UTF-8
+  lengths and the text before the first escape, so a string with a lone surrogate escape can compare as unequal without
+  throwing.
+
 The eWeLink LAN protocol and the Hue API, from the .NET app's research (public sources):
 
 - The MINIR4M is eWeLink UIID 138, like the MINIR3/MINIR4
@@ -205,6 +232,7 @@ The eWeLink LAN protocol and the Hue API, from the .NET app's research (public s
 | 4 | Hue directly over CLIP v2, with its own link-button pairing, the pinned certificate (`aiohttp.Fingerprint`), and an aiohttp connector of its own that keeps idle connections 5 minutes | The user chose direct control. Home Assistant's shared connector would close the connection between two keep-alives (15 s against 45 s), and the .NET app's decision 9 keeps it warm for a quick toggle |
 | 5 | Home Assistant's own UI, as the user chose. A single config entry for the one bridge: its setup flow finds or takes the bridge's address, then pairs it, or imports a `sonoff2hue.yaml`; reconfigure pairs again with the switches kept, and reauth runs after the key is rejected. One config subentry of type `switch` per MINIR4M, with identify-by-press. Entities: Status, Bridge reachable and eWeLink devices seen on the bridge's device; Press (event), Last action, Online and Test toggle on each switch's device. Repairs for problems, logbook entries for presses and toggles, and redacted diagnostics. Stored `lights`/`groups` keep the web UI's encoding (the name if unique, else the id; `room:`/`zone:` prefixes) | Everything the web interface showed or did has a native place, and Home Assistant's users and HTTPS replace its own sign-in. The same encoding makes imported and new switches resolve as in .NET |
 | 6 | Pinned tools: `pytest-homeassistant` at the Home Assistant version (2026.11.3), pytest-cov, ruff (lint and format, lines of up to 120 characters, as in the .NET repository) and mypy (strict), installed by uv. `scripts/check` runs them all, and CI and `test-each-commit.sh` run that | pytest-homeassistant-custom-component no longer works with 2026.11. One script keeps local checks, per-commit checks and CI the same |
+| 7 | Pin the port to the .NET app's own results. `tools/dotnet_oracle` runs the app's classes (a `ProjectReference` to a checkout of `abpostelnicu/sonoff2hue`) on edge cases that `engine_cases.py` builds, and .NET's string rules for every code point; the fixtures it writes are committed, and `tests/engine/test_dotnet_parity.py` and `test_text.py` replay them through the port. Known differences are listed in the parity test with their reasons. After a change to the app's engine, run `tools/dotnet_oracle/generate.sh <checkout>` | "Exactly as now" is checkable only against the app itself: the first runs found four rules where Python's functions differ from .NET's (white space, case mappings, JSON escaping, lone surrogates). CI needs no .NET and no access to the private repository |
 
 ## Record keeping
 
@@ -234,6 +262,12 @@ The eWeLink LAN protocol and the Hue API, from the .NET app's research (public s
   with `jsonnode.py` for the payload's JSON. The cases of `EwelinkTests` and `PressDetectorTests` and the engine cases of
   `QaRegressionTests` pass, with the openssl reference vector, plus new ones for the fallbacks (no `id`, no address
   records), the missing IV and payloads that aren't JSON objects. Tests use made-up device ids.
+- 2026-11-24: the .NET oracle, against `sonoff2hue v1.0.1-5-g4c08a3a` (`main`) built with .NET 10.0.15. All 197 cases
+  of `dotnet_engine.json` pass: 36 packets, 83 payloads, 15 press-detection sequences, 38 summaries and 25 JSON
+  comparisons, two of them the known differences of `DeepEquals`. `test_text.py` checks every code point against
+  `dotnet_text.json`. Its first runs showed that `text.py` mapped 'ı', 'ſ' and 'İ' as Python does, which .NET doesn't, and
+  missed the 27 Greek mappings; the fix is in the same commit. Breaking the dotless-i rule or the escaping of `+`, `` ` ``
+  and `'` on purpose failed the matching cases. Regenerating gave the same fixtures, byte for byte.
 
 ## Status
 

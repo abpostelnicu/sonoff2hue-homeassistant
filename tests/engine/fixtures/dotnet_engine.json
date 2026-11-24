@@ -1,0 +1,4016 @@
+{
+  "generator": "tools/dotnet_oracle/generate.sh",
+  "runtime": "10.0.15",
+  "app": "sonoff2hue v1.0.1-5-g4c08a3a",
+  "packets": [
+    {
+      "name": "announcement",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000200000002085f6577656c696e6b045f746370056c6f63616c00000c0001000000780028126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00001080010000119402b409747874766572733d310d69643d3130303061626364656609747970653d706c756709617069766572733d31077365713d3737310c656e63727970743d747275650569763d6976ff64617461313d787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878ff64617461323d7878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878786c64617461333d787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c0000210001000000780020000000001f91126557654c696e6b5f31303030616263646566056c6f63616c00126557654c696e6b5f31303030616263646566056c6f63616c00000100010000007800040a000005",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "_ewelink._tcp.local",
+            "type": 12,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": "eWeLink_1000abcdef._ewelink._tcp.local",
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          },
+          {
+            "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": true,
+            "ttl": 4500,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "txtvers",
+                "1"
+              ],
+              [
+                "id",
+                "1000abcdef"
+              ],
+              [
+                "type",
+                "plug"
+              ],
+              [
+                "apivers",
+                "1"
+              ],
+              [
+                "seq",
+                "771"
+              ],
+              [
+                "encrypt",
+                "true"
+              ],
+              [
+                "iv",
+                "iv"
+              ],
+              [
+                "data1",
+                "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+              ],
+              [
+                "data2",
+                "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+              ],
+              [
+                "data3",
+                "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+              ]
+            ]
+          }
+        ],
+        "authorities": [],
+        "additionals": [
+          {
+            "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+            "type": 33,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": "eWeLink_1000abcdef.local",
+            "srvPort": 8081,
+            "txt": null
+          },
+          {
+            "name": "eWeLink_1000abcdef.local",
+            "type": 1,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": "10.0.0.5",
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          }
+        ]
+      },
+      "announcements": [
+        {
+          "deviceId": "1000abcdef",
+          "instanceName": "eWeLink_1000abcdef",
+          "seq": 771,
+          "deviceType": "plug",
+          "encrypted": true,
+          "iv": "iv",
+          "data": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "address": "10.0.0.5"
+        }
+      ],
+      "probes": []
+    },
+    {
+      "name": "plain",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000200000002085f6577656c696e6b045f746370056c6f63616c00000c0001000000780028126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c000010800100001194007609747874766572733d310d69643d3130303061626364656609747970653d706c756709617069766572733d31057365713d314364617461313d7b227377697463686573223a5b7b226f75746c6574223a302c22737769746368223a226f6e227d5d2c2272656c617953657061726174696f6e223a317d126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c0000210001000000780020000000001f91126557654c696e6b5f31303030616263646566056c6f63616c00126557654c696e6b5f31303030616263646566056c6f63616c00000100010000007800040a000005",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "_ewelink._tcp.local",
+            "type": 12,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": "eWeLink_1000abcdef._ewelink._tcp.local",
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          },
+          {
+            "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": true,
+            "ttl": 4500,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "txtvers",
+                "1"
+              ],
+              [
+                "id",
+                "1000abcdef"
+              ],
+              [
+                "type",
+                "plug"
+              ],
+              [
+                "apivers",
+                "1"
+              ],
+              [
+                "seq",
+                "1"
+              ],
+              [
+                "data1",
+                "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1}"
+              ]
+            ]
+          }
+        ],
+        "authorities": [],
+        "additionals": [
+          {
+            "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+            "type": 33,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": "eWeLink_1000abcdef.local",
+            "srvPort": 8081,
+            "txt": null
+          },
+          {
+            "name": "eWeLink_1000abcdef.local",
+            "type": 1,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": "10.0.0.5",
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          }
+        ]
+      },
+      "announcements": [
+        {
+          "deviceId": "1000abcdef",
+          "instanceName": "eWeLink_1000abcdef",
+          "seq": 1,
+          "deviceType": "plug",
+          "encrypted": false,
+          "iv": null,
+          "data": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1}",
+          "address": "10.0.0.5"
+        }
+      ],
+      "probes": []
+    },
+    {
+      "name": "probe",
+      "sender": "10.0.0.6",
+      "hex": "000000000002000000020000126557654c696e6b5f31303030414243444546085f6577656c696e6b045f746370056c6f63616c0000ff0001126557654c696e6b5f31303030414243444546056c6f63616c0000ff0001126557654c696e6b5f31303030414243444546085f6577656c696e6b045f746370056c6f63616c0000210001000000780020000000001f91126557654c696e6b5f31303030414243444546056c6f63616c00126557654c696e6b5f31303030414243444546056c6f63616c00000100010000007800040a000005",
+      "message": {
+        "id": 0,
+        "isResponse": false,
+        "questions": [
+          [
+            "eWeLink_1000ABCDEF._ewelink._tcp.local",
+            255,
+            false
+          ],
+          [
+            "eWeLink_1000ABCDEF.local",
+            255,
+            false
+          ]
+        ],
+        "answers": [],
+        "authorities": [
+          {
+            "name": "eWeLink_1000ABCDEF._ewelink._tcp.local",
+            "type": 33,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": "eWeLink_1000ABCDEF.local",
+            "srvPort": 8081,
+            "txt": null
+          },
+          {
+            "name": "eWeLink_1000ABCDEF.local",
+            "type": 1,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": "10.0.0.5",
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          }
+        ],
+        "additionals": []
+      },
+      "announcements": [],
+      "probes": [
+        "1000abcdef"
+      ]
+    },
+    {
+      "name": "goodbye",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000200000002085f6577656c696e6b045f746370056c6f63616c00000c0001000000780028126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c000010800100000000004f09747874766572733d310d69643d3130303061626364656609747970653d706c756709617069766572733d31057365713d310c656e63727970743d747275650569763d69760964617461313d616263126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c0000210001000000780020000000001f91126557654c696e6b5f31303030616263646566056c6f63616c00126557654c696e6b5f31303030616263646566056c6f63616c00000100010000007800040a000005",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "_ewelink._tcp.local",
+            "type": 12,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": "eWeLink_1000abcdef._ewelink._tcp.local",
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          },
+          {
+            "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": true,
+            "ttl": 0,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "txtvers",
+                "1"
+              ],
+              [
+                "id",
+                "1000abcdef"
+              ],
+              [
+                "type",
+                "plug"
+              ],
+              [
+                "apivers",
+                "1"
+              ],
+              [
+                "seq",
+                "1"
+              ],
+              [
+                "encrypt",
+                "true"
+              ],
+              [
+                "iv",
+                "iv"
+              ],
+              [
+                "data1",
+                "abc"
+              ]
+            ]
+          }
+        ],
+        "authorities": [],
+        "additionals": [
+          {
+            "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+            "type": 33,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": "eWeLink_1000abcdef.local",
+            "srvPort": 8081,
+            "txt": null
+          },
+          {
+            "name": "eWeLink_1000abcdef.local",
+            "type": 1,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": "10.0.0.5",
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          }
+        ]
+      },
+      "announcements": [],
+      "probes": []
+    },
+    {
+      "name": "zbbridge",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000200000002085f6577656c696e6b045f746370056c6f63616c00000c000100000078002a147a62627269646765752d31303030616263646566085f6577656c696e6b045f746370056c6f63616c00147a62627269646765752d31303030616263646566085f6577656c696e6b045f746370056c6f63616c000010800100001194004f09747874766572733d310d69643d3130303061626364656609747970653d706c756709617069766572733d31057365713d310c656e63727970743d747275650569763d69760964617461313d616263147a62627269646765752d31303030616263646566085f6577656c696e6b045f746370056c6f63616c0000210001000000780022000000001f91147a62627269646765752d31303030616263646566056c6f63616c00147a62627269646765752d31303030616263646566056c6f63616c00000100010000007800040a000005",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "_ewelink._tcp.local",
+            "type": 12,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": "zbbridgeu-1000abcdef._ewelink._tcp.local",
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          },
+          {
+            "name": "zbbridgeu-1000abcdef._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": true,
+            "ttl": 4500,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "txtvers",
+                "1"
+              ],
+              [
+                "id",
+                "1000abcdef"
+              ],
+              [
+                "type",
+                "plug"
+              ],
+              [
+                "apivers",
+                "1"
+              ],
+              [
+                "seq",
+                "1"
+              ],
+              [
+                "encrypt",
+                "true"
+              ],
+              [
+                "iv",
+                "iv"
+              ],
+              [
+                "data1",
+                "abc"
+              ]
+            ]
+          }
+        ],
+        "authorities": [],
+        "additionals": [
+          {
+            "name": "zbbridgeu-1000abcdef._ewelink._tcp.local",
+            "type": 33,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": "zbbridgeu-1000abcdef.local",
+            "srvPort": 8081,
+            "txt": null
+          },
+          {
+            "name": "zbbridgeu-1000abcdef.local",
+            "type": 1,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": "10.0.0.5",
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          }
+        ]
+      },
+      "announcements": [],
+      "probes": []
+    },
+    {
+      "name": "ihost",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000200000002085f6577656c696e6b045f746370056c6f63616c00000c00010000007800261069686f73742d31303030616263646566085f6577656c696e6b045f746370056c6f63616c001069686f73742d31303030616263646566085f6577656c696e6b045f746370056c6f63616c000010800100001194004f09747874766572733d310d69643d3130303061626364656609747970653d706c756709617069766572733d31057365713d310c656e63727970743d747275650569763d69760964617461313d6162631069686f73742d31303030616263646566085f6577656c696e6b045f746370056c6f63616c000021000100000078001e000000001f911069686f73742d31303030616263646566056c6f63616c001069686f73742d31303030616263646566056c6f63616c00000100010000007800040a000005",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "_ewelink._tcp.local",
+            "type": 12,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": "ihost-1000abcdef._ewelink._tcp.local",
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          },
+          {
+            "name": "ihost-1000abcdef._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": true,
+            "ttl": 4500,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "txtvers",
+                "1"
+              ],
+              [
+                "id",
+                "1000abcdef"
+              ],
+              [
+                "type",
+                "plug"
+              ],
+              [
+                "apivers",
+                "1"
+              ],
+              [
+                "seq",
+                "1"
+              ],
+              [
+                "encrypt",
+                "true"
+              ],
+              [
+                "iv",
+                "iv"
+              ],
+              [
+                "data1",
+                "abc"
+              ]
+            ]
+          }
+        ],
+        "authorities": [],
+        "additionals": [
+          {
+            "name": "ihost-1000abcdef._ewelink._tcp.local",
+            "type": 33,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": "ihost-1000abcdef.local",
+            "srvPort": 8081,
+            "txt": null
+          },
+          {
+            "name": "ihost-1000abcdef.local",
+            "type": 1,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": "10.0.0.5",
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          }
+        ]
+      },
+      "announcements": [],
+      "probes": []
+    },
+    {
+      "name": "eWelink",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000200000002085f6577656c696e6b045f746370056c6f63616c00000c0001000000780028126557656c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00126557656c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c000010800100001194004f09747874766572733d310d69643d3130303061626364656609747970653d706c756709617069766572733d31057365713d310c656e63727970743d747275650569763d69760964617461313d616263126557656c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c0000210001000000780020000000001f91126557656c696e6b5f31303030616263646566056c6f63616c00126557656c696e6b5f31303030616263646566056c6f63616c00000100010000007800040a000005",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "_ewelink._tcp.local",
+            "type": 12,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": "eWelink_1000abcdef._ewelink._tcp.local",
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          },
+          {
+            "name": "eWelink_1000abcdef._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": true,
+            "ttl": 4500,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "txtvers",
+                "1"
+              ],
+              [
+                "id",
+                "1000abcdef"
+              ],
+              [
+                "type",
+                "plug"
+              ],
+              [
+                "apivers",
+                "1"
+              ],
+              [
+                "seq",
+                "1"
+              ],
+              [
+                "encrypt",
+                "true"
+              ],
+              [
+                "iv",
+                "iv"
+              ],
+              [
+                "data1",
+                "abc"
+              ]
+            ]
+          }
+        ],
+        "authorities": [],
+        "additionals": [
+          {
+            "name": "eWelink_1000abcdef._ewelink._tcp.local",
+            "type": 33,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": "eWelink_1000abcdef.local",
+            "srvPort": 8081,
+            "txt": null
+          },
+          {
+            "name": "eWelink_1000abcdef.local",
+            "type": 1,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": "10.0.0.5",
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          }
+        ]
+      },
+      "announcements": [
+        {
+          "deviceId": "1000abcdef",
+          "instanceName": "eWelink_1000abcdef",
+          "seq": 1,
+          "deviceType": "plug",
+          "encrypted": true,
+          "iv": "iv",
+          "data": "abc",
+          "address": "10.0.0.5"
+        }
+      ],
+      "probes": []
+    },
+    {
+      "name": "EWELINKnoUnderscore",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000200000002085f6577656c696e6b045f746370056c6f63616c00000c0001000000780028124557454c494e4b7831303030616263646566085f6577656c696e6b045f746370056c6f63616c00124557454c494e4b7831303030616263646566085f6577656c696e6b045f746370056c6f63616c000010800100001194004f09747874766572733d310d69643d3130303061626364656609747970653d706c756709617069766572733d31057365713d310c656e63727970743d747275650569763d69760964617461313d616263124557454c494e4b7831303030616263646566085f6577656c696e6b045f746370056c6f63616c0000210001000000780020000000001f91124557454c494e4b7831303030616263646566056c6f63616c00124557454c494e4b7831303030616263646566056c6f63616c00000100010000007800040a000005",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "_ewelink._tcp.local",
+            "type": 12,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": "EWELINKx1000abcdef._ewelink._tcp.local",
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          },
+          {
+            "name": "EWELINKx1000abcdef._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": true,
+            "ttl": 4500,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "txtvers",
+                "1"
+              ],
+              [
+                "id",
+                "1000abcdef"
+              ],
+              [
+                "type",
+                "plug"
+              ],
+              [
+                "apivers",
+                "1"
+              ],
+              [
+                "seq",
+                "1"
+              ],
+              [
+                "encrypt",
+                "true"
+              ],
+              [
+                "iv",
+                "iv"
+              ],
+              [
+                "data1",
+                "abc"
+              ]
+            ]
+          }
+        ],
+        "authorities": [],
+        "additionals": [
+          {
+            "name": "EWELINKx1000abcdef._ewelink._tcp.local",
+            "type": 33,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": "EWELINKx1000abcdef.local",
+            "srvPort": 8081,
+            "txt": null
+          },
+          {
+            "name": "EWELINKx1000abcdef.local",
+            "type": 1,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": "10.0.0.5",
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          }
+        ]
+      },
+      "announcements": [
+        {
+          "deviceId": "1000abcdef",
+          "instanceName": "EWELINKx1000abcdef",
+          "seq": 1,
+          "deviceType": "plug",
+          "encrypted": true,
+          "iv": "iv",
+          "data": "abc",
+          "address": "10.0.0.5"
+        }
+      ],
+      "probes": []
+    },
+    {
+      "name": "dotlessI",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000200000002085f6577656c696e6b045f746370056c6f63616c00000c0001000000780029136557654cc4b16e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00136557654cc4b16e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c000010800100001194004f09747874766572733d310d69643d3130303061626364656609747970653d706c756709617069766572733d31057365713d310c656e63727970743d747275650569763d69760964617461313d616263136557654cc4b16e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c0000210001000000780021000000001f91136557654cc4b16e6b5f31303030616263646566056c6f63616c00136557654cc4b16e6b5f31303030616263646566056c6f63616c00000100010000007800040a000005",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "_ewelink._tcp.local",
+            "type": 12,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": "eWeLınk_1000abcdef._ewelink._tcp.local",
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          },
+          {
+            "name": "eWeLınk_1000abcdef._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": true,
+            "ttl": 4500,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "txtvers",
+                "1"
+              ],
+              [
+                "id",
+                "1000abcdef"
+              ],
+              [
+                "type",
+                "plug"
+              ],
+              [
+                "apivers",
+                "1"
+              ],
+              [
+                "seq",
+                "1"
+              ],
+              [
+                "encrypt",
+                "true"
+              ],
+              [
+                "iv",
+                "iv"
+              ],
+              [
+                "data1",
+                "abc"
+              ]
+            ]
+          }
+        ],
+        "authorities": [],
+        "additionals": [
+          {
+            "name": "eWeLınk_1000abcdef._ewelink._tcp.local",
+            "type": 33,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": "eWeLınk_1000abcdef.local",
+            "srvPort": 8081,
+            "txt": null
+          },
+          {
+            "name": "eWeLınk_1000abcdef.local",
+            "type": 1,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": "10.0.0.5",
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          }
+        ]
+      },
+      "announcements": [],
+      "probes": []
+    },
+    {
+      "name": "truncated",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000200000002085f6577656c696e6b045f746370056c6f63616c00000c0001000000780028126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c000010800100001194004f09747874766572733d310d69643d3130303061626364656609747970653d706c756709617069766572733d31057365713d310c656e63727970743d747275650569763d69760964617461313d616263126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c0000210001000000780020000000001f91126557654c696e6b5f31303030616263646566056c6f63616c00126557654c696e6b5f31303030616263646566056c6f63616c00000100010000007800040a",
+      "parseError": "FormatException: DNS packet truncated."
+    },
+    {
+      "name": "short",
+      "sender": "10.0.0.5",
+      "hex": "0000000000",
+      "parseError": "FormatException: DNS packet shorter than header."
+    },
+    {
+      "name": "loop",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000100000000c00c",
+      "parseError": "FormatException: Too many DNS name compression pointers."
+    },
+    {
+      "name": "labelType",
+      "sender": "10.0.0.5",
+      "hex": "00008400000000010000000040",
+      "parseError": "FormatException: Unsupported DNS label type."
+    },
+    {
+      "name": "longName",
+      "sender": "10.0.0.5",
+      "hex": "0000840000000001000000003f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f61616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616100000100010000007800040a000001",
+      "parseError": "FormatException: DNS name too long."
+    },
+    {
+      "name": "emojiName",
+      "sender": "10.0.0.5",
+      "hex": "0000840000000001000000003cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f988000000100010000007800040a000001",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00.\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00.\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00.\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00.\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00.\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00.\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00.\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00.\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00.\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00.\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00.\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00.\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00.\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00.\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00.\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00.\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00",
+            "type": 1,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": "10.0.0.1",
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          }
+        ],
+        "authorities": [],
+        "additionals": []
+      },
+      "announcements": [],
+      "probes": []
+    },
+    {
+      "name": "query",
+      "sender": "10.0.0.5",
+      "hex": "000000000001000000000000085f6577656c696e6b045f746370056c6f63616c00000c0001",
+      "message": {
+        "id": 0,
+        "isResponse": false,
+        "questions": [
+          [
+            "_ewelink._tcp.local",
+            12,
+            false
+          ]
+        ],
+        "answers": [],
+        "authorities": [],
+        "additionals": []
+      },
+      "announcements": [],
+      "probes": []
+    },
+    {
+      "name": "seqNul",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000100000000126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00001000010000007800160d69643d31303030616263646566077365713d313200",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "id",
+                "1000abcdef"
+              ],
+              [
+                "seq",
+                "12\u0000"
+              ]
+            ]
+          }
+        ],
+        "authorities": [],
+        "additionals": []
+      },
+      "announcements": [
+        {
+          "deviceId": "1000abcdef",
+          "instanceName": "eWeLink_1000abcdef",
+          "seq": 12,
+          "deviceType": null,
+          "encrypted": false,
+          "iv": null,
+          "data": "",
+          "address": "10.0.0.5"
+        }
+      ],
+      "probes": []
+    },
+    {
+      "name": "seqSpaces",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000100000000126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00001000010000007800160d69643d31303030616263646566077365713d203720",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "id",
+                "1000abcdef"
+              ],
+              [
+                "seq",
+                " 7 "
+              ]
+            ]
+          }
+        ],
+        "authorities": [],
+        "additionals": []
+      },
+      "announcements": [
+        {
+          "deviceId": "1000abcdef",
+          "instanceName": "eWeLink_1000abcdef",
+          "seq": 7,
+          "deviceType": null,
+          "encrypted": false,
+          "iv": null,
+          "data": "",
+          "address": "10.0.0.5"
+        }
+      ],
+      "probes": []
+    },
+    {
+      "name": "seqUnderscore",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000100000000126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00001000010000007800160d69643d31303030616263646566077365713d315f30",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "id",
+                "1000abcdef"
+              ],
+              [
+                "seq",
+                "1_0"
+              ]
+            ]
+          }
+        ],
+        "authorities": [],
+        "additionals": []
+      },
+      "announcements": [
+        {
+          "deviceId": "1000abcdef",
+          "instanceName": "eWeLink_1000abcdef",
+          "seq": null,
+          "deviceType": null,
+          "encrypted": false,
+          "iv": null,
+          "data": "",
+          "address": "10.0.0.5"
+        }
+      ],
+      "probes": []
+    },
+    {
+      "name": "seqNegative",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000100000000126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00001000010000007800150d69643d31303030616263646566067365713d2d31",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "id",
+                "1000abcdef"
+              ],
+              [
+                "seq",
+                "-1"
+              ]
+            ]
+          }
+        ],
+        "authorities": [],
+        "additionals": []
+      },
+      "announcements": [
+        {
+          "deviceId": "1000abcdef",
+          "instanceName": "eWeLink_1000abcdef",
+          "seq": -1,
+          "deviceType": null,
+          "encrypted": false,
+          "iv": null,
+          "data": "",
+          "address": "10.0.0.5"
+        }
+      ],
+      "probes": []
+    },
+    {
+      "name": "seqOverflow",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000100000000126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00001000010000007800260d69643d31303030616263646566177365713d39323233333732303336383534373735383038",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "id",
+                "1000abcdef"
+              ],
+              [
+                "seq",
+                "9223372036854775808"
+              ]
+            ]
+          }
+        ],
+        "authorities": [],
+        "additionals": []
+      },
+      "announcements": [
+        {
+          "deviceId": "1000abcdef",
+          "instanceName": "eWeLink_1000abcdef",
+          "seq": null,
+          "deviceType": null,
+          "encrypted": false,
+          "iv": null,
+          "data": "",
+          "address": "10.0.0.5"
+        }
+      ],
+      "probes": []
+    },
+    {
+      "name": "seqArabic",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000100000000126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00001000010000007800150d69643d31303030616263646566067365713dd9a3",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "id",
+                "1000abcdef"
+              ],
+              [
+                "seq",
+                "٣"
+              ]
+            ]
+          }
+        ],
+        "authorities": [],
+        "additionals": []
+      },
+      "announcements": [
+        {
+          "deviceId": "1000abcdef",
+          "instanceName": "eWeLink_1000abcdef",
+          "seq": null,
+          "deviceType": null,
+          "encrypted": false,
+          "iv": null,
+          "data": "",
+          "address": "10.0.0.5"
+        }
+      ],
+      "probes": []
+    },
+    {
+      "name": "seqEmpty",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000100000000126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00001000010000007800130d69643d31303030616263646566047365713d",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "id",
+                "1000abcdef"
+              ],
+              [
+                "seq",
+                ""
+              ]
+            ]
+          }
+        ],
+        "authorities": [],
+        "additionals": []
+      },
+      "announcements": [
+        {
+          "deviceId": "1000abcdef",
+          "instanceName": "eWeLink_1000abcdef",
+          "seq": null,
+          "deviceType": null,
+          "encrypted": false,
+          "iv": null,
+          "data": "",
+          "address": "10.0.0.5"
+        }
+      ],
+      "probes": []
+    },
+    {
+      "name": "idBlank",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000100000000126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c000010000100000078000c0569643d2009057365713d31",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "id",
+                " \t"
+              ],
+              [
+                "seq",
+                "1"
+              ]
+            ]
+          }
+        ],
+        "authorities": [],
+        "additionals": []
+      },
+      "announcements": [
+        {
+          "deviceId": "1000abcdef",
+          "instanceName": "eWeLink_1000abcdef",
+          "seq": 1,
+          "deviceType": null,
+          "encrypted": false,
+          "iv": null,
+          "data": "",
+          "address": "10.0.0.5"
+        }
+      ],
+      "probes": []
+    },
+    {
+      "name": "idMissingShortInstance",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000100000000076557654c696e6b085f6577656c696e6b045f746370056c6f63616c0000100001000000780006057365713d31",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "eWeLink._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "seq",
+                "1"
+              ]
+            ]
+          }
+        ],
+        "authorities": [],
+        "additionals": []
+      },
+      "announcements": [],
+      "probes": []
+    },
+    {
+      "name": "idUpperSpaces",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000100000000126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00001000010000007800181149443d2031303030414243444546e38080057365713d31",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "ID",
+                " 1000ABCDEF\u3000"
+              ],
+              [
+                "seq",
+                "1"
+              ]
+            ]
+          }
+        ],
+        "authorities": [],
+        "additionals": []
+      },
+      "announcements": [
+        {
+          "deviceId": "1000abcdef",
+          "instanceName": "eWeLink_1000abcdef",
+          "seq": 1,
+          "deviceType": null,
+          "encrypted": false,
+          "iv": null,
+          "data": "",
+          "address": "10.0.0.5"
+        }
+      ],
+      "probes": []
+    },
+    {
+      "name": "idTurkish",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000100000000126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c000010000100000078000f0869643dc4b044c4b0057365713d31",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "id",
+                "İDİ"
+              ],
+              [
+                "seq",
+                "1"
+              ]
+            ]
+          }
+        ],
+        "authorities": [],
+        "additionals": []
+      },
+      "announcements": [
+        {
+          "deviceId": "İdİ",
+          "instanceName": "eWeLink_1000abcdef",
+          "seq": 1,
+          "deviceType": null,
+          "encrypted": false,
+          "iv": null,
+          "data": "",
+          "address": "10.0.0.5"
+        }
+      ],
+      "probes": []
+    },
+    {
+      "name": "encryptVariants",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000400000000096557654c696e6b5f31085f6577656c696e6b045f746370056c6f63616c00001000010000007800130c656e63727970743d54525545057365713d31096557654c696e6b5f32085f6577656c696e6b045f746370056c6f63616c00001000010000007800120b656e63727970743d796573057365713d31096557654c696e6b5f33085f6577656c696e6b045f746370056c6f63616c00001000010000007800230c454e43525950543d74727565057365713d310764617461323d620764617461313d61096557654c696e6b5f34085f6577656c696e6b045f746370054c4f43414c0000100001000000780016057365713d310764617461353d780764617461333d63",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "eWeLink_1._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "encrypt",
+                "TRUE"
+              ],
+              [
+                "seq",
+                "1"
+              ]
+            ]
+          },
+          {
+            "name": "eWeLink_2._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "encrypt",
+                "yes"
+              ],
+              [
+                "seq",
+                "1"
+              ]
+            ]
+          },
+          {
+            "name": "eWeLink_3._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "ENCRYPT",
+                "true"
+              ],
+              [
+                "seq",
+                "1"
+              ],
+              [
+                "data2",
+                "b"
+              ],
+              [
+                "data1",
+                "a"
+              ]
+            ]
+          },
+          {
+            "name": "eWeLink_4._ewelink._tcp.LOCAL",
+            "type": 16,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "seq",
+                "1"
+              ],
+              [
+                "data5",
+                "x"
+              ],
+              [
+                "data3",
+                "c"
+              ]
+            ]
+          }
+        ],
+        "authorities": [],
+        "additionals": []
+      },
+      "announcements": [
+        {
+          "deviceId": "1",
+          "instanceName": "eWeLink_1",
+          "seq": 1,
+          "deviceType": null,
+          "encrypted": true,
+          "iv": null,
+          "data": "",
+          "address": "10.0.0.5"
+        },
+        {
+          "deviceId": "2",
+          "instanceName": "eWeLink_2",
+          "seq": 1,
+          "deviceType": null,
+          "encrypted": false,
+          "iv": null,
+          "data": "",
+          "address": "10.0.0.5"
+        },
+        {
+          "deviceId": "3",
+          "instanceName": "eWeLink_3",
+          "seq": 1,
+          "deviceType": null,
+          "encrypted": true,
+          "iv": null,
+          "data": "ab",
+          "address": "10.0.0.5"
+        },
+        {
+          "deviceId": "4",
+          "instanceName": "eWeLink_4",
+          "seq": 1,
+          "deviceType": null,
+          "encrypted": false,
+          "iv": null,
+          "data": "c",
+          "address": "10.0.0.5"
+        }
+      ],
+      "probes": []
+    },
+    {
+      "name": "addressMatching",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000300000005096557654c696e6b5f31085f6577656c696e6b045f746370056c6f63616c0000100001000000780006057365713d31096557654c696e6b5f32085f6577656c696e6b045f746370056c6f63616c0000100001000000780006057365713d31096557654c696e6b5f33085f6577656c696e6b045f746370056c6f63616c0000100001000000780006057365713d31094557454c494e4b5f31085f4557454c494e4b045f544350054c4f43414c0000210001000000780014000000001f9106486f73742d31056c6f63616c0006686f73742d31054c4f43414c00000100010000007800040a090807096557654c696e6b5f32085f6577656c696e6b045f746370056c6f63616c0000210001000000780014000000001f9106686f73742d32056c6f63616c0006686f73742d32056c6f63616c00001c000100000078001000000000000000000000000000000001096557654c696e6b5f33085f6577656c696e6b045f746370056c6f63616c0000210001000000780005000000001f",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "eWeLink_1._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "seq",
+                "1"
+              ]
+            ]
+          },
+          {
+            "name": "eWeLink_2._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "seq",
+                "1"
+              ]
+            ]
+          },
+          {
+            "name": "eWeLink_3._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "seq",
+                "1"
+              ]
+            ]
+          }
+        ],
+        "authorities": [],
+        "additionals": [
+          {
+            "name": "EWELINK_1._EWELINK._TCP.LOCAL",
+            "type": 33,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": "Host-1.local",
+            "srvPort": 8081,
+            "txt": null
+          },
+          {
+            "name": "host-1.LOCAL",
+            "type": 1,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": "10.9.8.7",
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          },
+          {
+            "name": "eWeLink_2._ewelink._tcp.local",
+            "type": 33,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": "host-2.local",
+            "srvPort": 8081,
+            "txt": null
+          },
+          {
+            "name": "host-2.local",
+            "type": 28,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": "::1",
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          },
+          {
+            "name": "eWeLink_3._ewelink._tcp.local",
+            "type": 33,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          }
+        ]
+      },
+      "announcements": [
+        {
+          "deviceId": "1",
+          "instanceName": "eWeLink_1",
+          "seq": 1,
+          "deviceType": null,
+          "encrypted": false,
+          "iv": null,
+          "data": "",
+          "address": "10.9.8.7"
+        },
+        {
+          "deviceId": "2",
+          "instanceName": "eWeLink_2",
+          "seq": 1,
+          "deviceType": null,
+          "encrypted": false,
+          "iv": null,
+          "data": "",
+          "address": "10.0.0.5"
+        },
+        {
+          "deviceId": "3",
+          "instanceName": "eWeLink_3",
+          "seq": 1,
+          "deviceType": null,
+          "encrypted": false,
+          "iv": null,
+          "data": "",
+          "address": "10.0.0.5"
+        }
+      ],
+      "probes": []
+    },
+    {
+      "name": "probeAuthorities",
+      "sender": "10.0.0.5",
+      "hex": "000000000001000000050000096557654c696e6b5f58085f6577656c696e6b045f746370056c6f63616c0000ff0001096557654c696e6b5f58085f6577656c696e6b045f746370056c6f63616c0000210001000000780017000000001f91096557654c696e6b5f58056c6f63616c00094557454c494e4b5f78056c6f63616c00000100010000007800040a000001086557654c696e6b5f056c6f63616c00000100010000007800040a0000010b6557654c696e6b5fc4b164056c6f63616c00000100010000007800040a000001056f74686572056c6f63616c00000100010000007800040a000001",
+      "message": {
+        "id": 0,
+        "isResponse": false,
+        "questions": [
+          [
+            "eWeLink_X._ewelink._tcp.local",
+            255,
+            false
+          ]
+        ],
+        "answers": [],
+        "authorities": [
+          {
+            "name": "eWeLink_X._ewelink._tcp.local",
+            "type": 33,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": "eWeLink_X.local",
+            "srvPort": 8081,
+            "txt": null
+          },
+          {
+            "name": "EWELINK_x.local",
+            "type": 1,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": "10.0.0.1",
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          },
+          {
+            "name": "eWeLink_.local",
+            "type": 1,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": "10.0.0.1",
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          },
+          {
+            "name": "eWeLink_ıd.local",
+            "type": 1,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": "10.0.0.1",
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          },
+          {
+            "name": "other.local",
+            "type": 1,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": "10.0.0.1",
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          }
+        ],
+        "additionals": []
+      },
+      "announcements": [],
+      "probes": [
+        "x",
+        "ıd"
+      ]
+    },
+    {
+      "name": "txtOdd",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000100000000126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c0000100001000000780022057365713d31055345513d32023d7804666c61670964617461313d613d620002c328",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+            "type": 16,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": [
+              [
+                "seq",
+                "1"
+              ],
+              [
+                "",
+                "x"
+              ],
+              [
+                "flag",
+                ""
+              ],
+              [
+                "data1",
+                "a=b"
+              ],
+              [
+                "�(",
+                ""
+              ]
+            ]
+          }
+        ],
+        "authorities": [],
+        "additionals": []
+      },
+      "announcements": [
+        {
+          "deviceId": "1000abcdef",
+          "instanceName": "eWeLink_1000abcdef",
+          "seq": 1,
+          "deviceType": null,
+          "encrypted": false,
+          "iv": null,
+          "data": "a=b",
+          "address": "10.0.0.5"
+        }
+      ],
+      "probes": []
+    },
+    {
+      "name": "badUtf8Label",
+      "sender": "10.0.0.5",
+      "hex": "000084000000000100000000046162eda0056c6f63616c00000100010000007800040a000001",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "ab��.local",
+            "type": 1,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": "10.0.0.1",
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          }
+        ],
+        "authorities": [],
+        "additionals": []
+      },
+      "announcements": [],
+      "probes": []
+    },
+    {
+      "name": "ptrBadPointer",
+      "sender": "10.0.0.5",
+      "hex": "0000840000000001000000000178056c6f63616c00000c0001000000780002c0ff",
+      "parseError": "FormatException: DNS packet truncated."
+    },
+    {
+      "name": "srvShort",
+      "sender": "10.0.0.5",
+      "hex": "0000840000000001000000000178056c6f63616c0000210001000000780006000000000000",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "x.local",
+            "type": 33,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          }
+        ],
+        "authorities": [],
+        "additionals": []
+      },
+      "announcements": [],
+      "probes": []
+    },
+    {
+      "name": "aWrongLength",
+      "sender": "10.0.0.5",
+      "hex": "0000840000000001000000000178056c6f63616c0000010001000000780003010203",
+      "message": {
+        "id": 0,
+        "isResponse": true,
+        "questions": [],
+        "answers": [
+          {
+            "name": "x.local",
+            "type": 1,
+            "cacheFlush": false,
+            "ttl": 120,
+            "ptr": null,
+            "address": null,
+            "srvTarget": null,
+            "srvPort": 0,
+            "txt": null
+          }
+        ],
+        "authorities": [],
+        "additionals": []
+      },
+      "announcements": [],
+      "probes": []
+    },
+    {
+      "name": "txtOverrun",
+      "sender": "10.0.0.5",
+      "hex": "0000840000000001000000000178056c6f63616c0000100001000000780003056162",
+      "parseError": "FormatException: TXT string overruns record."
+    }
+  ],
+  "readParams": [
+    {
+      "name": "ok",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "feLVtpEa5OtDjfcUIa5yohgN0RsbYqiurJfzBqBzliBs6rIFeRiH51EIjpkZVRMn",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"switch\":\"on\",\"relaySeparation\":1}"
+      }
+    },
+    {
+      "name": "keyWithSpaces",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "feLVtpEa5OtDjfcUIa5yohgN0RsbYqiurJfzBqBzliBs6rIFeRiH51EIjpkZVRMn",
+      "key": " \ta1b2c3d4-e5f6-4711-8899-aabbccddeeff\u3000",
+      "error": null,
+      "params": {
+        "json": "{\"switch\":\"on\",\"relaySeparation\":1}"
+      }
+    },
+    {
+      "name": "wrongKey",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "feLVtpEa5OtDjfcUIa5yohgN0RsbYqiurJfzBqBzliBs6rIFeRiH51EIjpkZVRMn",
+      "key": "wrong",
+      "error": "decryption failed, check the deviceKey",
+      "params": null
+    },
+    {
+      "name": "noKey",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "feLVtpEa5OtDjfcUIa5yohgN0RsbYqiurJfzBqBzliBs6rIFeRiH51EIjpkZVRMn",
+      "key": null,
+      "error": null,
+      "params": null
+    },
+    {
+      "name": "blankKey",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "feLVtpEa5OtDjfcUIa5yohgN0RsbYqiurJfzBqBzliBs6rIFeRiH51EIjpkZVRMn",
+      "key": " \u2028",
+      "error": null,
+      "params": null
+    },
+    {
+      "name": "noIv",
+      "encrypted": true,
+      "iv": null,
+      "data": "feLVtpEa5OtDjfcUIa5yohgN0RsbYqiurJfzBqBzliBs6rIFeRiH51EIjpkZVRMn",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "encrypted payload has no iv",
+      "params": null
+    },
+    {
+      "name": "emptyIv",
+      "encrypted": true,
+      "iv": "",
+      "data": "feLVtpEa5OtDjfcUIa5yohgN0RsbYqiurJfzBqBzliBs6rIFeRiH51EIjpkZVRMn",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "encrypted payload has no iv",
+      "params": null
+    },
+    {
+      "name": "ivNotBase64",
+      "encrypted": true,
+      "iv": "not base64!",
+      "data": "feLVtpEa5OtDjfcUIa5yohgN0RsbYqiurJfzBqBzliBs6rIFeRiH51EIjpkZVRMn",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "iv is not valid base64",
+      "params": null
+    },
+    {
+      "name": "ivNonAscii",
+      "encrypted": true,
+      "iv": "äAECAwQFBgcICQoLDA0ODw==",
+      "data": "feLVtpEa5OtDjfcUIa5yohgN0RsbYqiurJfzBqBzliBs6rIFeRiH51EIjpkZVRMn",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "iv is not valid base64",
+      "params": null
+    },
+    {
+      "name": "ivSpaces",
+      "encrypted": true,
+      "iv": " AAECAwQF\nBgcICQoLDA0ODw==\t",
+      "data": "feLVtpEa5OtDjfcUIa5yohgN0RsbYqiurJfzBqBzliBs6rIFeRiH51EIjpkZVRMn",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"switch\":\"on\",\"relaySeparation\":1}"
+      }
+    },
+    {
+      "name": "ivFormFeed",
+      "encrypted": true,
+      "iv": "AAECAwQF\fBgcICQoLDA0ODw==",
+      "data": "feLVtpEa5OtDjfcUIa5yohgN0RsbYqiurJfzBqBzliBs6rIFeRiH51EIjpkZVRMn",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "iv is not valid base64",
+      "params": null
+    },
+    {
+      "name": "iv8",
+      "encrypted": true,
+      "iv": "AAAAAAAAAAA=",
+      "data": "feLVtpEa5OtDjfcUIa5yohgN0RsbYqiurJfzBqBzliBs6rIFeRiH51EIjpkZVRMn",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "iv has 8 bytes instead of 16",
+      "params": null
+    },
+    {
+      "name": "iv17",
+      "encrypted": true,
+      "iv": "AAAAAAAAAAAAAAAAAAAAAAA=",
+      "data": "feLVtpEa5OtDjfcUIa5yohgN0RsbYqiurJfzBqBzliBs6rIFeRiH51EIjpkZVRMn",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "iv has 17 bytes instead of 16",
+      "params": null
+    },
+    {
+      "name": "ivNoPadding",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw",
+      "data": "feLVtpEa5OtDjfcUIa5yohgN0RsbYqiurJfzBqBzliBs6rIFeRiH51EIjpkZVRMn",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "iv is not valid base64",
+      "params": null
+    },
+    {
+      "name": "ivExtraPadding",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw====",
+      "data": "feLVtpEa5OtDjfcUIa5yohgN0RsbYqiurJfzBqBzliBs6rIFeRiH51EIjpkZVRMn",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "iv is not valid base64",
+      "params": null
+    },
+    {
+      "name": "ivTrailingBits",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODx==",
+      "data": "feLVtpEa5OtDjfcUIa5yohgN0RsbYqiurJfzBqBzliBs6rIFeRiH51EIjpkZVRMn",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"switch\":\"on\",\"relaySeparation\":1}"
+      }
+    },
+    {
+      "name": "dataEmpty",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": null
+    },
+    {
+      "name": "dataSpace",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": " ",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "decryption failed, check the deviceKey",
+      "params": null
+    },
+    {
+      "name": "dataNotBlock",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "AAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "decryption failed, check the deviceKey",
+      "params": null
+    },
+    {
+      "name": "dataNotBase64",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "abc",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not valid base64",
+      "params": null
+    },
+    {
+      "name": "plainEmpty",
+      "encrypted": false,
+      "iv": null,
+      "data": "",
+      "key": null,
+      "error": null,
+      "params": null
+    },
+    {
+      "name": "encryptedJson0",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "t376PIF9NEAxWFicdVXwxQ==",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{}"
+      }
+    },
+    {
+      "name": "plainJson0",
+      "encrypted": false,
+      "iv": null,
+      "data": "{}",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{}"
+      }
+    },
+    {
+      "name": "encryptedJson1",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "se6ky3BII8NiFWqFD70ryA==",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not a JSON object",
+      "params": null
+    },
+    {
+      "name": "plainJson1",
+      "encrypted": false,
+      "iv": null,
+      "data": "null",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not a JSON object",
+      "params": null
+    },
+    {
+      "name": "encryptedJson2",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "6yF0yrESVYEtTMWx1Yb/yA==",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not a JSON object",
+      "params": null
+    },
+    {
+      "name": "plainJson2",
+      "encrypted": false,
+      "iv": null,
+      "data": "[1]",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not a JSON object",
+      "params": null
+    },
+    {
+      "name": "encryptedJson3",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "z8WywWREQm4C0GHw7kll5w==",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not a JSON object",
+      "params": null
+    },
+    {
+      "name": "plainJson3",
+      "encrypted": false,
+      "iv": null,
+      "data": "1",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not a JSON object",
+      "params": null
+    },
+    {
+      "name": "encryptedJson4",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "XxqxgIrLhVw++scrsM86gg==",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not a JSON object",
+      "params": null
+    },
+    {
+      "name": "plainJson4",
+      "encrypted": false,
+      "iv": null,
+      "data": "\"x\"",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not a JSON object",
+      "params": null
+    },
+    {
+      "name": "encryptedJson5",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "n4APLqsvmCdartbhOOVTNg==",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not valid JSON, check the deviceKey",
+      "params": null
+    },
+    {
+      "name": "plainJson5",
+      "encrypted": false,
+      "iv": null,
+      "data": "{",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not valid JSON",
+      "params": null
+    },
+    {
+      "name": "encryptedJson6",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "4I+uMVGp07geAK2Z6TFoAw==",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not valid JSON, check the deviceKey",
+      "params": null
+    },
+    {
+      "name": "plainJson6",
+      "encrypted": false,
+      "iv": null,
+      "data": "NaN",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not valid JSON",
+      "params": null
+    },
+    {
+      "name": "encryptedJson7",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "Ful0EFg2bWQsl5g4KfvvfQ==",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not valid JSON, check the deviceKey",
+      "params": null
+    },
+    {
+      "name": "plainJson7",
+      "encrypted": false,
+      "iv": null,
+      "data": "{\"a\":NaN}",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not valid JSON",
+      "params": null
+    },
+    {
+      "name": "encryptedJson8",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "eN3B4b1cjVGF7gPzgAhn/w==",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not valid JSON, check the deviceKey",
+      "params": null
+    },
+    {
+      "name": "plainJson8",
+      "encrypted": false,
+      "iv": null,
+      "data": "{\"a\":Infinity}",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not valid JSON",
+      "params": null
+    },
+    {
+      "name": "encryptedJson9",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "rPmVLWJZ1wtOVPOeLXrARA==",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not valid JSON, check the deviceKey",
+      "params": null
+    },
+    {
+      "name": "plainJson9",
+      "encrypted": false,
+      "iv": null,
+      "data": "{\"a\":01}",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not valid JSON",
+      "params": null
+    },
+    {
+      "name": "encryptedJson10",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "1+Bq5mu2CKKmv1zdzvrXDA==",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not valid JSON, check the deviceKey",
+      "params": null
+    },
+    {
+      "name": "plainJson10",
+      "encrypted": false,
+      "iv": null,
+      "data": "{\"a\":1,}",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not valid JSON",
+      "params": null
+    },
+    {
+      "name": "encryptedJson11",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "YVZdS5O/H+ker8155caKnQ==",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not valid JSON, check the deviceKey",
+      "params": null
+    },
+    {
+      "name": "plainJson11",
+      "encrypted": false,
+      "iv": null,
+      "data": "{'a':1}",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not valid JSON",
+      "params": null
+    },
+    {
+      "name": "encryptedJson12",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "f8ZCIP3FXOKb+yS536+4pQ==",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"a\":1}"
+      }
+    },
+    {
+      "name": "plainJson12",
+      "encrypted": false,
+      "iv": null,
+      "data": "{\"a\":1} ",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"a\":1}"
+      }
+    },
+    {
+      "name": "encryptedJson13",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "7HlNKiU2dtZb+Ufe0p+bIg==",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"a\":1}"
+      }
+    },
+    {
+      "name": "plainJson13",
+      "encrypted": false,
+      "iv": null,
+      "data": " \n{\"a\":1}\t",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"a\":1}"
+      }
+    },
+    {
+      "name": "encryptedJson14",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "oplOJomuTO89Q+6Bcv15lA==",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not valid JSON, check the deviceKey",
+      "params": null
+    },
+    {
+      "name": "plainJson14",
+      "encrypted": false,
+      "iv": null,
+      "data": "{\"a\":1}\u0000",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not valid JSON",
+      "params": null
+    },
+    {
+      "name": "encryptedJson15",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "QJkx4Q1DvST8rMfN19IHxA==",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not valid JSON, check the deviceKey",
+      "params": null
+    },
+    {
+      "name": "plainJson15",
+      "encrypted": false,
+      "iv": null,
+      "data": "\uFEFF{\"a\":1}",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not valid JSON",
+      "params": null
+    },
+    {
+      "name": "encryptedJson16",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "u7NU0MRTJ2uZwfDQgs8lPXN4ram1AZgnnN5Drl8wEt8=",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not valid JSON, check the deviceKey",
+      "params": null
+    },
+    {
+      "name": "plainJson16",
+      "encrypted": false,
+      "iv": null,
+      "data": "{\"a\":1} // comment",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not valid JSON",
+      "params": null
+    },
+    {
+      "name": "encryptedJson17",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "BiOcu289GHSX61G7ExNs4A==",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"a\":1,\"a\":2}"
+      }
+    },
+    {
+      "name": "plainJson17",
+      "encrypted": false,
+      "iv": null,
+      "data": "{\"a\":1,\"a\":2}",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"a\":1,\"a\":2}"
+      }
+    },
+    {
+      "name": "encryptedJson18",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "Qwltk11MJ/IEkSVq6RvagsSzsE4fbI0uqm/EsidREo0=",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"a\":1,\"a\":2}"
+      }
+    },
+    {
+      "name": "plainJson18",
+      "encrypted": false,
+      "iv": null,
+      "data": "{\"a\":1,\"\\u0061\":2}",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"a\":1,\"a\":2}"
+      }
+    },
+    {
+      "name": "encryptedJson19",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "/yndr/KmJGG7q/ZEX2Kw2A==",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"a\":1,\"A\":2}"
+      }
+    },
+    {
+      "name": "plainJson19",
+      "encrypted": false,
+      "iv": null,
+      "data": "{\"a\":1,\"A\":2}",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"a\":1,\"A\":2}"
+      }
+    },
+    {
+      "name": "encryptedJson20",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "J+9y+eZHyS+FZqSSVM7iS7IRDoAQsdLPSYky7oCK+/La5I/ZuLyK5s21TmbiCbFCTy0i0EKCYXIRECHSkjmVxg==",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"switches\":[{\"outlet\":0,\"outlet\":1,\"switch\":\"on\"}]}"
+      }
+    },
+    {
+      "name": "plainJson20",
+      "encrypted": false,
+      "iv": null,
+      "data": "{\"switches\":[{\"outlet\":0,\"outlet\":1,\"switch\":\"on\"}]}",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"switches\":[{\"outlet\":0,\"outlet\":1,\"switch\":\"on\"}]}"
+      }
+    },
+    {
+      "name": "encryptedJson21",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "vsrs2XAGP59WESm9JsSP8Oli1yNH02OLunD+gLn7Lmw=",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "throws": "InvalidOperationException: Cannot read incomplete UTF-16 JSON text as string with missing low surrogate."
+      }
+    },
+    {
+      "name": "plainJson21",
+      "encrypted": false,
+      "iv": null,
+      "data": "{\"switch\":\"\\ud800\"}",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "throws": "InvalidOperationException: Cannot read incomplete UTF-16 JSON text as string with missing low surrogate."
+      }
+    },
+    {
+      "name": "encryptedJson22",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "/p6U6oSYyqoZRth/6kdBkg==",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "throws": "InvalidOperationException: Cannot read incomplete UTF-16 JSON text as string with missing low surrogate."
+      }
+    },
+    {
+      "name": "plainJson22",
+      "encrypted": false,
+      "iv": null,
+      "data": "{\"\\ud800\":1}",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "throws": "InvalidOperationException: Cannot read incomplete UTF-16 JSON text as string with missing low surrogate."
+      }
+    },
+    {
+      "name": "encryptedJson23",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "y4V36ZzIcARa6UQLVbjBhQoaoAUOgxaOe/d25DKXCV0=",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"a\":\"\\uD83D\\uDE00\"}"
+      }
+    },
+    {
+      "name": "plainJson23",
+      "encrypted": false,
+      "iv": null,
+      "data": "{\"a\":\"\\ud83d\\ude00\"}",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"a\":\"\\uD83D\\uDE00\"}"
+      }
+    },
+    {
+      "name": "encryptedJson24",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "dLq9r83BTbRmFLmyy+JzjVXzNpLq4OIEWKQMj06QVhBiKTesCu6wB2SS3gX3FOwR",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"a\":1e400,\"b\":-0,\"c\":1.0,\"d\":1E2,\"e\":-7.50}"
+      }
+    },
+    {
+      "name": "plainJson24",
+      "encrypted": false,
+      "iv": null,
+      "data": "{\"a\":1e400,\"b\":-0,\"c\":1.0,\"d\":1E2,\"e\":-7.50}",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"a\":1e400,\"b\":-0,\"c\":1.0,\"d\":1E2,\"e\":-7.50}"
+      }
+    },
+    {
+      "name": "encryptedJson25",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "sUdK5SyF8cv3dJbnHL65Kp88Har7T9fvbW3y/QVmIhKYQXh4DZyZD1oCO2ySc2RXdDYP+DSqZwPiKsr0hWulLacSkE3LtTXSJse8p2Kpld4zmqO+JPCXKMa6UZjubsbUtKELlHzW6ky5pj7BZvoGooSJjvvs6o0BfZ9JIPMP5zPz1YP8zunZEuEThgpv5EeV",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not a JSON object",
+      "params": null
+    },
+    {
+      "name": "plainJson25",
+      "encrypted": false,
+      "iv": null,
+      "data": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not a JSON object",
+      "params": null
+    },
+    {
+      "name": "encryptedJson26",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "sUdK5SyF8cv3dJbnHL65Kp88Har7T9fvbW3y/QVmIhKYQXh4DZyZD1oCO2ySc2RXdDYP+DSqZwPiKsr0hWulLS7hnV911A4yfRYWb9+7pPgECCfE73NRppBfx+ORnLhDF0Po7DDx/Ga6FsC4vk7p6PiJIEsv0gs9TtAdm/7QqV1Cx4LXBuejFmPXLbRlbSxA",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not valid JSON, check the deviceKey",
+      "params": null
+    },
+    {
+      "name": "plainJson26",
+      "encrypted": false,
+      "iv": null,
+      "data": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not valid JSON",
+      "params": null
+    },
+    {
+      "name": "encryptedJson27",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "kvO6jTHRj34Fn6+57ofAt1n1HlDd+vFYoo5ASef0xxYgXnkdN7sRA/I3niV3LUXat7iI7qG/o44jBcyqI/d8047S5O71O5aoB2Yz4OdxPaU=",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"a\":\"[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[\"}"
+      }
+    },
+    {
+      "name": "plainJson27",
+      "encrypted": false,
+      "iv": null,
+      "data": "{\"a\":\"[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[\"}",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"a\":\"[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[\"}"
+      }
+    },
+    {
+      "name": "encryptedJson28",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "UCZNDk6a8fSh8PZ9uqdpwA==",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"a\":\"\\u0022[[[\"}"
+      }
+    },
+    {
+      "name": "plainJson28",
+      "encrypted": false,
+      "iv": null,
+      "data": "{\"a\":\"\\\"[[[\"}",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"a\":\"\\u0022[[[\"}"
+      }
+    },
+    {
+      "name": "invalidUtf8",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "yUxS4jl3fGDNPMo2Ygd8p4y97wvBqlHrCWREAzZWQ7c=",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"switch\":\"\\uFFFD\\uFFFD\\uFFFD\"}"
+      }
+    },
+    {
+      "name": "overlong",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "9YCTwSRvrsyDlpwd1A4ZRA==",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"switch\":\"\\uFFFD\\uFFFD\"}"
+      }
+    },
+    {
+      "name": "truncatedUtf8",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "65Fm9w31yit0uE6ixENOeQ==",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": null,
+      "params": {
+        "json": "{\"switch\":\"\\uFFFD\"}"
+      }
+    },
+    {
+      "name": "bom",
+      "encrypted": true,
+      "iv": "AAECAwQFBgcICQoLDA0ODw==",
+      "data": "bgSdsuttmDHkycrxdJnW1dqjp4fUMM3B/xBd5z+LkBw=",
+      "key": "a1b2c3d4-e5f6-4711-8899-aabbccddeeff",
+      "error": "payload is not valid JSON, check the deviceKey",
+      "params": null
+    }
+  ],
+  "detector": [
+    {
+      "name": "pressesWithoutParams",
+      "steps": [
+        {
+          "seq": 1,
+          "iv": "iv",
+          "data": "payload1",
+          "params": null
+        },
+        {
+          "seq": 2,
+          "iv": "iv",
+          "data": "payload2",
+          "params": null
+        },
+        {
+          "seq": 2,
+          "iv": "iv",
+          "data": "payload2",
+          "params": null
+        },
+        {
+          "seq": 4,
+          "iv": "iv",
+          "data": "payload4",
+          "params": null
+        },
+        {
+          "seq": 3,
+          "iv": "iv",
+          "data": "payload3",
+          "params": null
+        },
+        {
+          "seq": 5,
+          "iv": "iv",
+          "data": "payload5",
+          "params": null
+        }
+      ],
+      "results": [
+        {
+          "kind": "Baseline",
+          "seq": 1,
+          "detail": null,
+          "isDetached": null,
+          "hasBaseline": true
+        },
+        {
+          "kind": "Press",
+          "seq": 2,
+          "detail": null,
+          "isDetached": null,
+          "hasBaseline": true
+        },
+        {
+          "kind": "Duplicate",
+          "seq": 2,
+          "detail": null,
+          "isDetached": null,
+          "hasBaseline": true
+        },
+        {
+          "kind": "Press",
+          "seq": 4,
+          "detail": null,
+          "isDetached": null,
+          "hasBaseline": true
+        },
+        {
+          "kind": "SequenceReset",
+          "seq": 3,
+          "detail": "seq went from 4 to 3",
+          "isDetached": null,
+          "hasBaseline": true
+        },
+        {
+          "kind": "Press",
+          "seq": 5,
+          "detail": null,
+          "isDetached": null,
+          "hasBaseline": true
+        }
+      ]
+    },
+    {
+      "name": "noSeq",
+      "steps": [
+        {
+          "seq": null,
+          "iv": "iv",
+          "data": "a",
+          "params": null
+        },
+        {
+          "seq": null,
+          "iv": "iv",
+          "data": "a",
+          "params": null
+        },
+        {
+          "seq": null,
+          "iv": null,
+          "data": "a",
+          "params": null
+        },
+        {
+          "seq": null,
+          "iv": "iv",
+          "data": "b",
+          "params": null
+        },
+        {
+          "seq": 7,
+          "iv": "iv",
+          "data": "b",
+          "params": null
+        },
+        {
+          "seq": null,
+          "iv": "iv",
+          "data": "b",
+          "params": null
+        }
+      ],
+      "results": [
+        {
+          "kind": "Baseline",
+          "seq": null,
+          "detail": null,
+          "isDetached": null,
+          "hasBaseline": true
+        },
+        {
+          "kind": "Duplicate",
+          "seq": null,
+          "detail": null,
+          "isDetached": null,
+          "hasBaseline": true
+        },
+        {
+          "kind": "Press",
+          "seq": null,
+          "detail": null,
+          "isDetached": null,
+          "hasBaseline": true
+        },
+        {
+          "kind": "Press",
+          "seq": null,
+          "detail": null,
+          "isDetached": null,
+          "hasBaseline": true
+        },
+        {
+          "kind": "Duplicate",
+          "seq": 7,
+          "detail": null,
+          "isDetached": null,
+          "hasBaseline": true
+        },
+        {
+          "kind": "Duplicate",
+          "seq": null,
+          "detail": null,
+          "isDetached": null,
+          "hasBaseline": true
+        }
+      ]
+    },
+    {
+      "name": "relayCaseOnly",
+      "steps": [
+        {
+          "seq": 1,
+          "iv": "iv",
+          "data": "payload1",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":3,\"rssi\":-70}"
+        },
+        {
+          "seq": 2,
+          "iv": "iv",
+          "data": "payload2",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"ON\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":3,\"rssi\":-71}"
+        },
+        {
+          "seq": 3,
+          "iv": "iv",
+          "data": "payload3",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"off\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":3,\"rssi\":-70}"
+        }
+      ],
+      "results": [
+        {
+          "kind": "Baseline",
+          "seq": 1,
+          "detail": null,
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "kind": "Press",
+          "seq": 2,
+          "detail": null,
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "kind": "RelayChanged",
+          "seq": 3,
+          "detail": "relay 0 ON -> off",
+          "isDetached": true,
+          "hasBaseline": true
+        }
+      ]
+    },
+    {
+      "name": "settingsCase",
+      "steps": [
+        {
+          "seq": 1,
+          "iv": "iv",
+          "data": "payload1",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":3,\"rssi\":-70}"
+        },
+        {
+          "seq": 2,
+          "iv": "iv",
+          "data": "payload2",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"ON\",\"swMode\":3,\"rssi\":-70}"
+        }
+      ],
+      "results": [
+        {
+          "kind": "Baseline",
+          "seq": 1,
+          "detail": null,
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "kind": "SettingsChanged",
+          "seq": 2,
+          "detail": "sledOnline",
+          "isDetached": true,
+          "hasBaseline": true
+        }
+      ]
+    },
+    {
+      "name": "numbersByValue",
+      "steps": [
+        {
+          "seq": 1,
+          "iv": "iv",
+          "data": "payload1",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":3,\"rssi\":-70}"
+        },
+        {
+          "seq": 2,
+          "iv": "iv",
+          "data": "payload2",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":3.0,\"rssi\":-70}"
+        },
+        {
+          "seq": 3,
+          "iv": "iv",
+          "data": "payload3",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":\"3\",\"rssi\":-70}"
+        },
+        {
+          "seq": 4,
+          "iv": "iv",
+          "data": "payload4",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":true,\"rssi\":-70}"
+        },
+        {
+          "seq": 5,
+          "iv": "iv",
+          "data": "payload5",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":1,\"rssi\":-70}"
+        },
+        {
+          "seq": 6,
+          "iv": "iv",
+          "data": "payload6",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":true,\"rssi\":-70}"
+        },
+        {
+          "seq": 7,
+          "iv": "iv",
+          "data": "payload7",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":null,\"rssi\":-70}"
+        },
+        {
+          "seq": 8,
+          "iv": "iv",
+          "data": "payload8",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":null,\"rssi\":-71}"
+        },
+        {
+          "seq": 9,
+          "iv": "iv",
+          "data": "payload9",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"rssi\":-70}"
+        },
+        {
+          "seq": 10,
+          "iv": "iv",
+          "data": "payload10",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":3,\"rssi\":-70}"
+        }
+      ],
+      "results": [
+        {
+          "kind": "Baseline",
+          "seq": 1,
+          "detail": null,
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "kind": "Press",
+          "seq": 2,
+          "detail": null,
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "kind": "SettingsChanged",
+          "seq": 3,
+          "detail": "swMode",
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "kind": "SettingsChanged",
+          "seq": 4,
+          "detail": "swMode",
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "kind": "SettingsChanged",
+          "seq": 5,
+          "detail": "swMode",
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "kind": "SettingsChanged",
+          "seq": 6,
+          "detail": "swMode",
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "kind": "SettingsChanged",
+          "seq": 7,
+          "detail": "swMode",
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "kind": "Press",
+          "seq": 8,
+          "detail": null,
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "kind": "Press",
+          "seq": 9,
+          "detail": null,
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "kind": "Press",
+          "seq": 10,
+          "detail": null,
+          "isDetached": true,
+          "hasBaseline": true
+        }
+      ]
+    },
+    {
+      "name": "separation",
+      "steps": [
+        {
+          "seq": 1,
+          "iv": "iv",
+          "data": "payload1",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":\" 1 \",\"sledOnline\":\"on\",\"swMode\":3}"
+        },
+        {
+          "seq": 2,
+          "iv": "iv",
+          "data": "payload2",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":0,\"sledOnline\":\"on\",\"swMode\":3}"
+        },
+        {
+          "seq": 3,
+          "iv": "iv",
+          "data": "payload3",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1.0,\"sledOnline\":\"on\",\"swMode\":3}"
+        }
+      ],
+      "results": [
+        {
+          "kind": "Baseline",
+          "seq": 1,
+          "detail": null,
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "kind": "SettingsChanged",
+          "seq": 2,
+          "detail": "relaySeparation",
+          "isDetached": false,
+          "hasBaseline": true
+        },
+        {
+          "kind": "SettingsChanged",
+          "seq": 3,
+          "detail": "relaySeparation",
+          "isDetached": false,
+          "hasBaseline": true
+        }
+      ]
+    },
+    {
+      "name": "outlets",
+      "steps": [
+        {
+          "seq": 1,
+          "iv": "iv",
+          "data": "payload1",
+          "params": "{\"switches\":[{\"outlet\":\"1\",\"switch\":\"on\"},{\"outlet\":\" 0\",\"switch\":\"off\"}]}"
+        },
+        {
+          "seq": 2,
+          "iv": "iv",
+          "data": "payload2",
+          "params": "{\"switches\":[{\"outlet\":\"1\",\"switch\":\"off\"},{\"outlet\":\" 0\",\"switch\":\"off\"}]}"
+        },
+        {
+          "seq": 3,
+          "iv": "iv",
+          "data": "payload3",
+          "params": "{\"switches\":[{\"switch\":\"on\"},{\"switch\":\"on\"},{\"outlet\":0,\"switch\":\"off\"}]}"
+        },
+        {
+          "seq": 4,
+          "iv": "iv",
+          "data": "payload4",
+          "params": "{\"switches\":[{\"switch\":\"on\"},{\"switch\":\"off\"},{\"outlet\":0,\"switch\":\"off\"}]}"
+        },
+        {
+          "seq": 5,
+          "iv": "iv",
+          "data": "payload5",
+          "params": "{\"switches\":[{\"outlet\":-3,\"switch\":\"on\"}],\"switch\":\"off\"}"
+        },
+        {
+          "seq": 6,
+          "iv": "iv",
+          "data": "payload6",
+          "params": "{\"switches\":[{\"outlet\":-3,\"switch\":\"off\"}],\"switch\":\"off\"}"
+        }
+      ],
+      "results": [
+        {
+          "kind": "Baseline",
+          "seq": 1,
+          "detail": null,
+          "isDetached": null,
+          "hasBaseline": true
+        },
+        {
+          "kind": "RelayChanged",
+          "seq": 2,
+          "detail": "relay 1 on -> off",
+          "isDetached": null,
+          "hasBaseline": true
+        },
+        {
+          "kind": "RelayChanged",
+          "seq": 3,
+          "detail": "relay 1 off -> on",
+          "isDetached": null,
+          "hasBaseline": true
+        },
+        {
+          "kind": "RelayChanged",
+          "seq": 4,
+          "detail": "relay 1 on -> off",
+          "isDetached": null,
+          "hasBaseline": true
+        },
+        {
+          "kind": "Press",
+          "seq": 5,
+          "detail": null,
+          "isDetached": null,
+          "hasBaseline": true
+        },
+        {
+          "kind": "RelayChanged",
+          "seq": 6,
+          "detail": "relay on -> off",
+          "isDetached": null,
+          "hasBaseline": true
+        }
+      ]
+    },
+    {
+      "name": "topLevel",
+      "steps": [
+        {
+          "seq": 1,
+          "iv": "iv",
+          "data": "payload1",
+          "params": "{\"switch\":\"on\",\"startup\":\"stay\"}"
+        },
+        {
+          "seq": 2,
+          "iv": "iv",
+          "data": "payload2",
+          "params": "{\"switch\":\"on\",\"startup\":\"on\"}"
+        },
+        {
+          "seq": 3,
+          "iv": "iv",
+          "data": "payload3",
+          "params": "{\"switch\":\"off\",\"startup\":\"on\"}"
+        },
+        {
+          "seq": 4,
+          "iv": "iv",
+          "data": "payload4",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":1}],\"switch\":true}"
+        }
+      ],
+      "results": [
+        {
+          "kind": "Baseline",
+          "seq": 1,
+          "detail": null,
+          "isDetached": null,
+          "hasBaseline": true
+        },
+        {
+          "kind": "SettingsChanged",
+          "seq": 2,
+          "detail": "startup",
+          "isDetached": null,
+          "hasBaseline": true
+        },
+        {
+          "kind": "RelayChanged",
+          "seq": 3,
+          "detail": "relay on -> off",
+          "isDetached": null,
+          "hasBaseline": true
+        },
+        {
+          "kind": "Press",
+          "seq": 4,
+          "detail": null,
+          "isDetached": null,
+          "hasBaseline": true
+        }
+      ]
+    },
+    {
+      "name": "objectsUnordered",
+      "steps": [
+        {
+          "seq": 1,
+          "iv": "iv",
+          "data": "payload1",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"configure\":[{\"outlet\":0,\"startup\":\"stay\"}]}"
+        },
+        {
+          "seq": 2,
+          "iv": "iv",
+          "data": "payload2",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"configure\":[{\"startup\":\"stay\",\"outlet\":0}]}"
+        },
+        {
+          "seq": 3,
+          "iv": "iv",
+          "data": "payload3",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"configure\":[{\"outlet\":0,\"startup\":\"on\"}]}"
+        }
+      ],
+      "results": [
+        {
+          "kind": "Baseline",
+          "seq": 1,
+          "detail": null,
+          "isDetached": null,
+          "hasBaseline": true
+        },
+        {
+          "kind": "Press",
+          "seq": 2,
+          "detail": null,
+          "isDetached": null,
+          "hasBaseline": true
+        },
+        {
+          "kind": "SettingsChanged",
+          "seq": 3,
+          "detail": "configure",
+          "isDetached": null,
+          "hasBaseline": true
+        }
+      ]
+    },
+    {
+      "name": "lateParams",
+      "steps": [
+        {
+          "seq": 1,
+          "iv": "iv",
+          "data": "payload1",
+          "params": null
+        },
+        {
+          "seq": 1,
+          "iv": "iv",
+          "data": "payload1",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":3,\"rssi\":-70}"
+        },
+        {
+          "seq": 2,
+          "iv": "iv",
+          "data": "payload2",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"off\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":3,\"rssi\":-70}"
+        }
+      ],
+      "results": [
+        {
+          "kind": "Baseline",
+          "seq": 1,
+          "detail": null,
+          "isDetached": null,
+          "hasBaseline": true
+        },
+        {
+          "kind": "Duplicate",
+          "seq": 1,
+          "detail": null,
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "kind": "RelayChanged",
+          "seq": 2,
+          "detail": "relay 0 on -> off",
+          "isDetached": true,
+          "hasBaseline": true
+        }
+      ]
+    },
+    {
+      "name": "paramsDisappear",
+      "steps": [
+        {
+          "seq": 1,
+          "iv": "iv",
+          "data": "payload1",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":3,\"rssi\":-70}"
+        },
+        {
+          "seq": 2,
+          "iv": "iv",
+          "data": "payload2",
+          "params": null
+        },
+        {
+          "seq": 3,
+          "iv": "iv",
+          "data": "payload3",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"off\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":3,\"rssi\":-70}"
+        }
+      ],
+      "results": [
+        {
+          "kind": "Baseline",
+          "seq": 1,
+          "detail": null,
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "kind": "Press",
+          "seq": 2,
+          "detail": null,
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "kind": "Press",
+          "seq": 3,
+          "detail": null,
+          "isDetached": true,
+          "hasBaseline": true
+        }
+      ]
+    },
+    {
+      "name": "duplicateTopLevel",
+      "steps": [
+        {
+          "seq": 1,
+          "iv": "iv",
+          "data": "payload1",
+          "params": "{\"relaySeparation\":1,\"relaySeparation\":1}"
+        },
+        {
+          "seq": 2,
+          "iv": "iv",
+          "data": "payload2",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":3,\"rssi\":-70}"
+        },
+        {
+          "seq": 3,
+          "iv": "iv",
+          "data": "payload3",
+          "params": "{\"relaySeparation\":1,\"relaySeparation\":1}"
+        },
+        {
+          "seq": 4,
+          "iv": "iv",
+          "data": "payload4",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":3,\"rssi\":-70}"
+        }
+      ],
+      "results": [
+        {
+          "throws": "ArgumentException: An item with the same key has already been added. Key: relaySeparation (Parameter 'key')",
+          "isDetached": null,
+          "hasBaseline": false
+        },
+        {
+          "kind": "Baseline",
+          "seq": 2,
+          "detail": null,
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "throws": "ArgumentException: An item with the same key has already been added. Key: relaySeparation (Parameter 'key')",
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "kind": "Press",
+          "seq": 4,
+          "detail": null,
+          "isDetached": true,
+          "hasBaseline": true
+        }
+      ]
+    },
+    {
+      "name": "duplicateInSwitchItem",
+      "steps": [
+        {
+          "seq": 1,
+          "iv": "iv",
+          "data": "payload1",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\",\"switch\":\"on\"}],\"relaySeparation\":1}"
+        },
+        {
+          "seq": 2,
+          "iv": "iv",
+          "data": "payload2",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":3,\"rssi\":-70}"
+        },
+        {
+          "seq": 3,
+          "iv": "iv",
+          "data": "payload3",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":3,\"rssi\":-70}"
+        }
+      ],
+      "results": [
+        {
+          "kind": "Baseline",
+          "seq": 1,
+          "detail": null,
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "throws": "ArgumentException: An item with the same key has already been added. Key: switch (Parameter 'key')",
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "kind": "Press",
+          "seq": 3,
+          "detail": null,
+          "isDetached": true,
+          "hasBaseline": true
+        }
+      ]
+    },
+    {
+      "name": "duplicateInSetting",
+      "steps": [
+        {
+          "seq": 1,
+          "iv": "iv",
+          "data": "payload1",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"configure\":[{\"outlet\":0,\"startup\":\"stay\"}]}"
+        },
+        {
+          "seq": 2,
+          "iv": "iv",
+          "data": "payload2",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"configure\":[{\"outlet\":0,\"outlet\":0,\"startup\":\"stay\"}]}"
+        },
+        {
+          "seq": 3,
+          "iv": "iv",
+          "data": "payload3",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"configure\":[{\"outlet\":0,\"startup\":\"stay\"}]}"
+        }
+      ],
+      "results": [
+        {
+          "kind": "Baseline",
+          "seq": 1,
+          "detail": null,
+          "isDetached": null,
+          "hasBaseline": true
+        },
+        {
+          "throws": "ArgumentException: An item with the same key has already been added. Key: outlet (Parameter 'key')",
+          "isDetached": null,
+          "hasBaseline": true
+        },
+        {
+          "throws": "ArgumentException: An item with the same key has already been added. Key: outlet (Parameter 'key')",
+          "isDetached": null,
+          "hasBaseline": true
+        }
+      ]
+    },
+    {
+      "name": "loneSurrogates",
+      "steps": [
+        {
+          "seq": 1,
+          "iv": "iv",
+          "data": "payload1",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":3,\"rssi\":-70}"
+        },
+        {
+          "seq": 2,
+          "iv": "iv",
+          "data": "payload2",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"\\ud800\"}]}"
+        },
+        {
+          "seq": 3,
+          "iv": "iv",
+          "data": "payload3",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":3,\"rssi\":-70}"
+        },
+        {
+          "seq": 4,
+          "iv": "iv",
+          "data": "payload4",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"sledOnline\":\"\\ud800\"}"
+        },
+        {
+          "seq": 5,
+          "iv": "iv",
+          "data": "payload5",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"sledOnline\":\"\\ud800\"}"
+        },
+        {
+          "seq": 6,
+          "iv": "iv",
+          "data": "payload6",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"sledOnline\":\"\\udc00\"}"
+        },
+        {
+          "seq": 7,
+          "iv": "iv",
+          "data": "payload7",
+          "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":3,\"rssi\":-70}"
+        },
+        {
+          "seq": 8,
+          "iv": "iv",
+          "data": "payload8",
+          "params": "{\"switches\":[{\"outlet\":\"\\ud800\",\"switch\":\"on\"}]}"
+        }
+      ],
+      "results": [
+        {
+          "kind": "Baseline",
+          "seq": 1,
+          "detail": null,
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "throws": "InvalidOperationException: Cannot read incomplete UTF-16 JSON text as string with missing low surrogate.",
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "throws": "InvalidOperationException: Cannot read incomplete UTF-16 JSON text as string with missing low surrogate.",
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "throws": "InvalidOperationException: Cannot read incomplete UTF-16 JSON text as string with missing low surrogate.",
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "throws": "InvalidOperationException: Cannot read incomplete UTF-16 JSON text as string with missing low surrogate.",
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "throws": "InvalidOperationException: Cannot read invalid UTF-16 JSON text as string. Invalid surrogate value: '0xDC00'.",
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "throws": "InvalidOperationException: Cannot read invalid UTF-16 JSON text as string. Invalid surrogate value: '0xDC00'.",
+          "isDetached": true,
+          "hasBaseline": true
+        },
+        {
+          "throws": "InvalidOperationException: Cannot read incomplete UTF-16 JSON text as string with missing low surrogate.",
+          "isDetached": true,
+          "hasBaseline": true
+        }
+      ]
+    }
+  ],
+  "summarize": [
+    {
+      "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":3,\"rssi\":-70}",
+      "summary": "relay0=on relaySeparation=1 swMode=3 rssi=-70"
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"off\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":3,\"rssi\":-70}",
+      "summary": "relay0=off relaySeparation=1 swMode=3 rssi=-70"
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"ON\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":3,\"rssi\":-71}",
+      "summary": "relay0=ON relaySeparation=1 swMode=3 rssi=-71"
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"ON\",\"swMode\":3,\"rssi\":-70}",
+      "summary": "relay0=on relaySeparation=1 swMode=3 rssi=-70"
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":3.0,\"rssi\":-70}",
+      "summary": "relay0=on relaySeparation=1 swMode=3.0 rssi=-70"
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":\"3\",\"rssi\":-70}",
+      "summary": "relay0=on relaySeparation=1 swMode=3 rssi=-70"
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":true,\"rssi\":-70}",
+      "summary": "relay0=on relaySeparation=1 swMode=true rssi=-70"
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":1,\"rssi\":-70}",
+      "summary": "relay0=on relaySeparation=1 swMode=1 rssi=-70"
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"swMode\":null,\"rssi\":-70}",
+      "summary": "relay0=on relaySeparation=1 rssi=-70"
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1,\"sledOnline\":\"on\",\"rssi\":-70}",
+      "summary": "relay0=on relaySeparation=1 rssi=-70"
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":\" 1 \",\"sledOnline\":\"on\",\"swMode\":3}",
+      "summary": "relay0=on relaySeparation= 1  swMode=3"
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":0,\"sledOnline\":\"on\",\"swMode\":3}",
+      "summary": "relay0=on relaySeparation=0 swMode=3"
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1.0,\"sledOnline\":\"on\",\"swMode\":3}",
+      "summary": "relay0=on relaySeparation=1.0 swMode=3"
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":\"1\",\"switch\":\"on\"},{\"outlet\":\" 0\",\"switch\":\"off\"}]}",
+      "summary": "relay0=off relay1=on"
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":\"1\",\"switch\":\"off\"},{\"outlet\":\" 0\",\"switch\":\"off\"}]}",
+      "summary": "relay0=off relay1=off"
+    },
+    {
+      "params": "{\"switches\":[{\"switch\":\"on\"},{\"switch\":\"on\"},{\"outlet\":0,\"switch\":\"off\"}]}",
+      "summary": "relay0=off relay1=on"
+    },
+    {
+      "params": "{\"switches\":[{\"switch\":\"on\"},{\"switch\":\"off\"},{\"outlet\":0,\"switch\":\"off\"}]}",
+      "summary": "relay0=off relay1=off"
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":-3,\"switch\":\"on\"}],\"switch\":\"off\"}",
+      "summary": "relay=on relay=off"
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":-3,\"switch\":\"off\"}],\"switch\":\"off\"}",
+      "summary": "relay=off relay=off"
+    },
+    {
+      "params": "{\"switch\":\"on\",\"startup\":\"stay\"}",
+      "summary": "relay=on"
+    },
+    {
+      "params": "{\"switch\":\"on\",\"startup\":\"on\"}",
+      "summary": "relay=on"
+    },
+    {
+      "params": "{\"switch\":\"off\",\"startup\":\"on\"}",
+      "summary": "relay=off"
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":0,\"switch\":1}],\"switch\":true}",
+      "summary": ""
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"configure\":[{\"outlet\":0,\"startup\":\"stay\"}]}",
+      "summary": "relay0=on"
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"configure\":[{\"startup\":\"stay\",\"outlet\":0}]}",
+      "summary": "relay0=on"
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"configure\":[{\"outlet\":0,\"startup\":\"on\"}]}",
+      "summary": "relay0=on"
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"configure\":[{\"outlet\":0,\"outlet\":0,\"startup\":\"stay\"}]}",
+      "summary": "relay0=on"
+    },
+    {
+      "params": "{\"relaySeparation\":1,\"relaySeparation\":1}",
+      "throws": "ArgumentException: An item with the same key has already been added. Key: relaySeparation (Parameter 'key')"
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\",\"switch\":\"on\"}],\"relaySeparation\":1}",
+      "throws": "ArgumentException: An item with the same key has already been added. Key: switch (Parameter 'key')"
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"\\ud800\"}]}",
+      "throws": "InvalidOperationException: Cannot read incomplete UTF-16 JSON text as string with missing low surrogate."
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"sledOnline\":\"\\ud800\"}",
+      "summary": "relay0=on"
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"sledOnline\":\"\\udc00\"}",
+      "summary": "relay0=on"
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":\"\\ud800\",\"switch\":\"on\"}]}",
+      "throws": "InvalidOperationException: Cannot read incomplete UTF-16 JSON text as string with missing low surrogate."
+    },
+    {
+      "params": "{\"switch\":\"on\",\"fwVersion\":\"<1.0 & ä>\",\"rssi\":-7.50,\"swMode\":true,\"triggerType\":null}",
+      "summary": "relay=on swMode=true rssi=-7.50 fwVersion=\\u003C1.0 \\u0026 \\u00E4\\u003E"
+    },
+    {
+      "params": "{\"fwVersion\":\"\\\"q\\\" \\\\ \\n\\t\\b\\f\\r\\u0001\\u007f é \uD83D\uDE00 +`'\",\"rssi\":1e5,\"swMode\":{\"a\":1},\"triggerType\":[1]}",
+      "summary": "rssi=1e5 fwVersion=\\u0022q\\u0022 \\\\ \\n\\t\\b\\f\\r\\u0001\\u007F \\u00E9 \\uD83D\\uDE00 \\u002B\\u0060\\u0027"
+    },
+    {
+      "params": "{\"fwVersion\":\"\\\"\\\"x\\\"\\\"\",\"relaySeparation\":\"\\u0022\"}",
+      "summary": "relaySeparation=\\u0022 fwVersion=\\u0022\\u0022x\\u0022\\u0022"
+    },
+    {
+      "params": "{\"fwVersion\":\"\\ud800\"}",
+      "throws": "InvalidOperationException: Cannot read incomplete UTF-16 JSON text as string with missing low surrogate."
+    },
+    {
+      "params": "{\"switches\":[{\"outlet\":2,\"switch\":\"on\"},{\"outlet\":2,\"switch\":\"off\"},{\"outlet\":1,\"switch\":\"x\"}]}",
+      "summary": "relay1=x relay2=off"
+    }
+  ],
+  "deepEquals": [
+    {
+      "left": "1",
+      "right": "1.0",
+      "equal": true
+    },
+    {
+      "left": "1",
+      "right": "1e0",
+      "equal": true
+    },
+    {
+      "left": "10",
+      "right": "1e1",
+      "equal": true
+    },
+    {
+      "left": "true",
+      "right": "1",
+      "equal": false
+    },
+    {
+      "left": "1",
+      "right": "1.0000000000000001",
+      "equal": false
+    },
+    {
+      "left": "0",
+      "right": "-0",
+      "equal": true
+    },
+    {
+      "left": "1e400",
+      "right": "1e400",
+      "equal": true
+    },
+    {
+      "left": "1e400",
+      "right": "1e401",
+      "equal": false
+    },
+    {
+      "left": "\"A\"",
+      "right": "\"\\u0041\"",
+      "equal": true
+    },
+    {
+      "left": "{\"a\":1,\"b\":2}",
+      "right": "{\"b\":2,\"a\":1}",
+      "equal": true
+    },
+    {
+      "left": "{\"a\":1}",
+      "right": "{\"a\":1,\"b\":2}",
+      "equal": false
+    },
+    {
+      "left": "{\"a\":null}",
+      "right": "{}",
+      "equal": false
+    },
+    {
+      "left": "[1,2]",
+      "right": "[2,1]",
+      "equal": false
+    },
+    {
+      "left": "[]",
+      "right": "{}",
+      "equal": false
+    },
+    {
+      "left": "null",
+      "right": "null",
+      "equal": true
+    },
+    {
+      "left": "\"a\"",
+      "right": "1",
+      "equal": false
+    },
+    {
+      "left": "{\"a\":1,\"a\":1}",
+      "right": "{\"a\":1}",
+      "throws": "ArgumentException: An item with the same key has already been added. Key: a (Parameter 'key')"
+    },
+    {
+      "left": "\"\\ud800\"",
+      "right": "\"\\ud800\"",
+      "throws": "InvalidOperationException: Cannot read incomplete UTF-16 JSON text as string with missing low surrogate."
+    },
+    {
+      "left": "\"\\ud800\"",
+      "right": "\"x\"",
+      "throws": "InvalidOperationException: Cannot read incomplete UTF-16 JSON text as string with missing low surrogate."
+    },
+    {
+      "left": "\"\\ud800x\"",
+      "right": "\"x\"",
+      "throws": "InvalidOperationException: Cannot read incomplete UTF-16 JSON text as string with missing low surrogate."
+    },
+    {
+      "left": "\"\\ud800\\ud800\"",
+      "right": "\"x\"",
+      "equal": false
+    },
+    {
+      "left": "\"x\\udc00\\ud800\"",
+      "right": "\"x\"",
+      "equal": false
+    },
+    {
+      "left": "\"x\"",
+      "right": "\"\\udfff\"",
+      "throws": "InvalidOperationException: Cannot read invalid UTF-16 JSON text as string. Invalid surrogate value: '0xDFFF'."
+    },
+    {
+      "left": "{\"\\ud800\":1,\"a\":1,\"a\":2}",
+      "right": "{}",
+      "throws": "InvalidOperationException: Cannot read incomplete UTF-16 JSON text as string with missing low surrogate."
+    },
+    {
+      "left": "{\"a\":1,\"a\":2,\"\\udc00\":1}",
+      "right": "{}",
+      "throws": "ArgumentException: An item with the same key has already been added. Key: a (Parameter 'key')"
+    }
+  ]
+}

@@ -40,17 +40,30 @@ def is_null_or_white_space(value: str | None) -> bool:
     return value is None or all(char in _WHITE_SPACE for char in value)
 
 
-def _simple_upper(char: str) -> str:
+# Where .NET's invariant uppercase mapping differs from Python's one-to-one mappings, measured on .NET 10 with invariant
+# globalization for every code point: .NET keeps U+0131 (dotless i) and U+017F (long s), which Python maps to ASCII, and
+# maps 27 Greek letters with ypogegrammeni, which Python only maps to several characters.
+_UPPER_EXCEPTIONS = {
+    "\u0131": "\u0131",
+    "\u017f": "\u017f",
+    **{chr(c): chr(c + 8) for start in (0x1F80, 0x1F90, 0x1FA0) for c in range(start, start + 8)},
+    **{chr(c): chr(c + 9) for c in (0x1FB3, 0x1FC3, 0x1FF3)},
+}
+
+
+def _upper_invariant(char: str) -> str:
+    if (exception := _UPPER_EXCEPTIONS.get(char)) is not None:
+        return exception
     upper = char.upper()
-    # .NET uses simple (one-to-one) case mappings; Python's full mappings turn 'ß' into 'SS'.
+    # .NET maps one character to one character; Python's full mappings turn 'ß' into 'SS'.
     return upper if len(upper) == 1 else char
 
 
 def fold(value: str) -> str:
-    """A key that makes ``OrdinalIgnoreCase`` comparisons plain comparisons."""
+    """``ToUpperInvariant()``, the key that makes ``OrdinalIgnoreCase`` comparisons plain comparisons."""
     if value.isascii():
         return value.upper()
-    return "".join(_simple_upper(char) for char in value)
+    return "".join(_upper_invariant(char) for char in value)
 
 
 def equals_ignore_case(left: str, right: str) -> bool:
@@ -69,10 +82,10 @@ def ends_with_ignore_case(value: str, suffix: str) -> bool:
 
 
 def lower_invariant(value: str) -> str:
-    """``string.ToLowerInvariant()``: per character, without Python's final-sigma rule or 'İ' → 'i̇'."""
+    """``string.ToLowerInvariant()``: per character, without Python's final-sigma rule, and 'İ' stays 'İ'."""
     if value.isascii():
         return value.lower()
-    return "".join("i" if char == "\u0130" else char.lower() for char in value)
+    return "".join(lower if len(lower := char.lower()) == 1 else char for char in value)
 
 
 def utf16_length(value: str) -> int:

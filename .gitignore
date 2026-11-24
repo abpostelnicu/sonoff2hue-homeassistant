@@ -22,3 +22,7 @@ sonoff2hue.yaml
 !.vscode/tasks.json
 !.vscode/extensions.json
 .idea/
+
+# Build output of the .NET fixture generator.
+tools/dotnet_oracle/bin/
+tools/dotnet_oracle/obj/
