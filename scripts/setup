@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Creates .venv with Python 3.14 and the pinned test and lint tools of requirements_test.txt, which include the
+# matching Home Assistant release. Needs uv: https://docs.astral.sh/uv/
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+uv venv --allow-existing --python 3.14 .venv
+uv pip install --python .venv/bin/python -r requirements_test.txt
+echo "Ready. Run the checks with scripts/check."

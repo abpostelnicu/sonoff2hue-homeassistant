@@ -81,6 +81,14 @@ The user's choices, made on 2026-11-23 when the plan was approved:
 - Push new commits to a branch, open a pull request and wait for the checks. Then merge by fast-forwarding `main`
   (`git push origin <sha>:main`), which keeps the commit hashes; GitHub then marks the pull request as merged.
 
+| Folder | Contents |
+|--------|----------|
+| `custom_components/sonoff2hue` | The integration |
+| `custom_components/sonoff2hue/engine` | Ports of the .NET engine, without Home Assistant imports. `text.py` holds the .NET string and number rules (trim, ordinal case-insensitive comparison, `ToLowerInvariant`, `TryParse`); `dns.py` is `Mdns/DnsMessage.cs` |
+| `tests/engine` | Tests of the engine, ported from the .NET tests. `packets.py` builds raw DNS packets and MINIR4M broadcasts (the .NET tests' `TestPackets.cs`) |
+| `scripts` | `setup` (the virtual environment) and `check` (lint, formatting, types, tests) |
+| `.github/scripts` | `check-commits.sh` (the .NET repository's, unchanged) and `test-each-commit.sh` |
+
 ## Parity with the .NET app
 
 The C# tests are ported as the executable form of this table, with recognizable names.
@@ -210,15 +218,20 @@ The eWeLink LAN protocol and the Hue API, from the .NET app's research (public s
 
 ## Verification log
 
-- 2026-11-24: bootstrap. `.github/scripts/check-commits.sh` is the .NET repository's script, unchanged.
+- 2026-11-24: bootstrap. `.github/scripts/check-commits.sh` is the .NET repository's script, unchanged. The first
+  commit holds only documents, so `scripts/check` passes from the second one on, which adds the tools and the first
+  code.
+- 2026-11-24: the DNS port (`engine/dns.py`, `engine/text.py`). The six cases of `DnsMessageTests` and three new ones
+  pass (TXT keys, unknown record types, overruns, long names, unsupported labels), and ruff, the formatter and mypy
+  (strict) find nothing.
 
 ## Status
 
-- [x] Repository created, with the license, the tooling and this memory
+- [x] Repository started: the license, this memory, the tools (`scripts/setup`, `scripts/check`) and the commit checks
 - [ ] CI (lint, tests, hassfest, HACS validation, per-commit checks) and a ruleset on `main`
 - [ ] mDNS spike on the user's Home Assistant OS: own UDP 5353 socket next to Home Assistant's zeroconf
-- [ ] Engine port with its tests: DNS, eWeLink and press detection, mDNS listener, fake Hue bridge, Hue client and
-  pairing, runner, YAML import
+- [ ] Engine port with its tests: DNS (done), eWeLink and press detection, mDNS listener, fake Hue bridge, Hue client
+  and pairing, runner, YAML import
 - [ ] Home Assistant layer: skeleton, runtime, setup and import flow, switch subentries, entities, diagnostics,
   logbook
 - [ ] Development tooling and end-to-end CI with a real Home Assistant, the fake bridge and a simulated switch

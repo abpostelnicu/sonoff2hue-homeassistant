@@ -1,0 +1,88 @@
+# Settings of the development tools only. The integration is custom_components/sonoff2hue, which Home Assistant
+# loads; it isn't a Python package of its own.
+
+[tool.ruff]
+target-version = "py314"
+line-length = 120
+extend-exclude = [".dev"]
+
+[tool.ruff.lint]
+select = [
+  "A",
+  "ASYNC",
+  "B",
+  "BLE",
+  "C4",
+  "DTZ",
+  "E",
+  "F",
+  "FLY",
+  "G",
+  "I",
+  "LOG",
+  "N",
+  "PERF",
+  "PGH",
+  "PIE",
+  "PL",
+  "PT",
+  "RET",
+  "RSE",
+  "RUF",
+  "S",
+  "SIM",
+  "SLF",
+  "T20",
+  "TRY",
+  "UP",
+  "W",
+]
+ignore = [
+  "E501",    # line length: ruff format decides, and log messages stay on one line
+  "PLR0911", # too many returns
+  "PLR0912", # too many branches
+  "PLR0913", # too many arguments
+  "PLR0915", # too many statements
+  "PLR0917", # too many positional arguments
+  "PLR2004", # magic values
+  "TRY003",  # long exception messages: they are part of the behavior this port keeps
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "SLF001"]
+"tools/**" = ["T20"]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+force-sort-within-sections = true
+known-first-party = ["custom_components", "tests", "tools"]
+
+[tool.mypy]
+python_version = "3.14"
+files = ["custom_components"]
+mypy_path = "."
+explicit_package_bases = true
+strict = true
+warn_unreachable = true
+enable_error_code = ["ignore-without-code", "redundant-self", "truthy-iterable"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+# Let Home Assistant install its httpx alias before respx is imported (pytest-homeassistant's README).
+addopts = "-p no:respx"
+filterwarnings = [
+  # Home Assistant's own code and the third-party code its test plugin loads.
+  "ignore:'asyncio.iscoroutinefunction' is deprecated:DeprecationWarning:backoff",
+  "ignore:Inheritance class HomeAssistantApplication from web.Application is discouraged:DeprecationWarning",
+]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["custom_components/sonoff2hue"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

@@ -1,0 +1,5 @@
+# Test and lint tools, pinned. pytest-homeassistant pins the matching homeassistant release: upgrade them together.
+pytest-homeassistant==2026.11.3
+pytest-cov==7.1.0
+ruff==0.17.6
+mypy==2.4.1

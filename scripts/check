@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Runs the checks that CI runs on every commit: lint, formatting, types and tests.
+# PYTHON chooses the interpreter (default: .venv/bin/python, made by scripts/setup).
+set -euo pipefail
+cd "$(dirname "$0")/.."
+python=${PYTHON:-.venv/bin/python}
+
+"$python" -m ruff check .
+"$python" -m ruff format --check .
+"$python" -m mypy
+"$python" -m pytest "$@"
