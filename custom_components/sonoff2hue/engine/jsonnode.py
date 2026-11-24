@@ -10,9 +10,13 @@ number's text. This module reproduces that. A parsed value is a ``dict``, ``list
 from collections.abc import Iterator, Mapping
 from decimal import Decimal
 from enum import Enum
+from functools import partial
 import json
 import re
-from typing import NoReturn
+from typing import Any, NoReturn
+
+from . import text as dotnet_text
+from .errors import UnexpectedError
 
 MAX_DEPTH = 64  # JsonDocumentOptions.MaxDepth's default
 
@@ -24,8 +28,13 @@ class JsonError(ValueError):
     """The text isn't valid JSON (``JsonException`` in .NET)."""
 
 
-class JsonAccessError(Exception):
-    """Reading a value that .NET can parse but not read (``ArgumentException`` or ``InvalidOperationException``)."""
+class JsonAccessError(UnexpectedError):
+    """Reading a value that .NET can parse but not read: an ``ArgumentException`` for a duplicate key, an
+    ``InvalidOperationException`` for a lone surrogate."""
+
+    def __init__(self, message: str) -> None:
+        duplicate = message.startswith("An item with the same key")
+        super().__init__("ArgumentException" if duplicate else "InvalidOperationException", message)
 
 
 class JsonNumber:
@@ -107,17 +116,37 @@ class JsonKind(Enum):
     NULL = "Null"
 
 
-def parse(text: str) -> JsonValue:
-    """``JsonNode.Parse``; raises :class:`JsonError` for text that isn't valid JSON."""
-    if _depth(text) > MAX_DEPTH:
+class CaseInsensitiveObject(dict[str, "JsonValue"]):
+    """An object whose properties are found without regard to case (``OrdinalIgnoreCase``), as in a ``JsonObject`` that
+    ``JsonSerializer`` made with ``JsonSerializerDefaults.Web``."""
+
+    def __init__(self, pairs: Any = ()) -> None:
+        super().__init__(pairs)
+        self._folded = {dotnet_text.fold(key): key for key in self}
+
+    def __getitem__(self, key: str) -> JsonValue:
+        return super().__getitem__(self._folded[dotnet_text.fold(key)])
+
+    def get(self, key: str, default: Any = None) -> Any:
+        actual = self._folded.get(dotnet_text.fold(key))
+        return default if actual is None else super().__getitem__(actual)
+
+    def __contains__(self, key: object) -> bool:
+        return isinstance(key, str) and dotnet_text.fold(key) in self._folded
+
+
+def parse(text: str, *, case_insensitive: bool = False) -> JsonValue:
+    """``JsonNode.Parse``, or with ``case_insensitive`` ``JsonSerializer.Deserialize<JsonNode>`` with
+    ``JsonSerializerDefaults.Web``; raises :class:`JsonError` for text that isn't valid JSON."""
+    if nesting_depth(text) > MAX_DEPTH:
         raise JsonError(f"The maximum configured depth of {MAX_DEPTH} has been exceeded.")
     try:
         value = json.loads(
             text,
             parse_float=JsonNumber,
             parse_int=JsonNumber,
-            parse_constant=_reject_constant,
-            object_pairs_hook=_object,
+            parse_constant=reject_constant,
+            object_pairs_hook=partial(_object, case_insensitive=case_insensitive),
         )
     except ValueError as err:  # JSONDecodeError, or a rejected constant
         raise JsonError(str(err)) from err
@@ -204,19 +233,25 @@ def to_json_string(value: str | BrokenString | JsonNumber | bool) -> str:
             return '"' + _escape(value) + '"'
 
 
-def _reject_constant(name: str) -> NoReturn:
+def reject_constant(name: str) -> NoReturn:
+    """For ``json.loads``'s ``parse_constant``: .NET rejects ``NaN`` and ``Infinity``."""
     raise ValueError(f"'{name[0]}' is an invalid start of a value.")
 
 
-def _object(pairs: list[tuple[str, JsonValue]]) -> dict[str, JsonValue] | BrokenObject:
+def _object(
+    pairs: list[tuple[str, JsonValue]], *, case_insensitive: bool = False
+) -> dict[str, JsonValue] | BrokenObject:
     result: dict[str, JsonValue] = {}
+    seen: set[str] = set()
     for key, value in pairs:
-        if key in result:
+        folded = dotnet_text.fold(key) if case_insensitive else key
+        if folded in seen:
             return BrokenObject(f"An item with the same key has already been added. Key: {key} (Parameter 'key')")
         if _LONE_SURROGATE.search(key):
             return BrokenObject(_surrogate_error(key))
+        seen.add(folded)
         result[key] = value
-    return result
+    return CaseInsensitiveObject(result) if case_insensitive else result
 
 
 def _surrogate_error(value: str) -> str:
@@ -231,6 +266,8 @@ def _mark_broken_strings(value: JsonValue) -> JsonValue:
     match value:
         case str() if _LONE_SURROGATE.search(value):
             return BrokenString(value)
+        case CaseInsensitiveObject():
+            return CaseInsensitiveObject({key: _mark_broken_strings(item) for key, item in dict.items(value)})
         case dict():
             return {key: _mark_broken_strings(item) for key, item in value.items()}
         case list():
@@ -239,7 +276,7 @@ def _mark_broken_strings(value: JsonValue) -> JsonValue:
             return value
 
 
-def _depth(text: str) -> int:
+def nesting_depth(text: str) -> int:
     """The deepest nesting of objects and arrays, outside strings."""
     depth = deepest = 0
     in_string = escaped = False

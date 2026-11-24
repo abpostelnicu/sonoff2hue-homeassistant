@@ -4012,5 +4012,5752 @@
       "right": "{}",
       "throws": "ArgumentException: An item with the same key has already been added. Key: a (Parameter 'key')"
     }
-  ]
+  ],
+  "bridgeAddress": [
+    {
+      "address": "192.168.1.20",
+      "uri": "https://192.168.1.20/",
+      "host": "192.168.1.20",
+      "port": 443,
+      "idnHost": "192.168.1.20"
+    },
+    {
+      "address": " 192.168.1.20 ",
+      "uri": "https://192.168.1.20/",
+      "host": "192.168.1.20",
+      "port": 443,
+      "idnHost": "192.168.1.20"
+    },
+    {
+      "address": "127.0.0.1:8443",
+      "uri": "https://127.0.0.1:8443/",
+      "host": "127.0.0.1",
+      "port": 8443,
+      "idnHost": "127.0.0.1"
+    },
+    {
+      "address": "bridge.local",
+      "uri": "https://bridge.local/",
+      "host": "bridge.local",
+      "port": 443,
+      "idnHost": "bridge.local"
+    },
+    {
+      "address": "Bridge.Local:443",
+      "uri": "https://bridge.local/",
+      "host": "bridge.local",
+      "port": 443,
+      "idnHost": "bridge.local"
+    },
+    {
+      "address": "fe80::1",
+      "uri": "https://[fe80::1]/",
+      "host": "[fe80::1]",
+      "port": 443,
+      "idnHost": "fe80::1"
+    },
+    {
+      "address": "[fe80::1]:8443",
+      "uri": "https://[fe80::1]:8443/",
+      "host": "[fe80::1]",
+      "port": 8443,
+      "idnHost": "fe80::1"
+    },
+    {
+      "address": "not a host",
+      "error": "'not a host' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "192.168.1.20/api",
+      "error": "'192.168.1.20/api' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "https://192.168.1.20",
+      "error": "'https://192.168.1.20' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "user@192.168.1.20",
+      "error": "'user@192.168.1.20' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "192.168.1.20:99999",
+      "error": "'192.168.1.20:99999' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "192.168.1.20?debug=1",
+      "error": "'192.168.1.20?debug=1' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "192.168.1.20#top",
+      "error": "'192.168.1.20#top' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "[fe80::1",
+      "error": "'[fe80::1' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": null,
+      "error": "The Hue bridge address is empty."
+    },
+    {
+      "address": "",
+      "error": "The Hue bridge address is empty."
+    },
+    {
+      "address": "   ",
+      "error": "The Hue bridge address is empty."
+    },
+    {
+      "address": "192.168.1",
+      "uri": "https://192.168.0.1/",
+      "host": "192.168.0.1",
+      "port": 443,
+      "idnHost": "192.168.0.1"
+    },
+    {
+      "address": "192.168",
+      "uri": "https://192.0.0.168/",
+      "host": "192.0.0.168",
+      "port": 443,
+      "idnHost": "192.0.0.168"
+    },
+    {
+      "address": "3232235796",
+      "uri": "https://192.168.1.20/",
+      "host": "192.168.1.20",
+      "port": 443,
+      "idnHost": "192.168.1.20"
+    },
+    {
+      "address": "0x7f.1",
+      "uri": "https://127.0.0.1/",
+      "host": "127.0.0.1",
+      "port": 443,
+      "idnHost": "127.0.0.1"
+    },
+    {
+      "address": "0177.0.0.1",
+      "uri": "https://127.0.0.1/",
+      "host": "127.0.0.1",
+      "port": 443,
+      "idnHost": "127.0.0.1"
+    },
+    {
+      "address": "0x7F000001",
+      "uri": "https://127.0.0.1/",
+      "host": "127.0.0.1",
+      "port": 443,
+      "idnHost": "127.0.0.1"
+    },
+    {
+      "address": "123",
+      "uri": "https://0.0.0.123/",
+      "host": "0.0.0.123",
+      "port": 443,
+      "idnHost": "0.0.0.123"
+    },
+    {
+      "address": "0",
+      "uri": "https://0.0.0.0/",
+      "host": "0.0.0.0",
+      "port": 443,
+      "idnHost": "0.0.0.0"
+    },
+    {
+      "address": "256.1.1.1",
+      "uri": "https://256.1.1.1/",
+      "host": "256.1.1.1",
+      "port": 443,
+      "idnHost": "256.1.1.1"
+    },
+    {
+      "address": "1.2.3.4.5",
+      "uri": "https://1.2.3.4.5/",
+      "host": "1.2.3.4.5",
+      "port": 443,
+      "idnHost": "1.2.3.4.5"
+    },
+    {
+      "address": "192.168.1.20.",
+      "uri": "https://192.168.1.20./",
+      "host": "192.168.1.20.",
+      "port": 443,
+      "idnHost": "192.168.1.20."
+    },
+    {
+      "address": "1.2.3.",
+      "uri": "https://1.2.3./",
+      "host": "1.2.3.",
+      "port": 443,
+      "idnHost": "1.2.3."
+    },
+    {
+      "address": "0x",
+      "uri": "https://0x/",
+      "host": "0x",
+      "port": 443,
+      "idnHost": "0x"
+    },
+    {
+      "address": "0x.0x.0x.0x",
+      "uri": "https://0x.0x.0x.0x/",
+      "host": "0x.0x.0x.0x",
+      "port": 443,
+      "idnHost": "0x.0x.0x.0x"
+    },
+    {
+      "address": "08.1.1.1",
+      "uri": "https://08.1.1.1/",
+      "host": "08.1.1.1",
+      "port": 443,
+      "idnHost": "08.1.1.1"
+    },
+    {
+      "address": "1.2.3.0400",
+      "uri": "https://1.2.3.0400/",
+      "host": "1.2.3.0400",
+      "port": 443,
+      "idnHost": "1.2.3.0400"
+    },
+    {
+      "address": "1.2.3.0377",
+      "uri": "https://1.2.3.255/",
+      "host": "1.2.3.255",
+      "port": 443,
+      "idnHost": "1.2.3.255"
+    },
+    {
+      "address": "4294967295",
+      "uri": "https://255.255.255.255/",
+      "host": "255.255.255.255",
+      "port": 443,
+      "idnHost": "255.255.255.255"
+    },
+    {
+      "address": "4294967296",
+      "uri": "https://4294967296/",
+      "host": "4294967296",
+      "port": 443,
+      "idnHost": "4294967296"
+    },
+    {
+      "address": "1.16777215",
+      "uri": "https://1.255.255.255/",
+      "host": "1.255.255.255",
+      "port": 443,
+      "idnHost": "1.255.255.255"
+    },
+    {
+      "address": "1.16777216",
+      "uri": "https://1.16777216/",
+      "host": "1.16777216",
+      "port": 443,
+      "idnHost": "1.16777216"
+    },
+    {
+      "address": "1.2.65535",
+      "uri": "https://1.2.255.255/",
+      "host": "1.2.255.255",
+      "port": 443,
+      "idnHost": "1.2.255.255"
+    },
+    {
+      "address": "1.2.65536",
+      "uri": "https://1.2.65536/",
+      "host": "1.2.65536",
+      "port": 443,
+      "idnHost": "1.2.65536"
+    },
+    {
+      "address": "0xFFFFFFFF",
+      "uri": "https://255.255.255.255/",
+      "host": "255.255.255.255",
+      "port": 443,
+      "idnHost": "255.255.255.255"
+    },
+    {
+      "address": "0x100000000",
+      "uri": "https://0x100000000/",
+      "host": "0x100000000",
+      "port": 443,
+      "idnHost": "0x100000000"
+    },
+    {
+      "address": "00000000000000000001.1.1.1",
+      "uri": "https://1.1.1.1/",
+      "host": "1.1.1.1",
+      "port": 443,
+      "idnHost": "1.1.1.1"
+    },
+    {
+      "address": "1..1.1",
+      "error": "'1..1.1' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "+1.1.1.1",
+      "error": "'+1.1.1.1' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "١.1.1.1",
+      "uri": "https://١.1.1.1/",
+      "host": "١.1.1.1",
+      "port": 443,
+      "idnHost": "xn--9hb.1.1.1"
+    },
+    {
+      "address": "192.168.1.20:",
+      "uri": "https://192.168.1.20/",
+      "host": "192.168.1.20",
+      "port": 443,
+      "idnHost": "192.168.1.20"
+    },
+    {
+      "address": "192.168.1.20:0",
+      "uri": "https://192.168.1.20:0/",
+      "host": "192.168.1.20",
+      "port": 0,
+      "idnHost": "192.168.1.20"
+    },
+    {
+      "address": "192.168.1.20:065535",
+      "uri": "https://192.168.1.20:65535/",
+      "host": "192.168.1.20",
+      "port": 65535,
+      "idnHost": "192.168.1.20"
+    },
+    {
+      "address": "192.168.1.20:00000000000000000080",
+      "uri": "https://192.168.1.20:80/",
+      "host": "192.168.1.20",
+      "port": 80,
+      "idnHost": "192.168.1.20"
+    },
+    {
+      "address": "192.168.1.20:+1",
+      "error": "'192.168.1.20:+1' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "192.168.1.20:65535",
+      "uri": "https://192.168.1.20:65535/",
+      "host": "192.168.1.20",
+      "port": 65535,
+      "idnHost": "192.168.1.20"
+    },
+    {
+      "address": "192.168.1.20:65536",
+      "error": "'192.168.1.20:65536' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "192.168.1.20: 80",
+      "error": "'192.168.1.20: 80' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "192.168.1.20 :80",
+      "error": "'192.168.1.20 :80' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "192.168.1.20:٨٠",
+      "error": "'192.168.1.20:٨٠' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge:80:80",
+      "error": "'bridge:80:80' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge:abc",
+      "error": "'bridge:abc' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": ":80",
+      "error": "':80' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": ":",
+      "error": "':' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "BRIDGE",
+      "uri": "https://bridge/",
+      "host": "bridge",
+      "port": 443,
+      "idnHost": "bridge"
+    },
+    {
+      "address": "bridge_1.local",
+      "uri": "https://bridge_1.local/",
+      "host": "bridge_1.local",
+      "port": 443,
+      "idnHost": "bridge_1.local"
+    },
+    {
+      "address": "_bridge",
+      "uri": "https://_bridge/",
+      "host": "_bridge",
+      "port": 443,
+      "idnHost": "_bridge"
+    },
+    {
+      "address": "-bridge.local",
+      "uri": "https://-bridge.local/",
+      "host": "-bridge.local",
+      "port": 443,
+      "idnHost": "-bridge.local"
+    },
+    {
+      "address": "bridge-.local",
+      "uri": "https://bridge-.local/",
+      "host": "bridge-.local",
+      "port": 443,
+      "idnHost": "bridge-.local"
+    },
+    {
+      "address": "bridge..local",
+      "error": "'bridge..local' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": ".bridge",
+      "error": "'.bridge' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge.local.",
+      "uri": "https://bridge.local./",
+      "host": "bridge.local.",
+      "port": 443,
+      "idnHost": "bridge.local."
+    },
+    {
+      "address": "bridge.local..",
+      "error": "'bridge.local..' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local",
+      "uri": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local/",
+      "host": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local",
+      "port": 443,
+      "idnHost": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local"
+    },
+    {
+      "address": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local",
+      "uri": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local/",
+      "host": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local",
+      "port": 443,
+      "idnHost": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local"
+    },
+    {
+      "address": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uri": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/",
+      "host": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "port": 443,
+      "idnHost": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "address": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uri": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/",
+      "host": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "port": 443,
+      "idnHost": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "address": "1.2.3.a",
+      "uri": "https://1.2.3.a/",
+      "host": "1.2.3.a",
+      "port": 443,
+      "idnHost": "1.2.3.a"
+    },
+    {
+      "address": "1a.2.3.4",
+      "uri": "https://1a.2.3.4/",
+      "host": "1a.2.3.4",
+      "port": 443,
+      "idnHost": "1a.2.3.4"
+    },
+    {
+      "address": "0x1g.1.1.1",
+      "uri": "https://0x1g.1.1.1/",
+      "host": "0x1g.1.1.1",
+      "port": 443,
+      "idnHost": "0x1g.1.1.1"
+    },
+    {
+      "address": "bridge%1",
+      "error": "'bridge%1' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge!",
+      "error": "'bridge!' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge$",
+      "error": "'bridge$' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge=1",
+      "error": "'bridge=1' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge,1",
+      "error": "'bridge,1' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge;1",
+      "error": "'bridge;1' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge'1",
+      "error": "'bridge'1' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge(1)",
+      "error": "'bridge(1)' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge~1",
+      "error": "'bridge~1' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge&1",
+      "error": "'bridge&1' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge*1",
+      "error": "'bridge*1' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge+1",
+      "error": "'bridge+1' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge\"1",
+      "error": "'bridge\"1' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge<1>",
+      "error": "'bridge<1>' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge\\1",
+      "error": "'bridge\\1' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge^1",
+      "error": "'bridge^1' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge{1}",
+      "error": "'bridge{1}' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge|1",
+      "error": "'bridge|1' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge`1",
+      "error": "'bridge`1' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge\t1",
+      "error": "'bridge\t1' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bri dge",
+      "error": "'bri dge' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge#",
+      "error": "'bridge#' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge?",
+      "error": "'bridge?' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge/",
+      "error": "'bridge/' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "@bridge",
+      "uri": "https://@bridge/",
+      "host": "bridge",
+      "port": 443,
+      "idnHost": "bridge"
+    },
+    {
+      "address": "bridge@",
+      "error": "'bridge@' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "user:pass@bridge",
+      "error": "'user:pass@bridge' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "[",
+      "error": "'[' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "]",
+      "error": "']' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge%20x",
+      "error": "'bridge%20x' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "%41bridge",
+      "error": "'%41bridge' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge%2Elocal",
+      "error": "'bridge%2Elocal' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge\u0000",
+      "error": "'bridge\u0000' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge\u007F",
+      "error": "'bridge\u007F' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "::1",
+      "uri": "https://[::1]/",
+      "host": "[::1]",
+      "port": 443,
+      "idnHost": "::1"
+    },
+    {
+      "address": "[::1]",
+      "uri": "https://[::1]/",
+      "host": "[::1]",
+      "port": 443,
+      "idnHost": "::1"
+    },
+    {
+      "address": "[::1]:443",
+      "uri": "https://[::1]/",
+      "host": "[::1]",
+      "port": 443,
+      "idnHost": "::1"
+    },
+    {
+      "address": "FE80::1",
+      "uri": "https://[fe80::1]/",
+      "host": "[fe80::1]",
+      "port": 443,
+      "idnHost": "fe80::1"
+    },
+    {
+      "address": "fe80:0:0:0:0:0:0:1",
+      "uri": "https://[fe80::1]/",
+      "host": "[fe80::1]",
+      "port": 443,
+      "idnHost": "fe80::1"
+    },
+    {
+      "address": "fe80:0000:0000:0000:0000:0000:0000:0001",
+      "uri": "https://[fe80::1]/",
+      "host": "[fe80::1]",
+      "port": 443,
+      "idnHost": "fe80::1"
+    },
+    {
+      "address": "2001:db8:0:0:1:0:0:1",
+      "uri": "https://[2001:db8::1:0:0:1]/",
+      "host": "[2001:db8::1:0:0:1]",
+      "port": 443,
+      "idnHost": "2001:db8::1:0:0:1"
+    },
+    {
+      "address": "fe80::1%eth0",
+      "uri": "https://[fe80::1]/",
+      "host": "[fe80::1]",
+      "port": 443,
+      "idnHost": "fe80::1%eth0"
+    },
+    {
+      "address": "[fe80::1%eth0]:8443",
+      "uri": "https://[fe80::1]:8443/",
+      "host": "[fe80::1]",
+      "port": 8443,
+      "idnHost": "fe80::1%eth0"
+    },
+    {
+      "address": "[fe80::1%25eth0]",
+      "uri": "https://[fe80::1]/",
+      "host": "[fe80::1]",
+      "port": 443,
+      "idnHost": "fe80::1%25eth0"
+    },
+    {
+      "address": "fe80::1%",
+      "uri": "https://[fe80::1]/",
+      "host": "[fe80::1]",
+      "port": 443,
+      "idnHost": "fe80::1%"
+    },
+    {
+      "address": "fe80::1%1",
+      "uri": "https://[fe80::1]/",
+      "host": "[fe80::1]",
+      "port": 443,
+      "idnHost": "fe80::1%1"
+    },
+    {
+      "address": "::ffff:192.168.1.20",
+      "uri": "https://[::ffff:192.168.1.20]/",
+      "host": "[::ffff:192.168.1.20]",
+      "port": 443,
+      "idnHost": "::ffff:192.168.1.20"
+    },
+    {
+      "address": "[::ffff:192.168.1.20]",
+      "uri": "https://[::ffff:192.168.1.20]/",
+      "host": "[::ffff:192.168.1.20]",
+      "port": 443,
+      "idnHost": "::ffff:192.168.1.20"
+    },
+    {
+      "address": "::192.168.1.20",
+      "uri": "https://[::192.168.1.20]/",
+      "host": "[::192.168.1.20]",
+      "port": 443,
+      "idnHost": "::192.168.1.20"
+    },
+    {
+      "address": "fe80::1::2",
+      "error": "'fe80::1::2' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "[fe80::1]x",
+      "error": "'[fe80::1]x' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "[fe80::1]:",
+      "uri": "https://[fe80::1]/",
+      "host": "[fe80::1]",
+      "port": 443,
+      "idnHost": "fe80::1"
+    },
+    {
+      "address": "[fe80::1]:99999",
+      "error": "'[fe80::1]:99999' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "[]",
+      "error": "'[]' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "[192.168.1.20]",
+      "error": "'[192.168.1.20]' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "[bridge]",
+      "error": "'[bridge]' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "[::1]]",
+      "error": "'[::1]]' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "[[::1]]",
+      "error": "'[[::1]]' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "1:2:3:4:5:6:7:8:9",
+      "error": "'1:2:3:4:5:6:7:8:9' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "1:2:3:4:5:6:7::8",
+      "error": "'1:2:3:4:5:6:7::8' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bücher.local",
+      "uri": "https://bücher.local/",
+      "host": "bücher.local",
+      "port": 443,
+      "idnHost": "xn--bcher-kva.local"
+    },
+    {
+      "address": "BÜCHER.LOCAL",
+      "uri": "https://bücher.local/",
+      "host": "bücher.local",
+      "port": 443,
+      "idnHost": "xn--bcher-kva.local"
+    },
+    {
+      "address": "xn--bcher-kva.local",
+      "uri": "https://xn--bcher-kva.local/",
+      "host": "xn--bcher-kva.local",
+      "port": 443,
+      "idnHost": "xn--bcher-kva.local"
+    },
+    {
+      "address": "straße.local",
+      "uri": "https://straße.local/",
+      "host": "straße.local",
+      "port": 443,
+      "idnHost": "xn--strae-oqa.local"
+    },
+    {
+      "address": "İstanbul.local",
+      "uri": "https://İstanbul.local/",
+      "host": "İstanbul.local",
+      "port": 443,
+      "idnHost": "xn--stanbul-ifb.local"
+    },
+    {
+      "address": "café",
+      "uri": "https://café/",
+      "host": "café",
+      "port": 443,
+      "idnHost": "xn--caf-dma"
+    },
+    {
+      "address": "bridge\u3000",
+      "uri": "https://bridge/",
+      "host": "bridge",
+      "port": 443,
+      "idnHost": "bridge"
+    },
+    {
+      "address": "\u3000bridge",
+      "uri": "https://bridge/",
+      "host": "bridge",
+      "port": 443,
+      "idnHost": "bridge"
+    },
+    {
+      "address": "brid­ge.local",
+      "uri": "https://brid­ge.local/",
+      "host": "brid­ge.local",
+      "port": 443,
+      "idnHost": "xn--bridge-eja.local"
+    },
+    {
+      "address": "ﬁ.local",
+      "uri": "https://ﬁ.local/",
+      "host": "ﬁ.local",
+      "port": 443,
+      "idnHost": "xn--jm6c.local"
+    },
+    {
+      "address": "١٢٣",
+      "uri": "https://١٢٣/",
+      "host": "١٢٣",
+      "port": 443,
+      "idnHost": "xn--9hbcd"
+    },
+    {
+      "address": "bridge​.local",
+      "uri": "https://bridge​.local/",
+      "host": "bridge​.local",
+      "port": 443,
+      "idnHost": "xn--bridge-gf0c.local"
+    },
+    {
+      "address": "\uD83D\uDE00.local",
+      "uri": "https://\uD83D\uDE00.local/",
+      "host": "\uD83D\uDE00.local",
+      "port": 443,
+      "idnHost": "xn--e28h.local"
+    },
+    {
+      "address": "bridge.ｌｏｃａｌ",
+      "uri": "https://bridge.ｌｏｃａｌ/",
+      "host": "bridge.ｌｏｃａｌ",
+      "port": 443,
+      "idnHost": "bridge.xn--mi7cd0acm"
+    },
+    {
+      "address": "Σας.local",
+      "uri": "https://Σας.local/",
+      "host": "Σας.local",
+      "port": 443,
+      "idnHost": "xn--7wa2a1c.local"
+    },
+    {
+      "address": "бридж.local",
+      "uri": "https://бридж.local/",
+      "host": "бридж.local",
+      "port": 443,
+      "idnHost": "xn--90aggg3b.local"
+    },
+    {
+      "address": "xn--.local",
+      "uri": "https://xn--.local/",
+      "host": "xn--.local",
+      "port": 443,
+      "idnHost": "xn--.local"
+    },
+    {
+      "address": "xn--zz.local",
+      "uri": "https://xn--zz.local/",
+      "host": "xn--zz.local",
+      "port": 443,
+      "idnHost": "xn--zz.local"
+    },
+    {
+      "address": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé.local",
+      "uri": "https://ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé.local/",
+      "host": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé.local",
+      "port": 443,
+      "idnHost": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé.local"
+    },
+    {
+      "address": "bridge/.",
+      "uri": "https://bridge/",
+      "host": "bridge",
+      "port": 443,
+      "idnHost": "bridge"
+    },
+    {
+      "address": "bridge/..",
+      "uri": "https://bridge/",
+      "host": "bridge",
+      "port": 443,
+      "idnHost": "bridge"
+    },
+    {
+      "address": "bridge/./",
+      "error": "'bridge/./' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge/a/..",
+      "uri": "https://bridge/",
+      "host": "bridge",
+      "port": 443,
+      "idnHost": "bridge"
+    },
+    {
+      "address": "bridge/a/../",
+      "error": "'bridge/a/../' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge/%2e",
+      "uri": "https://bridge/",
+      "host": "bridge",
+      "port": 443,
+      "idnHost": "bridge"
+    },
+    {
+      "address": "bridge/%2E%2E",
+      "uri": "https://bridge/",
+      "host": "bridge",
+      "port": 443,
+      "idnHost": "bridge"
+    },
+    {
+      "address": "bridge/.%2e",
+      "uri": "https://bridge/",
+      "host": "bridge",
+      "port": 443,
+      "idnHost": "bridge"
+    },
+    {
+      "address": "bridge//",
+      "error": "'bridge//' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge/%2F",
+      "error": "'bridge/%2F' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge/./..",
+      "uri": "https://bridge/",
+      "host": "bridge",
+      "port": 443,
+      "idnHost": "bridge"
+    },
+    {
+      "address": "bridge/.\\",
+      "error": "'bridge/.\\' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge\\.",
+      "error": "'bridge\\.' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge/;",
+      "error": "'bridge/;' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge/...",
+      "error": "'bridge/...' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge/a./..",
+      "uri": "https://bridge/",
+      "host": "bridge",
+      "port": 443,
+      "idnHost": "bridge"
+    },
+    {
+      "address": "bridge/ ./",
+      "error": "'bridge/ ./' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge/%2e%2E/%2E",
+      "uri": "https://bridge/",
+      "host": "bridge",
+      "port": 443,
+      "idnHost": "bridge"
+    },
+    {
+      "address": "bridge/%252e",
+      "error": "'bridge/%252e' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "@bridge",
+      "uri": "https://@bridge/",
+      "host": "bridge",
+      "port": 443,
+      "idnHost": "bridge"
+    },
+    {
+      "address": "@@bridge",
+      "error": "'@@bridge' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "@bridge:8443",
+      "uri": "https://@bridge:8443/",
+      "host": "bridge",
+      "port": 8443,
+      "idnHost": "bridge"
+    },
+    {
+      "address": "@[::1]",
+      "uri": "https://@[::1]/",
+      "host": "[::1]",
+      "port": 443,
+      "idnHost": "::1"
+    },
+    {
+      "address": "@1.2.3.4",
+      "uri": "https://@1.2.3.4/",
+      "host": "1.2.3.4",
+      "port": 443,
+      "idnHost": "1.2.3.4"
+    },
+    {
+      "address": ":@bridge",
+      "error": "':@bridge' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "@",
+      "error": "'@' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "a@b@c",
+      "error": "'a@b@c' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "loopback",
+      "uri": "https://localhost/",
+      "host": "localhost",
+      "port": 443,
+      "idnHost": "localhost"
+    },
+    {
+      "address": "LOOPBACK",
+      "uri": "https://localhost/",
+      "host": "localhost",
+      "port": 443,
+      "idnHost": "localhost"
+    },
+    {
+      "address": "localhost",
+      "uri": "https://localhost/",
+      "host": "localhost",
+      "port": 443,
+      "idnHost": "localhost"
+    },
+    {
+      "address": "LocalHost",
+      "uri": "https://localhost/",
+      "host": "localhost",
+      "port": 443,
+      "idnHost": "localhost"
+    },
+    {
+      "address": "Loopback.local",
+      "uri": "https://loopback.local/",
+      "host": "loopback.local",
+      "port": 443,
+      "idnHost": "loopback.local"
+    },
+    {
+      "address": "localhost.",
+      "uri": "https://localhost./",
+      "host": "localhost.",
+      "port": 443,
+      "idnHost": "localhost."
+    },
+    {
+      "address": "1.2.65536:80",
+      "uri": "https://1.2.65536:80/",
+      "host": "1.2.65536",
+      "port": 80,
+      "idnHost": "1.2.65536"
+    },
+    {
+      "address": "1.2.3.4x",
+      "uri": "https://1.2.3.4x/",
+      "host": "1.2.3.4x",
+      "port": 443,
+      "idnHost": "1.2.3.4x"
+    },
+    {
+      "address": "0x7f.0x0.0x0.0x1",
+      "uri": "https://127.0.0.1/",
+      "host": "127.0.0.1",
+      "port": 443,
+      "idnHost": "127.0.0.1"
+    },
+    {
+      "address": "0X7F.1",
+      "uri": "https://127.0.0.1/",
+      "host": "127.0.0.1",
+      "port": 443,
+      "idnHost": "127.0.0.1"
+    },
+    {
+      "address": "01.02.03.04",
+      "uri": "https://1.2.3.4/",
+      "host": "1.2.3.4",
+      "port": 443,
+      "idnHost": "1.2.3.4"
+    },
+    {
+      "address": "255.255.255.255",
+      "uri": "https://255.255.255.255/",
+      "host": "255.255.255.255",
+      "port": 443,
+      "idnHost": "255.255.255.255"
+    },
+    {
+      "address": "1.2.3.4.",
+      "uri": "https://1.2.3.4./",
+      "host": "1.2.3.4.",
+      "port": 443,
+      "idnHost": "1.2.3.4."
+    },
+    {
+      "address": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.b",
+      "uri": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.b/",
+      "host": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.b",
+      "port": 443,
+      "idnHost": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.b"
+    },
+    {
+      "address": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.b",
+      "uri": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.b/",
+      "host": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.b",
+      "port": 443,
+      "idnHost": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.b"
+    },
+    {
+      "address": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.b",
+      "error": "'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.b' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "a-b_c.d_e-f",
+      "uri": "https://a-b_c.d_e-f/",
+      "host": "a-b_c.d_e-f",
+      "port": 443,
+      "idnHost": "a-b_c.d_e-f"
+    },
+    {
+      "address": "a.-b.c",
+      "uri": "https://a.-b.c/",
+      "host": "a.-b.c",
+      "port": 443,
+      "idnHost": "a.-b.c"
+    },
+    {
+      "address": "a.b.-c",
+      "error": "'a.b.-c' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "a._b",
+      "uri": "https://a._b/",
+      "host": "a._b",
+      "port": 443,
+      "idnHost": "a._b"
+    },
+    {
+      "address": "1-a.local",
+      "uri": "https://1-a.local/",
+      "host": "1-a.local",
+      "port": 443,
+      "idnHost": "1-a.local"
+    },
+    {
+      "address": "\u0080bridge",
+      "error": "'\u0080bridge' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bri\u00A0dge",
+      "uri": "https://bri\u00A0dge/",
+      "host": "bri\u00A0dge",
+      "port": 443,
+      "idnHost": "xn--bridge-rga"
+    },
+    {
+      "address": "[fe80::1/64]",
+      "uri": "https://[fe80::1]/",
+      "host": "[fe80::1]",
+      "port": 443,
+      "idnHost": "fe80::1"
+    },
+    {
+      "address": "[fe80::1/6]",
+      "uri": "https://[fe80::1]/",
+      "host": "[fe80::1]",
+      "port": 443,
+      "idnHost": "fe80::1"
+    },
+    {
+      "address": "[fe80::1/123]",
+      "error": "'[fe80::1/123]' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "fe80::1/64",
+      "error": "'fe80::1/64' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "[fe80::1%eth0/64]",
+      "uri": "https://[fe80::1]/",
+      "host": "[fe80::1]",
+      "port": 443,
+      "idnHost": "fe80::1%eth0"
+    },
+    {
+      "address": "[fe80::1%a b]",
+      "uri": "https://[fe80::1]/",
+      "host": "[fe80::1]",
+      "port": 443,
+      "idnHost": "fe80::1%a b"
+    },
+    {
+      "address": "fe80::1%a b",
+      "uri": "https://[fe80::1]/",
+      "host": "[fe80::1]",
+      "port": 443,
+      "idnHost": "fe80::1%a b"
+    },
+    {
+      "address": "[fe80::1%]",
+      "uri": "https://[fe80::1]/",
+      "host": "[fe80::1]",
+      "port": 443,
+      "idnHost": "fe80::1%"
+    },
+    {
+      "address": "fe80::1%%",
+      "uri": "https://[fe80::1]/",
+      "host": "[fe80::1]",
+      "port": 443,
+      "idnHost": "fe80::1%%"
+    },
+    {
+      "address": "fe80::1%eth0:8443",
+      "uri": "https://[fe80::1]/",
+      "host": "[fe80::1]",
+      "port": 443,
+      "idnHost": "fe80::1%eth0:8443"
+    },
+    {
+      "address": "[fe80::1%eth0]",
+      "uri": "https://[fe80::1]/",
+      "host": "[fe80::1]",
+      "port": 443,
+      "idnHost": "fe80::1%eth0"
+    },
+    {
+      "address": "[fe80::1%25]",
+      "uri": "https://[fe80::1]/",
+      "host": "[fe80::1]",
+      "port": 443,
+      "idnHost": "fe80::1%25"
+    },
+    {
+      "address": "[::1.2.3.04]",
+      "uri": "https://[::1.2.3.4]/",
+      "host": "[::1.2.3.4]",
+      "port": 443,
+      "idnHost": "::1.2.3.4"
+    },
+    {
+      "address": "::1.2.3.04",
+      "uri": "https://[::1.2.3.4]/",
+      "host": "[::1.2.3.4]",
+      "port": 443,
+      "idnHost": "::1.2.3.4"
+    },
+    {
+      "address": "[::1.2.3.4]",
+      "uri": "https://[::1.2.3.4]/",
+      "host": "[::1.2.3.4]",
+      "port": 443,
+      "idnHost": "::1.2.3.4"
+    },
+    {
+      "address": "::1.2.3.4",
+      "uri": "https://[::1.2.3.4]/",
+      "host": "[::1.2.3.4]",
+      "port": 443,
+      "idnHost": "::1.2.3.4"
+    },
+    {
+      "address": "[1.2.3.4]",
+      "error": "'[1.2.3.4]' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "fe80::5efe:192.168.1.1",
+      "uri": "https://[fe80::5efe:192.168.1.1]/",
+      "host": "[fe80::5efe:192.168.1.1]",
+      "port": 443,
+      "idnHost": "fe80::5efe:192.168.1.1"
+    },
+    {
+      "address": "::0.0.1.2",
+      "uri": "https://[::102]/",
+      "host": "[::102]",
+      "port": 443,
+      "idnHost": "::102"
+    },
+    {
+      "address": "::ffff:0:1",
+      "uri": "https://[::ffff:0:1]/",
+      "host": "[::ffff:0:1]",
+      "port": 443,
+      "idnHost": "::ffff:0:1"
+    },
+    {
+      "address": "1::",
+      "uri": "https://[1::]/",
+      "host": "[1::]",
+      "port": 443,
+      "idnHost": "1::"
+    },
+    {
+      "address": "::",
+      "uri": "https://[::]/",
+      "host": "[::]",
+      "port": 443,
+      "idnHost": "::"
+    },
+    {
+      "address": "[::]",
+      "uri": "https://[::]/",
+      "host": "[::]",
+      "port": 443,
+      "idnHost": "::"
+    },
+    {
+      "address": "0:0:0:0:0:0:0:0",
+      "uri": "https://[::]/",
+      "host": "[::]",
+      "port": 443,
+      "idnHost": "::"
+    },
+    {
+      "address": "1:0:0:2:0:0:0:3",
+      "uri": "https://[1:0:0:2::3]/",
+      "host": "[1:0:0:2::3]",
+      "port": 443,
+      "idnHost": "1:0:0:2::3"
+    },
+    {
+      "address": "1:0:0:0:2:0:0:3",
+      "uri": "https://[1::2:0:0:3]/",
+      "host": "[1::2:0:0:3]",
+      "port": 443,
+      "idnHost": "1::2:0:0:3"
+    },
+    {
+      "address": "::7f00:1",
+      "uri": "https://[::127.0.0.1]/",
+      "host": "[::127.0.0.1]",
+      "port": 443,
+      "idnHost": "::127.0.0.1"
+    },
+    {
+      "address": "::ffff:7f00:1",
+      "uri": "https://[::ffff:127.0.0.1]/",
+      "host": "[::ffff:127.0.0.1]",
+      "port": 443,
+      "idnHost": "::ffff:127.0.0.1"
+    },
+    {
+      "address": "fe80::00001",
+      "error": "'fe80::00001' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": ":1::",
+      "error": "':1::' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "1:2:3:4:5:6:7::",
+      "uri": "https://[1:2:3:4:5:6:7:0]/",
+      "host": "[1:2:3:4:5:6:7:0]",
+      "port": 443,
+      "idnHost": "1:2:3:4:5:6:7:0"
+    },
+    {
+      "address": "1:2:3:4:5:6::7:8",
+      "error": "'1:2:3:4:5:6::7:8' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "::ffff:1.2.3.4.5",
+      "error": "'::ffff:1.2.3.4.5' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "[::1]:0x10",
+      "error": "'[::1]:0x10' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "[::1]:8443/",
+      "error": "'[::1]:8443/' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "[::1%é]",
+      "uri": "https://[::1]/",
+      "host": "[::1]",
+      "port": 443,
+      "idnHost": "::1%é"
+    },
+    {
+      "address": "ÀÉÎ.local",
+      "uri": "https://ÀÉÎ.local/",
+      "host": "ÀÉÎ.local",
+      "port": 443,
+      "idnHost": "xn--3basp.local"
+    },
+    {
+      "address": "ĀĒĪ.local",
+      "uri": "https://ĀĒĪ.local/",
+      "host": "ĀĒĪ.local",
+      "port": 443,
+      "idnHost": "xn--xda0b4d.local"
+    },
+    {
+      "address": "ΑΒΓ.local",
+      "uri": "https://ΑΒΓ.local/",
+      "host": "ΑΒΓ.local",
+      "port": 443,
+      "idnHost": "xn--pwacd.local"
+    },
+    {
+      "address": "AΣ.local",
+      "uri": "https://aσ.local/",
+      "host": "aσ.local",
+      "port": 443,
+      "idnHost": "xn--a-0mb.local"
+    },
+    {
+      "address": "ǅ.local",
+      "uri": "https://ǅ.local/",
+      "host": "ǅ.local",
+      "port": 443,
+      "idnHost": "xn--kja.local"
+    },
+    {
+      "address": "Ⅻ.local",
+      "uri": "https://Ⅻ.local/",
+      "host": "Ⅻ.local",
+      "port": 443,
+      "idnHost": "xn--14g.local"
+    },
+    {
+      "address": "Ａ.local",
+      "uri": "https://Ａ.local/",
+      "host": "Ａ.local",
+      "port": 443,
+      "idnHost": "xn--ph7c.local"
+    },
+    {
+      "address": "µ.local",
+      "uri": "https://µ.local/",
+      "host": "µ.local",
+      "port": 443,
+      "idnHost": "xn--sba.local"
+    },
+    {
+      "address": "ÿ.local",
+      "uri": "https://ÿ.local/",
+      "host": "ÿ.local",
+      "port": 443,
+      "idnHost": "xn--wda.local"
+    },
+    {
+      "address": "Ÿ.local",
+      "uri": "https://Ÿ.local/",
+      "host": "Ÿ.local",
+      "port": 443,
+      "idnHost": "xn--dha.local"
+    },
+    {
+      "address": "K.local",
+      "uri": "https://K.local/",
+      "host": "K.local",
+      "port": 443,
+      "idnHost": "xn--62g.local"
+    },
+    {
+      "address": "ẞ.local",
+      "uri": "https://ẞ.local/",
+      "host": "ẞ.local",
+      "port": 443,
+      "idnHost": "xn--kkg.local"
+    },
+    {
+      "address": "\uD801\uDC00.local",
+      "uri": "https://\uD801\uDC00.local/",
+      "host": "\uD801\uDC00.local",
+      "port": 443,
+      "idnHost": "xn--ci8c.local"
+    },
+    {
+      "address": "A\uD801\uDC00.local",
+      "uri": "https://a\uD801\uDC28.local/",
+      "host": "a\uD801\uDC28.local",
+      "port": 443,
+      "idnHost": "xn--a-ps2i.local"
+    },
+    {
+      "address": "bridge‎.local",
+      "uri": "https://bridge.local/",
+      "host": "bridge.local",
+      "port": 443,
+      "idnHost": "bridge.local"
+    },
+    {
+      "address": "‎bridge.local",
+      "uri": "https://bridge.local/",
+      "host": "bridge.local",
+      "port": 443,
+      "idnHost": "bridge.local"
+    },
+    {
+      "address": "bridge‮.local",
+      "uri": "https://bridge.local/",
+      "host": "bridge.local",
+      "port": 443,
+      "idnHost": "bridge.local"
+    },
+    {
+      "address": "bridge‐.local",
+      "uri": "https://bridge‐.local/",
+      "host": "bridge‐.local",
+      "port": 443,
+      "idnHost": "xn--bridge-gg0c.local"
+    },
+    {
+      "address": "café.local",
+      "uri": "https://café.local/",
+      "host": "café.local",
+      "port": 443,
+      "idnHost": "xn--cafe-yvc.local"
+    },
+    {
+      "address": "xn--bücher.local",
+      "uri": "https://xn--bücher.local/",
+      "host": "xn--bücher.local",
+      "port": 443,
+      "idnHostThrows": "UriFormatException: An invalid Unicode character by IDN standards was specified in the host."
+    },
+    {
+      "address": "XN--bücher.local",
+      "uri": "https://xn--bücher.local/",
+      "host": "xn--bücher.local",
+      "port": 443,
+      "idnHostThrows": "UriFormatException: An invalid Unicode character by IDN standards was specified in the host."
+    },
+    {
+      "address": "aא.local",
+      "uri": "https://aא.local/",
+      "host": "aא.local",
+      "port": 443,
+      "idnHostThrows": "UriFormatException: An invalid Unicode character by IDN standards was specified in the host."
+    },
+    {
+      "address": "א1.local",
+      "uri": "https://א1.local/",
+      "host": "א1.local",
+      "port": 443,
+      "idnHostThrows": "UriFormatException: An invalid Unicode character by IDN standards was specified in the host."
+    },
+    {
+      "address": "אב.local",
+      "uri": "https://אב.local/",
+      "host": "אב.local",
+      "port": 443,
+      "idnHost": "xn--4dbc.local"
+    },
+    {
+      "address": "אaב.local",
+      "uri": "https://אaב.local/",
+      "host": "אaב.local",
+      "port": 443,
+      "idnHostThrows": "UriFormatException: An invalid Unicode character by IDN standards was specified in the host."
+    },
+    {
+      "address": "١a.local",
+      "uri": "https://١a.local/",
+      "host": "١a.local",
+      "port": 443,
+      "idnHost": "xn--a-9pc.local"
+    },
+    {
+      "address": "ال.local",
+      "uri": "https://ال.local/",
+      "host": "ال.local",
+      "port": 443,
+      "idnHost": "xn--mgb2d.local"
+    },
+    {
+      "address": "。bridge",
+      "error": "'。bridge' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "bridge。local",
+      "uri": "https://bridge。local/",
+      "host": "bridge。local",
+      "port": 443,
+      "idnHost": "bridge.local"
+    },
+    {
+      "address": "bridge．local",
+      "uri": "https://bridge．local/",
+      "host": "bridge．local",
+      "port": 443,
+      "idnHost": "bridge.local"
+    },
+    {
+      "address": "bridge｡local",
+      "uri": "https://bridge｡local/",
+      "host": "bridge｡local",
+      "port": 443,
+      "idnHost": "bridge.local"
+    },
+    {
+      "address": "bridge。",
+      "uri": "https://bridge。/",
+      "host": "bridge。",
+      "port": 443,
+      "idnHost": "bridge."
+    },
+    {
+      "address": "a。。b",
+      "error": "'a。。b' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "日本語日本語日本語日本語日本語日本語日本語",
+      "uri": "https://日本語日本語日本語日本語日本語日本語日本語/",
+      "host": "日本語日本語日本語日本語日本語日本語日本語",
+      "port": 443,
+      "idnHost": "xn--wgvaaaaaa42xbabbbbb2127kcaccccc"
+    },
+    {
+      "address": "日本語日本語日本語",
+      "uri": "https://日本語日本語日本語/",
+      "host": "日本語日本語日本語",
+      "port": 443,
+      "idnHost": "xn--wgvaa02kbab8264dcac"
+    },
+    {
+      "address": "\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00",
+      "error": "'\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443."
+    },
+    {
+      "address": "\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00",
+      "uri": "https://\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00/",
+      "host": "\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00",
+      "port": 443,
+      "idnHost": "xn--e28haaaaaaaaaaaaa"
+    },
+    {
+      "address": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+      "uri": "https://éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé/",
+      "host": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+      "port": 443,
+      "idnHost": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+    },
+    {
+      "address": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+      "uri": "https://ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé/",
+      "host": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+      "port": 443,
+      "idnHostThrows": "UriFormatException: An invalid Unicode character by IDN standards was specified in the host."
+    },
+    {
+      "address": "éééééééééééééééééééé.local",
+      "uri": "https://éééééééééééééééééééé.local/",
+      "host": "éééééééééééééééééééé.local",
+      "port": 443,
+      "idnHost": "xn--9caaaaaaaaaaaaaaaaaaaa.local"
+    },
+    {
+      "address": "éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé",
+      "uri": "https://éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé/",
+      "host": "éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé.éééééééééééééééééééé",
+      "port": 443,
+      "idnHostThrows": "UriFormatException: An invalid Unicode character by IDN standards was specified in the host."
+    },
+    {
+      "address": "bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher",
+      "uri": "https://bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher/",
+      "host": "bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher.bücher",
+      "port": 443,
+      "idnHostThrows": "UriFormatException: An invalid Unicode character by IDN standards was specified in the host."
+    },
+    {
+      "address": "Bücher.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uri": "https://bücher.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/",
+      "host": "bücher.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "port": 443,
+      "idnHost": "bücher.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "pairingResponse": [
+    {
+      "status": 200,
+      "body": "[{\"success\":{\"username\":\"new-app-key\",\"clientkey\":\"00AA\"}}]",
+      "result": {
+        "status": "Paired",
+        "appKey": "new-app-key",
+        "error": null
+      }
+    },
+    {
+      "status": 200,
+      "body": "[{\"error\":{\"type\":101,\"address\":\"\",\"description\":\"link button not pressed\"}}]",
+      "result": {
+        "status": "LinkButtonNotPressed",
+        "appKey": null,
+        "error": null
+      }
+    },
+    {
+      "status": 503,
+      "body": "<html><body>busy</body></html>",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 503): <html><body>busy</body></html>"
+      }
+    },
+    {
+      "status": 200,
+      "body": "",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): (empty body)"
+      }
+    },
+    {
+      "status": 200,
+      "body": "[]",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): []"
+      }
+    },
+    {
+      "status": 200,
+      "body": "[1]",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): [1]"
+      }
+    },
+    {
+      "status": 200,
+      "body": "[{\"success\":{\"username\":42}}]",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): [{\"success\":{\"username\":42}}]"
+      }
+    },
+    {
+      "status": 503,
+      "body": "<html>\n  <body>busy</body>\n</html>",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 503): <html> <body>busy</body> </html>"
+      }
+    },
+    {
+      "status": 502,
+      "body": " ",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 502): (empty body)"
+      }
+    },
+    {
+      "status": 200,
+      "body": "[{\"error\":{\"type\":7,\"address\":\"/devicetype\",\"description\":\"invalid value for parameter, devicetype\"}}]",
+      "throws": "HueApiException: The Hue bridge refused pairing: invalid value for parameter, devicetype (error 7).",
+      "statusCode": 200
+    },
+    {
+      "status": 200,
+      "body": "[{\"error\":{\"type\":7}}]",
+      "throws": "HueApiException: The Hue bridge refused pairing: no description (error 7).",
+      "statusCode": 200
+    },
+    {
+      "status": 200,
+      "body": "[{\"error\":{\"description\":\"\"}}]",
+      "throws": "HueApiException: The Hue bridge refused pairing:  (error unknown).",
+      "statusCode": 200
+    },
+    {
+      "status": 200,
+      "body": "[{\"error\":{\"description\":\" \"}}]",
+      "throws": "HueApiException: The Hue bridge refused pairing:   (error unknown).",
+      "statusCode": 200
+    },
+    {
+      "status": 200,
+      "body": "[{\"error\":{\"type\":\"101\"}}]",
+      "throws": "HueApiException: The Hue bridge refused pairing: no description (error unknown).",
+      "statusCode": 200
+    },
+    {
+      "status": 200,
+      "body": "[{\"error\":{\"type\":101.0}}]",
+      "throws": "HueApiException: The Hue bridge refused pairing: no description (error unknown).",
+      "statusCode": 200
+    },
+    {
+      "status": 200,
+      "body": "[{\"error\":{\"type\":1.01e2}}]",
+      "throws": "HueApiException: The Hue bridge refused pairing: no description (error unknown).",
+      "statusCode": 200
+    },
+    {
+      "status": 200,
+      "body": "[{\"error\":{\"type\":2147483648}}]",
+      "throws": "HueApiException: The Hue bridge refused pairing: no description (error unknown).",
+      "statusCode": 200
+    },
+    {
+      "status": 200,
+      "body": "[{\"error\":{\"type\":-1,\"description\":null}}]",
+      "throws": "HueApiException: The Hue bridge refused pairing: no description (error -1).",
+      "statusCode": 200
+    },
+    {
+      "status": 200,
+      "body": "[{\"error\":{\"type\":101,\"type\":7}}]",
+      "throws": "ArgumentException: An item with the same key has already been added. Key: type (Parameter 'key')"
+    },
+    {
+      "status": 200,
+      "body": "[{\"error\":null}]",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): [{\"error\":null}]"
+      }
+    },
+    {
+      "status": 200,
+      "body": "[{\"error\":\"link button not pressed\"}]",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): [{\"error\":\"link button not pressed\"}]"
+      }
+    },
+    {
+      "status": 200,
+      "body": "[{\"success\":{\"username\":\"\"}}]",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): [{\"success\":{\"username\":\"\"}}]"
+      }
+    },
+    {
+      "status": 200,
+      "body": "[{\"success\":{\"username\":\" \"}}]",
+      "result": {
+        "status": "Paired",
+        "appKey": " ",
+        "error": null
+      }
+    },
+    {
+      "status": 200,
+      "body": "[{\"success\":{\"username\":null}},{\"success\":{\"username\":\"second\"}}]",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): [{\"success\":{\"username\":null}},{\"success\":{\"username\":\"second\"}}]"
+      }
+    },
+    {
+      "status": 200,
+      "body": "[{\"success\":{\"username\":\"key\"},\"error\":{\"type\":101}}]",
+      "result": {
+        "status": "Paired",
+        "appKey": "key",
+        "error": null
+      }
+    },
+    {
+      "status": 200,
+      "body": "[{\"error\":{\"type\":101},\"success\":{\"username\":\"key\"}}]",
+      "result": {
+        "status": "Paired",
+        "appKey": "key",
+        "error": null
+      }
+    },
+    {
+      "status": 200,
+      "body": "[{\"success\":{\"username\":\"a\",\"username\":\"b\"}}]",
+      "throws": "ArgumentException: An item with the same key has already been added. Key: username (Parameter 'key')"
+    },
+    {
+      "status": 200,
+      "body": "[{\"success\":{\"USERNAME\":\"key\"}}]",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): [{\"success\":{\"USERNAME\":\"key\"}}]"
+      }
+    },
+    {
+      "status": 200,
+      "body": "[{\"SUCCESS\":{\"username\":\"key\"}}]",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): [{\"SUCCESS\":{\"username\":\"key\"}}]"
+      }
+    },
+    {
+      "status": 200,
+      "body": "[{\"success\":\"key\"}]",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): [{\"success\":\"key\"}]"
+      }
+    },
+    {
+      "status": 200,
+      "body": "[{\"success\":{\"username\":\"\\ud800\"}}]",
+      "throws": "InvalidOperationException: Cannot read incomplete UTF-16 JSON text as string with missing low surrogate."
+    },
+    {
+      "status": 200,
+      "body": "[{\"success\":{\"username\":\"k\\u00e9y\"}}]",
+      "result": {
+        "status": "Paired",
+        "appKey": "kéy",
+        "error": null
+      }
+    },
+    {
+      "status": 200,
+      "body": "[{\"success\":{\"username\":\"key\"}},{\"error\":{\"type\":101}}]",
+      "result": {
+        "status": "Paired",
+        "appKey": "key",
+        "error": null
+      }
+    },
+    {
+      "status": 200,
+      "body": "[null]",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): [null]"
+      }
+    },
+    {
+      "status": 200,
+      "body": "null",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): null"
+      }
+    },
+    {
+      "status": 200,
+      "body": "{\"success\":{\"username\":\"key\"}}",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): {\"success\":{\"username\":\"key\"}}"
+      }
+    },
+    {
+      "status": 200,
+      "body": "[{\"success\":{\"username\":\"key\"}}] trailing",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): [{\"success\":{\"username\":\"key\"}}] trailing"
+      }
+    },
+    {
+      "status": 200,
+      "body": "[{\"success\":{\"username\":\"key\"}}]\u0000",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): [{\"success\":{\"username\":\"key\"}}]\u0000"
+      }
+    },
+    {
+      "status": 200,
+      "body": "[{\"success\":{\"username\":\"key\"}}]\n",
+      "result": {
+        "status": "Paired",
+        "appKey": "key",
+        "error": null
+      }
+    },
+    {
+      "status": 200,
+      "body": "[{\"success\":{\"username\":\"key\"},}]",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): [{\"success\":{\"username\":\"key\"},}]"
+      }
+    },
+    {
+      "status": 200,
+      "body": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]..."
+      }
+    },
+    {
+      "status": 200,
+      "body": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx..."
+      }
+    },
+    {
+      "status": 200,
+      "body": "a\u3000b\u001Cc\u0085d",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): a b\u001Cc d"
+      }
+    },
+    {
+      "status": 200,
+      "body": "\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): \uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00..."
+      }
+    },
+    {
+      "status": 200,
+      "body": "a\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): a\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uD83D\uDE00\uFFFD..."
+      }
+    },
+    {
+      "status": 200,
+      "body": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\uD83D\uDE00",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\uFFFD..."
+      }
+    },
+    {
+      "status": 200,
+      "body": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "status": 200,
+      "body": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa..."
+      }
+    },
+    {
+      "status": 200,
+      "body": "\t\n ",
+      "result": {
+        "status": "RequestFailed",
+        "appKey": null,
+        "error": "unexpected response (HTTP 200): (empty body)"
+      }
+    },
+    {
+      "status": 404,
+      "body": "[{\"error\":{\"type\":3,\"address\":\"/x\",\"description\":\"resource, /x, not available\"}}]",
+      "throws": "HueApiException: The Hue bridge refused pairing: resource, /x, not available (error 3).",
+      "statusCode": 404
+    },
+    {
+      "status": 207,
+      "body": "[{\"error\":{\"type\":101}}]",
+      "result": {
+        "status": "LinkButtonNotPressed",
+        "appKey": null,
+        "error": null
+      }
+    }
+  ],
+  "hueClient": [
+    {
+      "name": "lights",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"l1\",\"type\":\"light\",\"metadata\":{\"name\":\"Ceiling\"},\"on\":{\"on\":true}},{\"id\":\"l2\",\"type\":\"light\",\"metadata\":{\"name\":\"Floor lamp\"},\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "l1",
+          "Ceiling",
+          true
+        ],
+        [
+          "l2",
+          "Floor lamp",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "groups",
+      "operation": "groups",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"r1\",\"type\":\"room\",\"metadata\":{\"name\":\"Living room\"},\"services\":[{\"rid\":\"g1\",\"rtype\":\"grouped_light\"}]}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"z1\",\"type\":\"zone\",\"metadata\":{\"name\":\"Downstairs\"},\"services\":[{\"rid\":\"g2\",\"rtype\":\"grouped_light\"}]}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "r1",
+          "Living room",
+          "room",
+          "g1"
+        ],
+        [
+          "z1",
+          "Downstairs",
+          "zone",
+          "g2"
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/room",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/zone",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "lightStates",
+      "operation": "lightStates",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"l1\",\"type\":\"light\",\"metadata\":{\"name\":\"Ceiling\"},\"on\":{\"on\":true}},{\"id\":\"l2\",\"type\":\"light\",\"metadata\":{\"name\":\"Floor lamp\"},\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "l1",
+          true
+        ],
+        [
+          "l2",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "groupedLightStates",
+      "operation": "groupedLightStates",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"g1\",\"on\":{\"on\":true}},{\"id\":\"g2\",\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "g1",
+          true
+        ],
+        [
+          "g2",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/grouped_light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "ping",
+      "operation": "ping",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"b1\",\"type\":\"bridge\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": "done",
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/bridge",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "setOnGroup",
+      "operation": "setOn",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": {
+        "kind": "GroupedLight",
+        "id": "g1",
+        "on": true
+      },
+      "result": "done",
+      "requests": [
+        {
+          "method": "PUT",
+          "uri": "https://192.168.1.20/clip/v2/resource/grouped_light/g1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ]
+    },
+    {
+      "name": "setOnLightOff",
+      "operation": "setOn",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": {
+        "kind": "Light",
+        "id": "l2",
+        "on": false
+      },
+      "result": "done",
+      "requests": [
+        {
+          "method": "PUT",
+          "uri": "https://192.168.1.20/clip/v2/resource/light/l2",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":false}}"
+        }
+      ]
+    },
+    {
+      "name": "setOnEscaped",
+      "operation": "setOn",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": {
+        "kind": "Light",
+        "id": "l 1/ü?#%+~_.-",
+        "on": true
+      },
+      "result": "done",
+      "requests": [
+        {
+          "method": "PUT",
+          "uri": "https://192.168.1.20/clip/v2/resource/light/l%201%2F%C3%BC%3F%23%25%2B~_.-",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ]
+    },
+    {
+      "name": "setOnDotDot",
+      "operation": "setOn",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": {
+        "kind": "Light",
+        "id": "..",
+        "on": true
+      },
+      "result": "done",
+      "requests": [
+        {
+          "method": "PUT",
+          "uri": "https://192.168.1.20/clip/v2/resource/",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ]
+    },
+    {
+      "name": "setOnDot",
+      "operation": "setOn",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": {
+        "kind": "Light",
+        "id": ".",
+        "on": true
+      },
+      "result": "done",
+      "requests": [
+        {
+          "method": "PUT",
+          "uri": "https://192.168.1.20/clip/v2/resource/light/",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ]
+    },
+    {
+      "name": "setOnEmptyId",
+      "operation": "setOn",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": {
+        "kind": "Light",
+        "id": "",
+        "on": true
+      },
+      "result": "done",
+      "requests": [
+        {
+          "method": "PUT",
+          "uri": "https://192.168.1.20/clip/v2/resource/light/",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ]
+    },
+    {
+      "name": "setOnEmoji",
+      "operation": "setOn",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": {
+        "kind": "GroupedLight",
+        "id": "\uD83D\uDE00",
+        "on": false
+      },
+      "result": "done",
+      "requests": [
+        {
+          "method": "PUT",
+          "uri": "https://192.168.1.20/clip/v2/resource/grouped_light/%F0%9F%98%80",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":false}}"
+        }
+      ]
+    },
+    {
+      "name": "forbidden",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 403,
+          "body": "{\"errors\":[{\"description\":\"unauthorized user\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: The Hue bridge rejected the application key (unauthorized user); run 'sonoff2hue hue-pair' again.",
+      "statusCode": 403,
+      "isTransient": false,
+      "isAuthenticationError": true,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "unauthorizedNoBody",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 401,
+          "body": "",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: The Hue bridge rejected the application key; run 'sonoff2hue hue-pair' again.",
+      "statusCode": 401,
+      "isTransient": false,
+      "isAuthenticationError": true,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "forbiddenTwoErrors",
+      "operation": "setOn",
+      "answers": [
+        {
+          "status": 403,
+          "body": "{\"errors\":[{\"description\":\"a\"},{}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": {
+        "kind": "Light",
+        "id": "l1",
+        "on": true
+      },
+      "throws": "HueApiException: The Hue bridge rejected the application key (a; no description); run 'sonoff2hue hue-pair' again.",
+      "statusCode": 403,
+      "isTransient": false,
+      "isAuthenticationError": true,
+      "requests": [
+        {
+          "method": "PUT",
+          "uri": "https://192.168.1.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ]
+    },
+    {
+      "name": "busy",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 503,
+          "body": "{}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Hue bridge returned 503 Service Unavailable for GET /clip/v2/resource/light",
+      "statusCode": 503,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "busyReason",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 503,
+          "body": "",
+          "reason": "Busy",
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Hue bridge returned 503 Busy for GET /clip/v2/resource/light",
+      "statusCode": 503,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "tooMany",
+      "operation": "setOn",
+      "answers": [
+        {
+          "status": 429,
+          "body": "{\"errors\":[{\"description\":\"rate limit\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": {
+        "kind": "Light",
+        "id": "l1",
+        "on": true
+      },
+      "throws": "HueApiException: Hue bridge returned 429 Too Many Requests for PUT /clip/v2/resource/light/l1: rate limit",
+      "statusCode": 429,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "PUT",
+          "uri": "https://192.168.1.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ]
+    },
+    {
+      "name": "serverError",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 500,
+          "body": "<html>oops</html>",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Hue bridge returned 500 Internal Server Error for GET /clip/v2/resource/light",
+      "statusCode": 500,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "badGateway",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 502,
+          "body": "",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Hue bridge returned 502 Bad Gateway for GET /clip/v2/resource/light",
+      "statusCode": 502,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "gatewayTimeout",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 504,
+          "body": "",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Hue bridge returned 504 Gateway Timeout for GET /clip/v2/resource/light",
+      "statusCode": 504,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "notFound",
+      "operation": "setOn",
+      "answers": [
+        {
+          "status": 404,
+          "body": "{\"errors\":[{\"description\":\"not found\"}],\"data\":[]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": {
+        "kind": "Light",
+        "id": "l1",
+        "on": true
+      },
+      "throws": "HueApiException: Hue bridge returned 404 Not Found for PUT /clip/v2/resource/light/l1: not found",
+      "statusCode": 404,
+      "isTransient": false,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "PUT",
+          "uri": "https://192.168.1.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ]
+    },
+    {
+      "name": "unknownStatus",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 599,
+          "body": "",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Hue bridge returned 599  for GET /clip/v2/resource/light",
+      "statusCode": 599,
+      "isTransient": false,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "unknownStatusReason",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 599,
+          "body": "",
+          "reason": "Odd",
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Hue bridge returned 599 Odd for GET /clip/v2/resource/light",
+      "statusCode": 599,
+      "isTransient": false,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "redirect",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 300,
+          "body": "",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Hue bridge returned 300 Multiple Choices for GET /clip/v2/resource/light",
+      "statusCode": 300,
+      "isTransient": false,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "teapot",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 418,
+          "body": "",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Hue bridge returned 418  for GET /clip/v2/resource/light",
+      "statusCode": 418,
+      "isTransient": false,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "multiStatusPut",
+      "operation": "setOn",
+      "answers": [
+        {
+          "status": 207,
+          "body": "{\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}],\"errors\":[{\"description\":\"device (light) has communication issues, command (.on.on) may not have effect\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": {
+        "kind": "Light",
+        "id": "l1",
+        "on": true
+      },
+      "throws": "HueApiException: The Hue bridge reported errors for PUT /clip/v2/resource/light/l1: device (light) has communication issues, command (.on.on) may not have effect",
+      "statusCode": 207,
+      "isTransient": false,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "PUT",
+          "uri": "https://192.168.1.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ]
+    },
+    {
+      "name": "multiStatusGet",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 207,
+          "body": "{\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}],\"errors\":[{\"description\":\"device (light) has communication issues, command (.on.on) may not have effect\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: The Hue bridge reported errors for GET /clip/v2/resource/light: device (light) has communication issues, command (.on.on) may not have effect",
+      "statusCode": 207,
+      "isTransient": false,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "okWithErrorsGet",
+      "operation": "lightStates",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[{\"description\":\"x\"}],\"data\":[]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: The Hue bridge reported errors for GET /clip/v2/resource/light: x",
+      "statusCode": 200,
+      "isTransient": false,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "noDescription",
+      "operation": "setOn",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[{}],\"data\":[]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": {
+        "kind": "Light",
+        "id": "l1",
+        "on": false
+      },
+      "throws": "HueApiException: The Hue bridge reported errors for PUT /clip/v2/resource/light/l1: no description",
+      "statusCode": 200,
+      "isTransient": false,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "PUT",
+          "uri": "https://192.168.1.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":false}}"
+        }
+      ]
+    },
+    {
+      "name": "blankDescription",
+      "operation": "setOn",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[{\"description\":\" \\u3000\"}],\"data\":[]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": {
+        "kind": "Light",
+        "id": "l1",
+        "on": true
+      },
+      "throws": "HueApiException: The Hue bridge reported errors for PUT /clip/v2/resource/light/l1: no description",
+      "statusCode": 200,
+      "isTransient": false,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "PUT",
+          "uri": "https://192.168.1.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ]
+    },
+    {
+      "name": "twoDescriptions",
+      "operation": "setOn",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[{\"description\":\"a\"},{\"description\":\"b\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": {
+        "kind": "Light",
+        "id": "l1",
+        "on": true
+      },
+      "throws": "HueApiException: The Hue bridge reported errors for PUT /clip/v2/resource/light/l1: a; b",
+      "statusCode": 200,
+      "isTransient": false,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "PUT",
+          "uri": "https://192.168.1.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ]
+    },
+    {
+      "name": "nullError",
+      "operation": "setOn",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[null],\"data\":[]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": {
+        "kind": "Light",
+        "id": "l1",
+        "on": true
+      },
+      "throws": "NullReferenceException: Object reference not set to an instance of an object.",
+      "requests": [
+        {
+          "method": "PUT",
+          "uri": "https://192.168.1.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ]
+    },
+    {
+      "name": "errorsString",
+      "operation": "setOn",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":\"x\"}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": {
+        "kind": "Light",
+        "id": "l1",
+        "on": true
+      },
+      "result": "done",
+      "requests": [
+        {
+          "method": "PUT",
+          "uri": "https://192.168.1.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ]
+    },
+    {
+      "name": "errorsStringGet",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":\"x\",\"data\":[]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Unexpected response from the Hue bridge for 'light'.",
+      "statusCode": null,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "errorsEmpty",
+      "operation": "setOn",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": {
+        "kind": "Light",
+        "id": "l1",
+        "on": true
+      },
+      "result": "done",
+      "requests": [
+        {
+          "method": "PUT",
+          "uri": "https://192.168.1.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ]
+    },
+    {
+      "name": "plainOkPut",
+      "operation": "setOn",
+      "answers": [
+        {
+          "status": 200,
+          "body": "OK",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": {
+        "kind": "Light",
+        "id": "l1",
+        "on": true
+      },
+      "result": "done",
+      "requests": [
+        {
+          "method": "PUT",
+          "uri": "https://192.168.1.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ]
+    },
+    {
+      "name": "plainOkGet",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "OK",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Unexpected response from the Hue bridge for 'light'.",
+      "statusCode": null,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "emptyPut",
+      "operation": "setOn",
+      "answers": [
+        {
+          "status": 204,
+          "body": "",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": {
+        "kind": "Light",
+        "id": "l1",
+        "on": true
+      },
+      "result": "done",
+      "requests": [
+        {
+          "method": "PUT",
+          "uri": "https://192.168.1.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ]
+    },
+    {
+      "name": "emptyGet",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Unexpected response from the Hue bridge for 'light'.",
+      "statusCode": null,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "nullBody",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "null",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "arrayBody",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "[]",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Unexpected response from the Hue bridge for 'light'.",
+      "statusCode": null,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "dataNull",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":null}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "dataMissing",
+      "operation": "lightStates",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "dataNullItem",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[null]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "NullReferenceException: Object reference not set to an instance of an object.",
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "dataNullItemStates",
+      "operation": "lightStates",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[null]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "NullReferenceException: Object reference not set to an instance of an object.",
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "dataNotObject",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[1]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Unexpected response from the Hue bridge for 'light'.",
+      "statusCode": null,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "onString",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"l1\",\"on\":{\"on\":\"true\"}}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Unexpected response from the Hue bridge for 'light'.",
+      "statusCode": null,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "onNull",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"l1\",\"on\":{\"on\":null}}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Unexpected response from the Hue bridge for 'light'.",
+      "statusCode": null,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "onEmpty",
+      "operation": "lightStates",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"l1\",\"on\":{}}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "l1",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "onObjectNull",
+      "operation": "lightStates",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"l1\",\"on\":null}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "onNumber",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"l1\",\"on\":{\"on\":1}}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Unexpected response from the Hue bridge for 'light'.",
+      "statusCode": null,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "idNumber",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":1}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Unexpected response from the Hue bridge for 'light'.",
+      "statusCode": null,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "idNull",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":null,\"on\":{\"on\":true}}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          null,
+          null,
+          true
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "idNullStates",
+      "operation": "lightStates",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":null,\"on\":{\"on\":true}}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "ArgumentNullException: Value cannot be null. (Parameter 'key')",
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "idMissing",
+      "operation": "lightStates",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"on\":{\"on\":true}}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "",
+          true
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "idMissingLights",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"on\":{\"on\":true}}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "",
+          "",
+          true
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "caseInsensitive",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"DATA\":[{\"ID\":\"l1\",\"Metadata\":{\"NAME\":\"x\"},\"ON\":{\"ON\":true}}],\"Errors\":[]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "l1",
+          "x",
+          true
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "turkishI",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"\\u0130d\":\"l1\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "",
+          "",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "duplicateProperty",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"l1\",\"id\":\"l2\",\"on\":{\"on\":true}}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "l2",
+          "l2",
+          true
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "duplicateData",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"l1\"}],\"data\":[{\"id\":\"l2\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "l2",
+          "l2",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "duplicateIds",
+      "operation": "lightStates",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"l1\",\"on\":{\"on\":true}},{\"id\":\"L1\",\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "ArgumentException: An item with the same key has already been added. Key: L1",
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "duplicateIdsLights",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"l1\",\"on\":{\"on\":true}},{\"id\":\"L1\",\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "l1",
+          "l1",
+          true
+        ],
+        [
+          "L1",
+          "L1",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "duplicateIdsTurkish",
+      "operation": "lightStates",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"\\u0131\",\"on\":{\"on\":true}},{\"id\":\"I\",\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "ı",
+          true
+        ],
+        [
+          "I",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "metadataNull",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"l1\",\"metadata\":null}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "l1",
+          "l1",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "nameNull",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"l1\",\"metadata\":{\"name\":null}}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "l1",
+          "l1",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "nameNumber",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"l1\",\"metadata\":{\"name\":1}}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Unexpected response from the Hue bridge for 'light'.",
+      "statusCode": null,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "metadataArray",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"l1\",\"metadata\":[]}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Unexpected response from the Hue bridge for 'light'.",
+      "statusCode": null,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "twoGroupedLights",
+      "operation": "groups",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"r1\",\"services\":[{\"rid\":\"g1\",\"rtype\":\"grouped_light\"},{\"rid\":\"g2\",\"rtype\":\"grouped_light\"}]}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{\"data\":[]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "r1",
+          "r1",
+          "room",
+          "g1"
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/room",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/zone",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "rtypeCase",
+      "operation": "groups",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"r1\",\"services\":[{\"rid\":\"g1\",\"rtype\":\"GROUPED_LIGHT\"}]}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "r1",
+          "r1",
+          "room",
+          null
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/room",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/zone",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "servicesNullItem",
+      "operation": "groups",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"r1\",\"services\":[null]}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "NullReferenceException: Object reference not set to an instance of an object.",
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/room",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/zone",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "servicesNullItemLater",
+      "operation": "groups",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"r1\",\"services\":[{\"rid\":\"g1\",\"rtype\":\"grouped_light\"},null]}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "r1",
+          "r1",
+          "room",
+          "g1"
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/room",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/zone",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "serviceNoRid",
+      "operation": "groups",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"r1\",\"services\":[{\"rtype\":\"grouped_light\"}]}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "r1",
+          "r1",
+          "room",
+          ""
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/room",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/zone",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "serviceNullRid",
+      "operation": "groups",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"r1\",\"services\":[{\"rid\":null,\"rtype\":\"grouped_light\"}]}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "r1",
+          "r1",
+          "room",
+          null
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/room",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/zone",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "serviceNullRtype",
+      "operation": "groups",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"r1\",\"services\":[{\"rid\":\"g1\",\"rtype\":null}]}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "r1",
+          "r1",
+          "room",
+          null
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/room",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/zone",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "servicesNull",
+      "operation": "groups",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"r1\",\"services\":null}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "r1",
+          "r1",
+          "room",
+          null
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/room",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/zone",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "zoneFails",
+      "operation": "groups",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"r1\",\"type\":\"room\",\"metadata\":{\"name\":\"Living room\"},\"services\":[{\"rid\":\"g1\",\"rtype\":\"grouped_light\"}]}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 503,
+          "body": "",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Hue bridge returned 503 Service Unavailable for GET /clip/v2/resource/zone",
+      "statusCode": 503,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/room",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/zone",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "tooDeep",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[],\"x\":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Unexpected response from the Hue bridge for 'light'.",
+      "statusCode": null,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "deepOk",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[],\"x\":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "nan",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[],\"x\":NaN}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Unexpected response from the Hue bridge for 'light'.",
+      "statusCode": null,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "comment",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[]/* c */}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Unexpected response from the Hue bridge for 'light'.",
+      "statusCode": null,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "trailingComma",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[],}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Unexpected response from the Hue bridge for 'light'.",
+      "statusCode": null,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "trailingText",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[]} x",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Unexpected response from the Hue bridge for 'light'.",
+      "statusCode": null,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "loneSurrogateId",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"\\ud800\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Unexpected response from the Hue bridge for 'light'.",
+      "statusCode": null,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "loneSurrogateIgnored",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"l1\",\"type\":\"\\ud800\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "l1",
+          "l1",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "loneSurrogateKey",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"l1\",\"\\ud800\":1}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Unexpected response from the Hue bridge for 'light'.",
+      "statusCode": null,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "loneSurrogateNestedKey",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"l1\",\"x\":{\"\\ud800\":1}}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "l1",
+          "l1",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "loneSurrogateDescription",
+      "operation": "setOn",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[{\"description\":\"\\ud800\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": {
+        "kind": "Light",
+        "id": "l1",
+        "on": true
+      },
+      "result": "done",
+      "requests": [
+        {
+          "method": "PUT",
+          "uri": "https://192.168.1.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ]
+    },
+    {
+      "name": "unicode",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"l\\u00e9\",\"metadata\":{\"name\":\"K\\u00fcche \uD83D\uDE00\"}}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "lé",
+          "Küche \uD83D\uDE00",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "latin1Charset",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"l1\",\"type\":\"light\",\"metadata\":{\"name\":\"Ceiling\"},\"on\":{\"on\":true}},{\"id\":\"l2\",\"type\":\"light\",\"metadata\":{\"name\":\"Floor lamp\"},\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": "application/json; charset=iso-8859-1"
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "l1",
+          "Ceiling",
+          true
+        ],
+        [
+          "l2",
+          "Floor lamp",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "unknownCharset",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"l1\",\"type\":\"light\",\"metadata\":{\"name\":\"Ceiling\"},\"on\":{\"on\":true}},{\"id\":\"l2\",\"type\":\"light\",\"metadata\":{\"name\":\"Floor lamp\"},\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": "application/json; charset=x-unknown"
+        }
+      ],
+      "target": null,
+      "throws": "InvalidOperationException: The character set provided in ContentType is invalid. Cannot read content as string using an invalid character set.",
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "numberHandling",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"l1\",\"on\":{\"on\":true},\"x\":\"1\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "l1",
+          "l1",
+          true
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "utf8Bom",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "",
+          "reason": null,
+          "contentType": null,
+          "bodyBase64": "77u/eyJlcnJvcnMiOltdLCJkYXRhIjpbeyJpZCI6ImwxIiwidHlwZSI6ImxpZ2h0IiwibWV0YWRhdGEiOnsibmFtZSI6IkNlaWxpbmcifSwib24iOnsib24iOnRydWV9fSx7ImlkIjoibDIiLCJ0eXBlIjoibGlnaHQiLCJtZXRhZGF0YSI6eyJuYW1lIjoiRmxvb3IgbGFtcCJ9LCJvbiI6eyJvbiI6ZmFsc2V9fV19"
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "l1",
+          "Ceiling",
+          true
+        ],
+        [
+          "l2",
+          "Floor lamp",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "utf8BomCharset",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "",
+          "reason": null,
+          "contentType": "application/json; charset=utf-8",
+          "bodyBase64": "77u/eyJlcnJvcnMiOltdLCJkYXRhIjpbeyJpZCI6ImwxIiwidHlwZSI6ImxpZ2h0IiwibWV0YWRhdGEiOnsibmFtZSI6IkNlaWxpbmcifSwib24iOnsib24iOnRydWV9fSx7ImlkIjoibDIiLCJ0eXBlIjoibGlnaHQiLCJtZXRhZGF0YSI6eyJuYW1lIjoiRmxvb3IgbGFtcCJ9LCJvbiI6eyJvbiI6ZmFsc2V9fV19"
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "l1",
+          "Ceiling",
+          true
+        ],
+        [
+          "l2",
+          "Floor lamp",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "utf16BomNoCharset",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "",
+          "reason": null,
+          "contentType": null,
+          "bodyBase64": "//57ACIAZQByAHIAbwByAHMAIgA6AFsAXQAsACIAZABhAHQAYQAiADoAWwB7ACIAaQBkACIAOgAiAGwAMQAiACwAIgB0AHkAcABlACIAOgAiAGwAaQBnAGgAdAAiACwAIgBtAGUAdABhAGQAYQB0AGEAIgA6AHsAIgBuAGEAbQBlACIAOgAiAEMAZQBpAGwAaQBuAGcAIgB9ACwAIgBvAG4AIgA6AHsAIgBvAG4AIgA6AHQAcgB1AGUAfQB9ACwAewAiAGkAZAAiADoAIgBsADIAIgAsACIAdAB5AHAAZQAiADoAIgBsAGkAZwBoAHQAIgAsACIAbQBlAHQAYQBkAGEAdABhACIAOgB7ACIAbgBhAG0AZQAiADoAIgBGAGwAbwBvAHIAIABsAGEAbQBwACIAfQAsACIAbwBuACIAOgB7ACIAbwBuACIAOgBmAGEAbABzAGUAfQB9AF0AfQA="
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "l1",
+          "Ceiling",
+          true
+        ],
+        [
+          "l2",
+          "Floor lamp",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "utf16BeBomNoCharset",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "",
+          "reason": null,
+          "contentType": null,
+          "bodyBase64": "/v8AewAiAGUAcgByAG8AcgBzACIAOgBbAF0ALAAiAGQAYQB0AGEAIgA6AFsAewAiAGkAZAAiADoAIgBsADEAIgAsACIAdAB5AHAAZQAiADoAIgBsAGkAZwBoAHQAIgAsACIAbQBlAHQAYQBkAGEAdABhACIAOgB7ACIAbgBhAG0AZQAiADoAIgBDAGUAaQBsAGkAbgBnACIAfQAsACIAbwBuACIAOgB7ACIAbwBuACIAOgB0AHIAdQBlAH0AfQAsAHsAIgBpAGQAIgA6ACIAbAAyACIALAAiAHQAeQBwAGUAIgA6ACIAbABpAGcAaAB0ACIALAAiAG0AZQB0AGEAZABhAHQAYQAiADoAewAiAG4AYQBtAGUAIgA6ACIARgBsAG8AbwByACAAbABhAG0AcAAiAH0ALAAiAG8AbgAiADoAewAiAG8AbgAiADoAZgBhAGwAcwBlAH0AfQBdAH0="
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "l1",
+          "Ceiling",
+          true
+        ],
+        [
+          "l2",
+          "Floor lamp",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "utf32BomNoCharset",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "",
+          "reason": null,
+          "contentType": null,
+          "bodyBase64": "//4AAHsAAAAiAAAAZQAAAHIAAAByAAAAbwAAAHIAAABzAAAAIgAAADoAAABbAAAAXQAAACwAAAAiAAAAZAAAAGEAAAB0AAAAYQAAACIAAAA6AAAAWwAAAHsAAAAiAAAAaQAAAGQAAAAiAAAAOgAAACIAAABsAAAAMQAAACIAAAAsAAAAIgAAAHQAAAB5AAAAcAAAAGUAAAAiAAAAOgAAACIAAABsAAAAaQAAAGcAAABoAAAAdAAAACIAAAAsAAAAIgAAAG0AAABlAAAAdAAAAGEAAABkAAAAYQAAAHQAAABhAAAAIgAAADoAAAB7AAAAIgAAAG4AAABhAAAAbQAAAGUAAAAiAAAAOgAAACIAAABDAAAAZQAAAGkAAABsAAAAaQAAAG4AAABnAAAAIgAAAH0AAAAsAAAAIgAAAG8AAABuAAAAIgAAADoAAAB7AAAAIgAAAG8AAABuAAAAIgAAADoAAAB0AAAAcgAAAHUAAABlAAAAfQAAAH0AAAAsAAAAewAAACIAAABpAAAAZAAAACIAAAA6AAAAIgAAAGwAAAAyAAAAIgAAACwAAAAiAAAAdAAAAHkAAABwAAAAZQAAACIAAAA6AAAAIgAAAGwAAABpAAAAZwAAAGgAAAB0AAAAIgAAACwAAAAiAAAAbQAAAGUAAAB0AAAAYQAAAGQAAABhAAAAdAAAAGEAAAAiAAAAOgAAAHsAAAAiAAAAbgAAAGEAAABtAAAAZQAAACIAAAA6AAAAIgAAAEYAAABsAAAAbwAAAG8AAAByAAAAIAAAAGwAAABhAAAAbQAAAHAAAAAiAAAAfQAAACwAAAAiAAAAbwAAAG4AAAAiAAAAOgAAAHsAAAAiAAAAbwAAAG4AAAAiAAAAOgAAAGYAAABhAAAAbAAAAHMAAABlAAAAfQAAAH0AAABdAAAAfQAAAA=="
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "l1",
+          "Ceiling",
+          true
+        ],
+        [
+          "l2",
+          "Floor lamp",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "utf16Charset",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "",
+          "reason": null,
+          "contentType": "application/json; charset=utf-16",
+          "bodyBase64": "//57ACIAZQByAHIAbwByAHMAIgA6AFsAXQAsACIAZABhAHQAYQAiADoAWwB7ACIAaQBkACIAOgAiAGwAMQAiACwAIgB0AHkAcABlACIAOgAiAGwAaQBnAGgAdAAiACwAIgBtAGUAdABhAGQAYQB0AGEAIgA6AHsAIgBuAGEAbQBlACIAOgAiAEMAZQBpAGwAaQBuAGcAIgB9ACwAIgBvAG4AIgA6AHsAIgBvAG4AIgA6AHQAcgB1AGUAfQB9ACwAewAiAGkAZAAiADoAIgBsADIAIgAsACIAdAB5AHAAZQAiADoAIgBsAGkAZwBoAHQAIgAsACIAbQBlAHQAYQBkAGEAdABhACIAOgB7ACIAbgBhAG0AZQAiADoAIgBGAGwAbwBvAHIAIABsAGEAbQBwACIAfQAsACIAbwBuACIAOgB7ACIAbwBuACIAOgBmAGEAbABzAGUAfQB9AF0AfQA="
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "l1",
+          "Ceiling",
+          true
+        ],
+        [
+          "l2",
+          "Floor lamp",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "utf16CharsetNoBom",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "",
+          "reason": null,
+          "contentType": "application/json; charset=utf-16",
+          "bodyBase64": "ewAiAGUAcgByAG8AcgBzACIAOgBbAF0ALAAiAGQAYQB0AGEAIgA6AFsAewAiAGkAZAAiADoAIgBsADEAIgAsACIAdAB5AHAAZQAiADoAIgBsAGkAZwBoAHQAIgAsACIAbQBlAHQAYQBkAGEAdABhACIAOgB7ACIAbgBhAG0AZQAiADoAIgBDAGUAaQBsAGkAbgBnACIAfQAsACIAbwBuACIAOgB7ACIAbwBuACIAOgB0AHIAdQBlAH0AfQAsAHsAIgBpAGQAIgA6ACIAbAAyACIALAAiAHQAeQBwAGUAIgA6ACIAbABpAGcAaAB0ACIALAAiAG0AZQB0AGEAZABhAHQAYQAiADoAewAiAG4AYQBtAGUAIgA6ACIARgBsAG8AbwByACAAbABhAG0AcAAiAH0ALAAiAG8AbgAiADoAewAiAG8AbgAiADoAZgBhAGwAcwBlAH0AfQBdAH0A"
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "l1",
+          "Ceiling",
+          true
+        ],
+        [
+          "l2",
+          "Floor lamp",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "utf16BomUtf8Charset",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "",
+          "reason": null,
+          "contentType": "application/json; charset=utf-8",
+          "bodyBase64": "//57ACIAZQByAHIAbwByAHMAIgA6AFsAXQAsACIAZABhAHQAYQAiADoAWwB7ACIAaQBkACIAOgAiAGwAMQAiACwAIgB0AHkAcABlACIAOgAiAGwAaQBnAGgAdAAiACwAIgBtAGUAdABhAGQAYQB0AGEAIgA6AHsAIgBuAGEAbQBlACIAOgAiAEMAZQBpAGwAaQBuAGcAIgB9ACwAIgBvAG4AIgA6AHsAIgBvAG4AIgA6AHQAcgB1AGUAfQB9ACwAewAiAGkAZAAiADoAIgBsADIAIgAsACIAdAB5AHAAZQAiADoAIgBsAGkAZwBoAHQAIgAsACIAbQBlAHQAYQBkAGEAdABhACIAOgB7ACIAbgBhAG0AZQAiADoAIgBGAGwAbwBvAHIAIABsAGEAbQBwACIAfQAsACIAbwBuACIAOgB7ACIAbwBuACIAOgBmAGEAbABzAGUAfQB9AF0AfQA="
+        }
+      ],
+      "target": null,
+      "throws": "HueApiException: Unexpected response from the Hue bridge for 'light'.",
+      "statusCode": null,
+      "isTransient": true,
+      "isAuthenticationError": false,
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "quotedCharset",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "",
+          "reason": null,
+          "contentType": "application/json; charset=\"utf-8\"",
+          "bodyBase64": "eyJlcnJvcnMiOltdLCJkYXRhIjpbeyJpZCI6ImwxIiwidHlwZSI6ImxpZ2h0IiwibWV0YWRhdGEiOnsibmFtZSI6IkNlaWxpbmcifSwib24iOnsib24iOnRydWV9fSx7ImlkIjoibDIiLCJ0eXBlIjoibGlnaHQiLCJtZXRhZGF0YSI6eyJuYW1lIjoiRmxvb3IgbGFtcCJ9LCJvbiI6eyJvbiI6ZmFsc2V9fV19"
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "l1",
+          "Ceiling",
+          true
+        ],
+        [
+          "l2",
+          "Floor lamp",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "asciiHighBytes",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "",
+          "reason": null,
+          "contentType": "application/json; charset=us-ascii",
+          "bodyBase64": "eyJkYXRhIjpbeyJpZCI6ImzpIiwibWV0YWRhdGEiOnsibmFtZSI6IoD/In19XX0="
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "l?",
+          "??",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "latin1Bytes",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "",
+          "reason": null,
+          "contentType": "application/json; charset=latin1",
+          "bodyBase64": "eyJkYXRhIjpbeyJpZCI6ImzpIiwibWV0YWRhdGEiOnsibmFtZSI6IoD/In19XX0="
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "lé",
+          "\u0080ÿ",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "invalidUtf8",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "",
+          "reason": null,
+          "contentType": null,
+          "bodyBase64": "eyJkYXRhIjpbeyJpZCI6ImzpwyIsIm1ldGFkYXRhIjp7Im5hbWUiOiLtoIAifX1dfQ=="
+        }
+      ],
+      "target": null,
+      "result": [
+        [
+          "l��",
+          "���",
+          false
+        ]
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "windows1252",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "",
+          "reason": null,
+          "contentType": "application/json; charset=windows-1252",
+          "bodyBase64": "eyJlcnJvcnMiOltdLCJkYXRhIjpbeyJpZCI6ImwxIiwidHlwZSI6ImxpZ2h0IiwibWV0YWRhdGEiOnsibmFtZSI6IkNlaWxpbmcifSwib24iOnsib24iOnRydWV9fSx7ImlkIjoibDIiLCJ0eXBlIjoibGlnaHQiLCJtZXRhZGF0YSI6eyJuYW1lIjoiRmxvb3IgbGFtcCJ9LCJvbiI6eyJvbiI6ZmFsc2V9fV19"
+        }
+      ],
+      "target": null,
+      "throws": "InvalidOperationException: The character set provided in ContentType is invalid. Cannot read content as string using an invalid character set.",
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "utf7",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "",
+          "reason": null,
+          "contentType": "application/json; charset=utf-7",
+          "bodyBase64": "eyJlcnJvcnMiOltdLCJkYXRhIjpbeyJpZCI6ImwxIiwidHlwZSI6ImxpZ2h0IiwibWV0YWRhdGEiOnsibmFtZSI6IkNlaWxpbmcifSwib24iOnsib24iOnRydWV9fSx7ImlkIjoibDIiLCJ0eXBlIjoibGlnaHQiLCJtZXRhZGF0YSI6eyJuYW1lIjoiRmxvb3IgbGFtcCJ9LCJvbiI6eyJvbiI6ZmFsc2V9fV19"
+        }
+      ],
+      "target": null,
+      "throws": "NotSupportedException: Support for UTF-7 is disabled. See https://aka.ms/dotnet-warnings/SYSLIB0001 for more information.",
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "utf8NoHyphen",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 200,
+          "body": "",
+          "reason": null,
+          "contentType": "application/json; charset=utf8",
+          "bodyBase64": "eyJlcnJvcnMiOltdLCJkYXRhIjpbeyJpZCI6ImwxIiwidHlwZSI6ImxpZ2h0IiwibWV0YWRhdGEiOnsibmFtZSI6IkNlaWxpbmcifSwib24iOnsib24iOnRydWV9fSx7ImlkIjoibDIiLCJ0eXBlIjoibGlnaHQiLCJtZXRhZGF0YSI6eyJuYW1lIjoiRmxvb3IgbGFtcCJ9LCJvbiI6eyJvbiI6ZmFsc2V9fV19"
+        }
+      ],
+      "target": null,
+      "throws": "InvalidOperationException: The character set provided in ContentType is invalid. Cannot read content as string using an invalid character set.",
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "invalidCharsetError",
+      "operation": "lights",
+      "answers": [
+        {
+          "status": 503,
+          "body": "",
+          "reason": null,
+          "contentType": "application/json; charset=x-unknown",
+          "bodyBase64": "e30="
+        }
+      ],
+      "target": null,
+      "throws": "InvalidOperationException: The character set provided in ContentType is invalid. Cannot read content as string using an invalid character set.",
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.168.1.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ]
+    }
+  ],
+  "fingerprint": [
+    {
+      "fingerprint": "aa:bb:cc",
+      "normalized": "AABBCC"
+    },
+    {
+      "fingerprint": " AB CD ",
+      "normalized": "ABCD"
+    },
+    {
+      "fingerprint": "\u3000ab\u3000",
+      "normalized": "AB"
+    },
+    {
+      "fingerprint": "ﬀ",
+      "normalized": "ﬀ"
+    },
+    {
+      "fingerprint": "ı",
+      "normalized": "ı"
+    },
+    {
+      "fingerprint": "ß",
+      "normalized": "ß"
+    },
+    {
+      "fingerprint": "a:b c\td",
+      "normalized": "ABC\tD"
+    },
+    {
+      "fingerprint": "ſ",
+      "normalized": "ſ"
+    }
+  ],
+  "statusLine": [
+    {
+      "status": 404,
+      "reason": null,
+      "reasonPhrase": "Not Found",
+      "ensureSuccess": "Response status code does not indicate success: 404 (Not Found)."
+    },
+    {
+      "status": 404,
+      "reason": "Not Found",
+      "reasonPhrase": "Not Found",
+      "ensureSuccess": "Response status code does not indicate success: 404 (Not Found)."
+    },
+    {
+      "status": 404,
+      "reason": "Nope",
+      "reasonPhrase": "Nope",
+      "ensureSuccess": "Response status code does not indicate success: 404 (Nope)."
+    },
+    {
+      "status": 404,
+      "reason": "",
+      "reasonPhrase": "",
+      "ensureSuccess": "Response status code does not indicate success: 404."
+    },
+    {
+      "status": 404,
+      "reason": " ",
+      "reasonPhrase": " ",
+      "ensureSuccess": "Response status code does not indicate success: 404."
+    },
+    {
+      "status": 599,
+      "reason": null,
+      "reasonPhrase": null,
+      "ensureSuccess": "Response status code does not indicate success: 599."
+    },
+    {
+      "status": 503,
+      "reason": "Busy",
+      "reasonPhrase": "Busy",
+      "ensureSuccess": "Response status code does not indicate success: 503 (Busy)."
+    }
+  ],
+  "encodings": [
+    {
+      "name": "utf-8",
+      "codePage": 65001
+    },
+    {
+      "name": "UTF-8",
+      "codePage": 65001
+    },
+    {
+      "name": "utf8",
+      "throws": "ArgumentException: 'utf8' is not a supported encoding name. For information on defining a custom encoding, see the documentation for the Encoding.RegisterProvider method. (Parameter 'name')"
+    },
+    {
+      "name": " utf-8",
+      "throws": "ArgumentException: ' utf-8' is not a supported encoding name. For information on defining a custom encoding, see the documentation for the Encoding.RegisterProvider method. (Parameter 'name')"
+    },
+    {
+      "name": "",
+      "throws": "ArgumentException: '' is not a supported encoding name. For information on defining a custom encoding, see the documentation for the Encoding.RegisterProvider method. (Parameter 'name')"
+    },
+    {
+      "name": "latin1",
+      "codePage": 28591
+    },
+    {
+      "name": "Latin1",
+      "codePage": 28591
+    },
+    {
+      "name": "l1",
+      "codePage": 28591
+    },
+    {
+      "name": "iso-8859-1",
+      "codePage": 28591
+    },
+    {
+      "name": "iso_8859-1:1987",
+      "codePage": 28591
+    },
+    {
+      "name": "cp819",
+      "codePage": 28591
+    },
+    {
+      "name": "ibm819",
+      "codePage": 28591
+    },
+    {
+      "name": "csisolatin1",
+      "codePage": 28591
+    },
+    {
+      "name": "iso-ir-100",
+      "codePage": 28591
+    },
+    {
+      "name": "iso8859-1",
+      "codePage": 28591
+    },
+    {
+      "name": "iso_8859-1",
+      "codePage": 28591
+    },
+    {
+      "name": "us-ascii",
+      "codePage": 20127
+    },
+    {
+      "name": "ascii",
+      "codePage": 20127
+    },
+    {
+      "name": "us",
+      "codePage": 20127
+    },
+    {
+      "name": "cp367",
+      "codePage": 20127
+    },
+    {
+      "name": "ibm367",
+      "codePage": 20127
+    },
+    {
+      "name": "csascii",
+      "codePage": 20127
+    },
+    {
+      "name": "iso-ir-6",
+      "codePage": 20127
+    },
+    {
+      "name": "iso646-us",
+      "codePage": 20127
+    },
+    {
+      "name": "iso_646.irv:1991",
+      "codePage": 20127
+    },
+    {
+      "name": "ansi_x3.4-1968",
+      "codePage": 20127
+    },
+    {
+      "name": "ansi_x3.4-1986",
+      "codePage": 20127
+    },
+    {
+      "name": "utf-16",
+      "codePage": 1200
+    },
+    {
+      "name": "utf-16le",
+      "codePage": 1200
+    },
+    {
+      "name": "utf-16be",
+      "codePage": 1201
+    },
+    {
+      "name": "unicode",
+      "codePage": 1200
+    },
+    {
+      "name": "unicodefffe",
+      "codePage": 1201
+    },
+    {
+      "name": "ucs-2",
+      "codePage": 1200
+    },
+    {
+      "name": "iso-10646-ucs-2",
+      "codePage": 1200
+    },
+    {
+      "name": "csunicode",
+      "throws": "ArgumentException: 'csunicode' is not a supported encoding name. For information on defining a custom encoding, see the documentation for the Encoding.RegisterProvider method. (Parameter 'name')"
+    },
+    {
+      "name": "utf-32",
+      "codePage": 12000
+    },
+    {
+      "name": "utf-32le",
+      "codePage": 12000
+    },
+    {
+      "name": "utf-32be",
+      "codePage": 12001
+    },
+    {
+      "name": "utf-7",
+      "throws": "NotSupportedException: Support for UTF-7 is disabled. See https://aka.ms/dotnet-warnings/SYSLIB0001 for more information."
+    },
+    {
+      "name": "csunicode11utf7",
+      "throws": "NotSupportedException: Support for UTF-7 is disabled. See https://aka.ms/dotnet-warnings/SYSLIB0001 for more information."
+    },
+    {
+      "name": "unicode-1-1-utf-7",
+      "throws": "NotSupportedException: Support for UTF-7 is disabled. See https://aka.ms/dotnet-warnings/SYSLIB0001 for more information."
+    },
+    {
+      "name": "unicode-2-0-utf-7",
+      "throws": "NotSupportedException: Support for UTF-7 is disabled. See https://aka.ms/dotnet-warnings/SYSLIB0001 for more information."
+    },
+    {
+      "name": "x-unicode-1-1-utf-7",
+      "throws": "NotSupportedException: Support for UTF-7 is disabled. See https://aka.ms/dotnet-warnings/SYSLIB0001 for more information."
+    },
+    {
+      "name": "x-unicode-2-0-utf-7",
+      "throws": "NotSupportedException: Support for UTF-7 is disabled. See https://aka.ms/dotnet-warnings/SYSLIB0001 for more information."
+    },
+    {
+      "name": "unicode-1-1-utf-8",
+      "codePage": 65001
+    },
+    {
+      "name": "unicode-2-0-utf-8",
+      "codePage": 65001
+    },
+    {
+      "name": "x-unicode-1-1-utf-8",
+      "codePage": 65001
+    },
+    {
+      "name": "x-unicode-2-0-utf-8",
+      "codePage": 65001
+    },
+    {
+      "name": "windows-1252",
+      "throws": "ArgumentException: 'windows-1252' is not a supported encoding name. For information on defining a custom encoding, see the documentation for the Encoding.RegisterProvider method. (Parameter 'name')"
+    },
+    {
+      "name": "iso-8859-15",
+      "throws": "ArgumentException: 'iso-8859-15' is not a supported encoding name. For information on defining a custom encoding, see the documentation for the Encoding.RegisterProvider method. (Parameter 'name')"
+    },
+    {
+      "name": "cp1252",
+      "throws": "ArgumentException: 'cp1252' is not a supported encoding name. For information on defining a custom encoding, see the documentation for the Encoding.RegisterProvider method. (Parameter 'name')"
+    },
+    {
+      "name": "x-unknown",
+      "throws": "ArgumentException: 'x-unknown' is not a supported encoding name. For information on defining a custom encoding, see the documentation for the Encoding.RegisterProvider method. (Parameter 'name')"
+    }
+  ],
+  "ipAddress": [
+    {
+      "address": "192.168.1.20",
+      "valid": true
+    },
+    {
+      "address": "192.168.1",
+      "valid": true
+    },
+    {
+      "address": "0x7f.1",
+      "valid": true
+    },
+    {
+      "address": "1.2.3.4/",
+      "valid": false
+    },
+    {
+      "address": "1.2.3.4:80",
+      "valid": false
+    },
+    {
+      "address": " 1.2.3.4",
+      "valid": false
+    },
+    {
+      "address": "",
+      "valid": false
+    },
+    {
+      "address": "fe80::1",
+      "valid": true
+    },
+    {
+      "address": "fe80::1%eth0",
+      "valid": true
+    },
+    {
+      "address": "fe80::1%",
+      "valid": true
+    },
+    {
+      "address": "fe80::1%a/b",
+      "valid": false
+    },
+    {
+      "address": "fe80::1%a]b",
+      "valid": false
+    },
+    {
+      "address": "[fe80::1]",
+      "valid": true
+    },
+    {
+      "address": "[fe80::1]:80",
+      "valid": true
+    },
+    {
+      "address": "[fe80::1]:0x50",
+      "valid": true
+    },
+    {
+      "address": "[fe80::1]:8x",
+      "valid": false
+    },
+    {
+      "address": "[fe80::1]x",
+      "valid": false
+    },
+    {
+      "address": "[fe80::1",
+      "valid": false
+    },
+    {
+      "address": "fe80::1]",
+      "valid": false
+    },
+    {
+      "address": "[fe80::1%eth0]:443",
+      "valid": true
+    },
+    {
+      "address": "[]",
+      "valid": false
+    },
+    {
+      "address": "[::]",
+      "valid": true
+    },
+    {
+      "address": "::",
+      "valid": true
+    },
+    {
+      "address": ":",
+      "valid": false
+    },
+    {
+      "address": ":::",
+      "valid": false
+    },
+    {
+      "address": "1::2::3",
+      "valid": false
+    },
+    {
+      "address": "::ffff:1.2.3.4",
+      "valid": true
+    },
+    {
+      "address": "::1.2.3.04",
+      "valid": true
+    },
+    {
+      "address": "fe80::1/64",
+      "valid": false
+    },
+    {
+      "address": "1:2:3:4:5:6:7:8",
+      "valid": true
+    },
+    {
+      "address": "1:2:3:4:5:6:7:8:9",
+      "valid": false
+    },
+    {
+      "address": "١.1.1.1",
+      "valid": false
+    }
+  ],
+  "reasonPhrases": {
+    "100": "Continue",
+    "101": "Switching Protocols",
+    "102": "Processing",
+    "103": "Early Hints",
+    "200": "OK",
+    "201": "Created",
+    "202": "Accepted",
+    "203": "Non-Authoritative Information",
+    "204": "No Content",
+    "205": "Reset Content",
+    "206": "Partial Content",
+    "207": "Multi-Status",
+    "208": "Already Reported",
+    "226": "IM Used",
+    "300": "Multiple Choices",
+    "301": "Moved Permanently",
+    "302": "Found",
+    "303": "See Other",
+    "304": "Not Modified",
+    "305": "Use Proxy",
+    "307": "Temporary Redirect",
+    "308": "Permanent Redirect",
+    "400": "Bad Request",
+    "401": "Unauthorized",
+    "402": "Payment Required",
+    "403": "Forbidden",
+    "404": "Not Found",
+    "405": "Method Not Allowed",
+    "406": "Not Acceptable",
+    "407": "Proxy Authentication Required",
+    "408": "Request Timeout",
+    "409": "Conflict",
+    "410": "Gone",
+    "411": "Length Required",
+    "412": "Precondition Failed",
+    "413": "Request Entity Too Large",
+    "414": "Request-Uri Too Long",
+    "415": "Unsupported Media Type",
+    "416": "Requested Range Not Satisfiable",
+    "417": "Expectation Failed",
+    "421": "Misdirected Request",
+    "422": "Unprocessable Entity",
+    "423": "Locked",
+    "424": "Failed Dependency",
+    "426": "Upgrade Required",
+    "428": "Precondition Required",
+    "429": "Too Many Requests",
+    "431": "Request Header Fields Too Large",
+    "451": "Unavailable For Legal Reasons",
+    "500": "Internal Server Error",
+    "501": "Not Implemented",
+    "502": "Bad Gateway",
+    "503": "Service Unavailable",
+    "504": "Gateway Timeout",
+    "505": "Http Version Not Supported",
+    "506": "Variant Also Negotiates",
+    "507": "Insufficient Storage",
+    "508": "Loop Detected",
+    "510": "Not Extended",
+    "511": "Network Authentication Required"
+  }
 }

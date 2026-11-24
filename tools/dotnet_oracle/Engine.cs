@@ -1,9 +1,12 @@
 #if SONOFF2HUE
 using System.Net;
+using System.Reflection;
+using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Sonoff2Hue.Ewelink;
+using Sonoff2Hue.Hue;
 using Sonoff2Hue.Mdns;
 
 /// <summary>Evaluates engine_cases.py's cases with the sonoff2hue app's own engine code.</summary>
@@ -24,6 +27,14 @@ internal static class Engine
             ["detector"] = Map(cases["detector"]!, Detector),
             ["summarize"] = Map(cases["summarize"]!, Summarize),
             ["deepEquals"] = Map(cases["deepEquals"]!, DeepEquals),
+            ["bridgeAddress"] = Map(cases["bridgeAddress"]!, BridgeAddress),
+            ["pairingResponse"] = Map(cases["pairingResponse"]!, PairingResponse),
+            ["hueClient"] = Map(cases["hueClient"]!, HueClientCase),
+            ["fingerprint"] = Map(cases["fingerprint"]!, Fingerprint),
+            ["statusLine"] = Map(cases["statusLine"]!, StatusLine),
+            ["encodings"] = Map(cases["encodings"]!, EncodingCase),
+            ["ipAddress"] = Map(cases["ipAddress"]!, IpAddressCase),
+            ["reasonPhrases"] = ReasonPhrases(),
         };
         var options = new JsonSerializerOptions { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
         File.WriteAllText(outputPath, output.ToJsonString(options) + "\n");
@@ -195,6 +206,227 @@ internal static class Engine
         }
 
         return result;
+    }
+
+    private static JsonObject BridgeAddress(JsonObject input)
+    {
+        var address = Text(input, "address");
+        var result = new JsonObject { ["address"] = address };
+        try
+        {
+            if (HueBridgeAddress.TryCreateBaseUri(address, out var uri, out var error))
+            {
+                result["uri"] = uri.AbsoluteUri;
+                result["host"] = uri.Host;
+                result["port"] = uri.Port;
+                try
+                {
+                    result["idnHost"] = uri.IdnHost;
+                }
+                catch (Exception ex)
+                {
+                    result["idnHostThrows"] = Thrown(ex);
+                }
+            }
+            else
+            {
+                result["error"] = error;
+            }
+        }
+        catch (Exception ex)
+        {
+            result["throws"] = Thrown(ex);
+        }
+
+        return result;
+    }
+
+    private static readonly MethodInfo ParsePairingResponse =
+        typeof(HueBridgeSetup).GetMethod("ParsePairingResponse", BindingFlags.NonPublic | BindingFlags.Static)!;
+
+    private static JsonObject PairingResponse(JsonObject input)
+    {
+        var status = input["status"]!.GetValue<int>();
+        var body = Text(input, "body")!;
+        var result = new JsonObject { ["status"] = status, ["body"] = body };
+        try
+        {
+            var pairing = (PairingResult)ParsePairingResponse.Invoke(null, [(HttpStatusCode)status, body])!;
+            result["result"] = new JsonObject
+            {
+                ["status"] = pairing.Status.ToString(),
+                ["appKey"] = pairing.AppKey,
+                ["error"] = pairing.Error,
+            };
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is { } inner)
+        {
+            result["throws"] = Thrown(inner);
+            if (inner is HueApiException hue)
+            {
+                result["statusCode"] = (int?)hue.StatusCode;
+            }
+        }
+
+        return result;
+    }
+
+    private static JsonObject HueClientCase(JsonObject input)
+    {
+        var handler = new CannedHandler(input["answers"]!.AsArray());
+        var result = new JsonObject
+        {
+            ["name"] = Text(input, "name"),
+            ["operation"] = Text(input, "operation"),
+            ["answers"] = input["answers"]!.DeepClone(),
+            ["target"] = input["target"]?.DeepClone(),
+        };
+        using var client = new HueClient("192.168.1.20", "app-key", handler);
+        try
+        {
+            result["result"] = Text(input, "operation") switch
+            {
+                "lights" => new JsonArray([.. client.GetLightsAsync(CancellationToken.None).GetAwaiter().GetResult().Select(
+                    l => (JsonNode)new JsonArray(l.Id, l.Name, l.On))]),
+                "groups" => new JsonArray([.. client.GetGroupsAsync(CancellationToken.None).GetAwaiter().GetResult().Select(
+                    g => (JsonNode)new JsonArray(g.Id, g.Name, g.Kind, g.GroupedLightId))]),
+                "lightStates" => States(client.GetLightStatesAsync(CancellationToken.None).GetAwaiter().GetResult()),
+                "groupedLightStates" => States(client.GetGroupedLightStatesAsync(CancellationToken.None).GetAwaiter().GetResult()),
+                "ping" => Done(client.PingAsync(CancellationToken.None)),
+                "setOn" => Done(client.SetOnAsync(Target(input["target"]!.AsObject()), input["target"]!["on"]!.GetValue<bool>(), CancellationToken.None)),
+                var other => throw new ArgumentException($"Unknown operation {other}"),
+            };
+        }
+        catch (Exception ex)
+        {
+            result["throws"] = Thrown(ex);
+            if (ex is HueApiException hue)
+            {
+                result["statusCode"] = (int?)hue.StatusCode;
+                result["isTransient"] = hue.IsTransient;
+                result["isAuthenticationError"] = hue.IsAuthenticationError;
+            }
+        }
+
+        result["requests"] = handler.Requests;
+        return result;
+    }
+
+    private static JsonNode? Done(Task task)
+    {
+        task.GetAwaiter().GetResult();
+        return "done";
+    }
+
+    private static JsonArray States(IReadOnlyDictionary<string, bool> states) =>
+        new([.. states.Select(s => (JsonNode)new JsonArray(s.Key, s.Value))]);
+
+    private static HueTarget Target(JsonObject json) =>
+        new(Enum.Parse<HueTargetKind>(Text(json, "kind")!), Text(json, "id")!, "name");
+
+    /// <summary>Answers each request with the next canned answer, the last one repeated, and records the requests.</summary>
+    private sealed class CannedHandler(JsonArray answers) : HttpMessageHandler
+    {
+        private int _next;
+
+        public JsonArray Requests { get; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Requests.Add(new JsonObject
+            {
+                ["method"] = request.Method.Method,
+                ["uri"] = request.RequestUri!.AbsoluteUri,
+                ["key"] = request.Headers.TryGetValues("hue-application-key", out var keys) ? string.Join(",", keys) : null,
+                ["contentType"] = request.Content?.Headers.ContentType?.ToString(),
+                ["body"] = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken),
+            });
+            var answer = answers[Math.Min(_next++, answers.Count - 1)]!.AsObject();
+            var response = new HttpResponseMessage((HttpStatusCode)answer["status"]!.GetValue<int>())
+            {
+                Content = new ByteArrayContent(Text(answer, "bodyBase64") is { } base64
+                    ? Convert.FromBase64String(base64)
+                    : Encoding.UTF8.GetBytes(Text(answer, "body") ?? string.Empty)),
+            };
+            if (Text(answer, "reason") is { } reason)
+            {
+                response.ReasonPhrase = reason;
+            }
+
+            if (Text(answer, "contentType") is { } contentType)
+            {
+                response.Content.Headers.TryAddWithoutValidation("Content-Type", contentType);
+            }
+
+            return response;
+        }
+    }
+
+    private static JsonObject Fingerprint(JsonObject input)
+    {
+        var fingerprint = Text(input, "fingerprint")!;
+        return new JsonObject { ["fingerprint"] = fingerprint, ["normalized"] = HueTls.Normalize(fingerprint) };
+    }
+
+    private static JsonObject StatusLine(JsonObject input)
+    {
+        var status = input["status"]!.GetValue<int>();
+        var reason = Text(input, "reason");
+        using var response = new HttpResponseMessage((HttpStatusCode)status);
+        if (reason is not null)
+        {
+            response.ReasonPhrase = reason;
+        }
+
+        var result = new JsonObject { ["status"] = status, ["reason"] = reason, ["reasonPhrase"] = response.ReasonPhrase };
+        try
+        {
+            response.EnsureSuccessStatusCode();
+        }
+        catch (HttpRequestException ex)
+        {
+            result["ensureSuccess"] = ex.Message;
+        }
+
+        return result;
+    }
+
+    private static JsonObject IpAddressCase(JsonObject input)
+    {
+        var address = Text(input, "address")!;
+        return new JsonObject { ["address"] = address, ["valid"] = IPAddress.TryParse(address, out _) };
+    }
+
+    private static JsonObject EncodingCase(JsonObject input)
+    {
+        var name = Text(input, "name")!;
+        var result = new JsonObject { ["name"] = name };
+        try
+        {
+            result["codePage"] = Encoding.GetEncoding(name).CodePage;
+        }
+        catch (Exception ex)
+        {
+            result["throws"] = Thrown(ex);
+        }
+
+        return result;
+    }
+
+    /// <summary>The reason phrase of a response whose status line has none, by status code.</summary>
+    private static JsonObject ReasonPhrases()
+    {
+        var phrases = new JsonObject();
+        for (var code = 100; code <= 599; code++)
+        {
+            using var response = new HttpResponseMessage((HttpStatusCode)code);
+            if (response.ReasonPhrase is { } phrase)
+            {
+                phrases[code.ToString(System.Globalization.CultureInfo.InvariantCulture)] = phrase;
+            }
+        }
+
+        return phrases;
     }
 }
 #endif

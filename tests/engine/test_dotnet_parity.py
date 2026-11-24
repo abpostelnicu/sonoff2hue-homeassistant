@@ -1,6 +1,7 @@
 """The engine against the .NET app itself: every case in fixtures/dotnet_engine.json, which tools/dotnet_oracle made by
 running the app's own code, must come out the same here."""
 
+import base64
 from datetime import UTC, datetime
 from ipaddress import IPv4Address, IPv6Address
 import json
@@ -9,9 +10,11 @@ from typing import Any
 
 import pytest
 
-from custom_components.sonoff2hue.engine import ewelink, jsonnode
+from custom_components.sonoff2hue.engine import ewelink, hue_address, hue_client, hue_setup, jsonnode
 from custom_components.sonoff2hue.engine.dns import DnsFormatError, DnsMessage, DnsResourceRecord
+from custom_components.sonoff2hue.engine.errors import UnexpectedError
 from custom_components.sonoff2hue.engine.ewelink import EwelinkAnnouncement
+from custom_components.sonoff2hue.engine.hue_address import BridgeUrl
 from custom_components.sonoff2hue.engine.mdns import MdnsPacket
 from custom_components.sonoff2hue.engine.press import PressDetector, summarize
 
@@ -34,9 +37,9 @@ def _cases(section: str) -> list[dict[str, Any]]:
     return cases
 
 
-def _thrown(err: Exception) -> str:
-    """The message part of the .NET app's "<type>: <message>"."""
-    return str(err)
+def _thrown(err: UnexpectedError) -> str:
+    """The .NET app's "<type>: <message>" for an exception it doesn't expect."""
+    return f"{err.dotnet_type}: {err}"
 
 
 def _message_of(dotnet: str) -> str:
@@ -171,8 +174,7 @@ def test_detector(case: dict[str, Any]) -> None:
         result.update(isDetached=detector.is_detached, hasBaseline=detector.has_baseline)
         results.append(result)
 
-    expected = [{**r, "throws": _message_of(r["throws"])} if "throws" in r else r for r in case["results"]]
-    assert results == expected
+    assert results == case["results"]
 
 
 @pytest.mark.parametrize("case", _cases("summarize"), ids=lambda case: case["params"][:60])
@@ -183,7 +185,7 @@ def test_summarize(case: dict[str, Any]) -> None:
     if "throws" in case:
         with pytest.raises(jsonnode.JsonAccessError) as err:
             summarize(params)
-        assert str(err.value) == _message_of(case["throws"])
+        assert _thrown(err.value) == case["throws"]
     else:
         assert summarize(params) == case["summary"]
 
@@ -196,7 +198,7 @@ def test_deep_equals(case: dict[str, Any]) -> None:
         with pytest.raises(jsonnode.JsonAccessError) as err:
             jsonnode.deep_equals(left, right)
         if "throws" in case:
-            assert str(err.value) == _message_of(case["throws"])
+            assert _thrown(err.value) == case["throws"]
     else:
         assert jsonnode.deep_equals(left, right) is case["equal"]
 
@@ -204,3 +206,158 @@ def test_deep_equals(case: dict[str, Any]) -> None:
 def test_fixture_comes_from_the_app() -> None:
     assert _FIXTURE["app"].startswith("sonoff2hue v")
     assert _FIXTURE["runtime"].startswith("10.")
+
+
+# The Hue bridge: addresses, pairing answers and the CLIP v2 client.
+
+_PAIR_AGAIN = "run 'sonoff2hue hue-pair' again"
+
+
+def _hue_thrown(err: Exception) -> str:
+    if isinstance(err, hue_client.HueApiError):
+        return "HueApiException: " + str(err).replace(hue_client.PAIR_AGAIN, _PAIR_AGAIN)
+    assert isinstance(err, UnexpectedError)
+    return _thrown(err)
+
+
+@pytest.mark.parametrize("case", _cases("bridgeAddress"), ids=lambda case: repr(case["address"])[:60])
+def test_bridge_address(case: dict[str, Any]) -> None:
+    url, error = hue_address.try_create_base_url(case["address"])
+
+    if "error" in case:
+        assert url is None
+        assert error == case["error"]
+    else:
+        assert url is not None
+        assert (url.uri, url.host, url.port) == (case["uri"], case["host"], case["port"])
+        assert url.idn_host == case.get("idnHost")
+        assert ("idnHostThrows" in case) == (url.idn_host is None)
+
+
+@pytest.mark.parametrize("case", _cases("pairingResponse"), ids=lambda case: f"{case['status']} {case['body'][:50]}")
+def test_pairing_response(case: dict[str, Any]) -> None:
+    if "throws" in case:
+        with pytest.raises((hue_client.HueApiError, UnexpectedError)) as err:
+            hue_setup.parse_pairing_response(case["status"], case["body"])
+        assert _hue_thrown(err.value) == case["throws"]
+        assert getattr(err.value, "status", None) == case.get("statusCode")
+    else:
+        result = hue_setup.parse_pairing_response(case["status"], case["body"])
+        assert {"status": result.status.value, "appKey": result.app_key, "error": result.error} == case["result"]
+
+
+class _CannedTransport:
+    """Answers each request with the next of a case's answers, the last one repeated, and records the requests."""
+
+    def __init__(self, url: BridgeUrl, answers: list[dict[str, Any]]) -> None:
+        self._url = url
+        self._answers = answers
+        self.requests: list[dict[str, Any]] = []
+
+    async def send(
+        self, method: str, path: str, body: bytes | None, headers: dict[str, str] | None = None
+    ) -> hue_client.HttpAnswer:
+        self.requests.append(
+            {
+                "method": method,
+                "uri": hue_client.request_url(self._url, path),
+                "key": (headers or {}).get("hue-application-key"),
+                "contentType": None if body is None else hue_client.JSON_CONTENT_TYPE,
+                "body": None if body is None else body.decode(),
+            }
+        )
+        answer = self._answers[min(len(self.requests) - 1, len(self._answers) - 1)]
+        content = base64.b64decode(answer["bodyBase64"]) if "bodyBase64" in answer else (answer["body"] or "").encode()
+        content_type = answer.get("contentType")
+        charset = None
+        if content_type is not None and "charset=" in content_type:
+            charset = content_type.split("charset=", 1)[1]
+        return hue_client.HttpAnswer(answer["status"], answer.get("reason"), content, charset)
+
+    async def close(self) -> None:
+        pass
+
+
+@pytest.mark.parametrize("case", _cases("hueClient"), ids=lambda case: case["name"])
+async def test_hue_client(case: dict[str, Any]) -> None:
+    transports: list[_CannedTransport] = []
+
+    def factory(url: BridgeUrl, pin: str | None, on_certificate: Any) -> _CannedTransport:
+        transports.append(_CannedTransport(url, case["answers"]))
+        return transports[-1]
+
+    client = hue_client.HueClient("192.168.1.20", "app-key", None, factory)
+    result: Any = None
+    thrown: Exception | None = None
+    try:
+        match case["operation"]:
+            case "lights":
+                result = [[light.id, light.name, light.on] for light in await client.get_lights()]
+            case "groups":
+                result = [[g.id, g.name, g.kind, g.grouped_light_id] for g in await client.get_groups()]
+            case "lightStates":
+                result = [[key, value] for key, value in (await client.get_light_states()).items()]
+            case "groupedLightStates":
+                result = [[key, value] for key, value in (await client.get_grouped_light_states()).items()]
+            case "ping":
+                await client.ping()
+                result = "done"
+            case "setOn":
+                target = case["target"]
+                kind = hue_client.HueTargetKind(target["kind"])
+                await client.set_on(hue_client.HueTarget(kind, target["id"], "name"), target["on"])
+                result = "done"
+    except (hue_client.HueApiError, UnexpectedError) as err:
+        thrown = err
+
+    if "throws" in case:
+        assert thrown is not None, result
+        assert _hue_thrown(thrown) == case["throws"]
+        if isinstance(thrown, hue_client.HueApiError):
+            assert thrown.status == case["statusCode"]
+            assert thrown.is_transient == case["isTransient"]
+            assert thrown.is_authentication_error == case["isAuthenticationError"]
+    else:
+        assert thrown is None, thrown
+        assert result == case["result"]
+    assert transports[0].requests == case["requests"]
+
+
+@pytest.mark.parametrize("case", _cases("fingerprint"), ids=lambda case: case["fingerprint"])
+def test_fingerprint(case: dict[str, Any]) -> None:
+    assert hue_client.normalize_fingerprint(case["fingerprint"]) == case["normalized"]
+
+
+@pytest.mark.parametrize("case", _cases("statusLine"), ids=lambda case: f"{case['status']} {case['reason']}")
+def test_status_line(case: dict[str, Any]) -> None:
+    answer = hue_client.HttpAnswer(case["status"], case["reason"], b"")
+
+    assert answer.reason_phrase == case["reasonPhrase"]
+    assert hue_setup.not_success_message(answer) == case["ensureSuccess"]
+
+
+def test_reason_phrases() -> None:
+    assert {int(code): phrase for code, phrase in _FIXTURE["reasonPhrases"].items()} == hue_client._REASON_PHRASES
+
+
+@pytest.mark.parametrize("case", _cases("encodings"), ids=lambda case: repr(case["name"]))
+def test_encoding_names(case: dict[str, Any]) -> None:
+    answer = hue_client.HttpAnswer(200, None, b"", case["name"])
+
+    if "codePage" in case:
+        assert answer.read_as_string() == ""
+        assert hue_client._code_page(case["name"]) == case["codePage"]
+    elif case["throws"].startswith("NotSupportedException"):
+        with pytest.raises(UnexpectedError) as err:
+            answer.read_as_string()
+        assert _thrown(err.value) == case["throws"]
+    else:
+        assert case["throws"].startswith("ArgumentException")
+        with pytest.raises(UnexpectedError) as err:
+            answer.read_as_string()
+        assert err.value.dotnet_type == "InvalidOperationException"
+
+
+@pytest.mark.parametrize("case", _cases("ipAddress"), ids=lambda case: repr(case["address"]))
+def test_ip_address(case: dict[str, Any]) -> None:
+    assert hue_address.is_ip_address(case["address"]) == case["valid"]
