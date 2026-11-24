@@ -89,7 +89,7 @@ The user's choices, made on 2026-11-23 when the plan was approved:
 | Folder | Contents |
 |--------|----------|
 | `custom_components/sonoff2hue` | The integration |
-| `custom_components/sonoff2hue/engine` | Ports of the .NET engine, without Home Assistant imports. `text.py` holds the .NET string and number rules (trim, ordinal case-insensitive comparison, `ToLowerInvariant`, `TryParse`). `dns.py` is `Mdns/DnsMessage.cs`; `mdns.py` has `MdnsPacket` (`Mdns/MdnsListener.cs`); `ewelink.py` is `Ewelink/EwelinkAnnouncement.cs` and `EwelinkCrypto.cs`; `press.py` is `Ewelink/PressDetector.cs` and `SwitchTracker.cs`; `config.py` is the model of `Configuration/AppConfig.cs`; `jsonnode.py` reads JSON as System.Text.Json's `JsonNode` does |
+| `custom_components/sonoff2hue/engine` | Ports of the .NET engine, without Home Assistant imports. `text.py` holds the .NET string and number rules (trim, ordinal case-insensitive comparison, `ToLowerInvariant`, `TryParse`). `dns.py` is `Mdns/DnsMessage.cs`; `mdns.py` is `Mdns/MdnsListener.cs` with the parts of .NET's `NetworkInterface` and `NetworkChange` it uses; `ewelink.py` is `Ewelink/EwelinkAnnouncement.cs` and `EwelinkCrypto.cs`; `press.py` is `Ewelink/PressDetector.cs` and `SwitchTracker.cs`; `config.py` is the model of `Configuration/AppConfig.cs`; `jsonnode.py` reads JSON as System.Text.Json's `JsonNode` does |
 | `tests/engine` | Tests of the engine, ported from the .NET tests. `packets.py` builds raw DNS packets and MINIR4M broadcasts (the .NET tests' `TestPackets.cs`) and `MdnsPacket`s |
 | `tests/engine/fixtures` | `dotnet_text.json` and `dotnet_engine.json`, made by `tools/dotnet_oracle` from .NET and from the .NET app's own code (decision 7) |
 | `tools/dotnet_oracle` | The generator of those fixtures: a .NET 10 console app (`Program.cs`, `Engine.cs`) that references the app's `Sonoff2Hue.csproj`, the cases it evaluates (`engine_cases.py`) and `generate.sh` |
@@ -204,6 +204,18 @@ app runs; `tools/dotnet_oracle` keeps them as fixtures):
   lengths and the text before the first escape, so a string with a lone surrogate escape can compare as unequal without
   throwing.
 
+.NET on Linux, from dotnet/runtime's release/10.0 sources (2026-11-24), for the listener:
+
+- `NetworkChange.NetworkAddressChanged` comes from a netlink route socket (`pal_networkchange.c`) bound to
+  `RTMGRP_LINK | RTMGRP_IPV4_IFADDR | RTMGRP_IPV4_ROUTE | RTMGRP_IPV6_ROUTE`. Only `RTM_NEWADDR` and `RTM_DELADDR`
+  raise it, once per message, so only IPv4 address changes count; a datagram's messages are read until `NLMSG_DONE` or
+  `NLMSG_ERROR`. Links and routes raise `NetworkAvailabilityChanged`, which the app doesn't use.
+- `NetworkInterface.GetAllNetworkInterfaces` (`pal_interfaceaddresses.c`) reads `getifaddrs`. An interface is
+  `OperationalStatus.Up` when it has both IFF_UP and IFF_RUNNING, unless `ETHTOOL_GLINK` reports no link; that check
+  runs only for hardware types other than Unknown, Tunnel and Loopback. It supports multicast with IFF_MULTICAST or
+  IFF_ALLMULTI. Its type comes from the ARPHRD type (`pal_maphardwaretype.c`: 772 is Loopback, 768 and 769 Tunnel,
+  everything unlisted Unknown). An address on an alias such as `eth0:1` belongs to `eth0`, as `if_nametoindex` says.
+
 The eWeLink LAN protocol and the Hue API, from the .NET app's research (public sources):
 
 - The MINIR4M is eWeLink UIID 138, like the MINIR3/MINIR4
@@ -233,6 +245,7 @@ The eWeLink LAN protocol and the Hue API, from the .NET app's research (public s
 | 5 | Home Assistant's own UI, as the user chose. A single config entry for the one bridge: its setup flow finds or takes the bridge's address, then pairs it, or imports a `sonoff2hue.yaml`; reconfigure pairs again with the switches kept, and reauth runs after the key is rejected. One config subentry of type `switch` per MINIR4M, with identify-by-press. Entities: Status, Bridge reachable and eWeLink devices seen on the bridge's device; Press (event), Last action, Online and Test toggle on each switch's device. Repairs for problems, logbook entries for presses and toggles, and redacted diagnostics. Stored `lights`/`groups` keep the web UI's encoding (the name if unique, else the id; `room:`/`zone:` prefixes) | Everything the web interface showed or did has a native place, and Home Assistant's users and HTTPS replace its own sign-in. The same encoding makes imported and new switches resolve as in .NET |
 | 6 | Pinned tools: `pytest-homeassistant` at the Home Assistant version (2026.11.3), pytest-cov, ruff (lint and format, lines of up to 120 characters, as in the .NET repository) and mypy (strict), installed by uv. `scripts/check` runs them all, and CI and `test-each-commit.sh` run that | pytest-homeassistant-custom-component no longer works with 2026.11. One script keeps local checks, per-commit checks and CI the same |
 | 7 | Pin the port to the .NET app's own results. `tools/dotnet_oracle` runs the app's classes (a `ProjectReference` to a checkout of `abpostelnicu/sonoff2hue`) on edge cases that `engine_cases.py` builds, and .NET's string rules for every code point; the fixtures it writes are committed, and `tests/engine/test_dotnet_parity.py` and `test_text.py` replay them through the port. Known differences are listed in the parity test with their reasons. After a change to the app's engine, run `tools/dotnet_oracle/generate.sh <checkout>` | "Exactly as now" is checkable only against the app itself: the first runs found four rules where Python's functions differ from .NET's (white space, case mappings, JSON escaping, lone surrogates). CI needs no .NET and no access to the private repository |
+| 8 | The listener is `engine/mdns.py`, on asyncio. It owns its UDP 5353 socket (SO_REUSEADDR, SO_REUSEPORT, TTL 255, loopback), joins 224.0.0.251 on the interfaces that .NET would choose (`interface_states`: SIOCGIFFLAGS, SIOCGIFHWADDR and ETHTOOL_GLINK ioctls, with the IPv4 addresses from `ifaddr`), and watches IPv4 address changes on a netlink socket of its own, debounced 3 s, with polling outside Linux. One listener per config entry serves both the LAN monitor and the runner: each adds a packet handler and a started callback, which runs at once if the socket is open, as each had a listener of its own in .NET. Sockets are behind a small transport interface, so the tests drive joins, errors and datagrams without the network | It keeps decision 3 of the .NET app (no mDNS library): the engine needs the raw TXT updates and the probes, which python-zeroconf's service browser hides. One socket sends and receives the same packets as the .NET backend's two did, and logs a socket error once instead of twice. Whether it binds UDP 5353 next to Home Assistant's own zeroconf on Home Assistant OS is the spike's question |
 
 ## Record keeping
 
@@ -268,15 +281,20 @@ The eWeLink LAN protocol and the Hue API, from the .NET app's research (public s
   `dotnet_text.json`. Its first runs showed that `text.py` mapped 'ı', 'ſ' and 'İ' as Python does, which .NET doesn't, and
   missed the 27 Greek mappings; the fix is in the same commit. Breaking the dotless-i rule or the escaping of `+`, `` ` ``
   and `'` on purpose failed the matching cases. Regenerating gave the same fixtures, byte for byte.
+- 2026-11-24: the mDNS listener. Its tests cover packets to several handlers, malformed packets and failing handlers,
+  queries on every joined interface, started callbacks for each socket and their cancellation, socket errors and their
+  retry, debounced network changes, the interface filter, netlink messages, and on a real socket: sharing the port,
+  TTL, loopback, and a join that fails. On the development machine (WSL 2), `interface_states` gave the same view as
+  .NET's `GetAllNetworkInterfaces`: `lo` loopback without multicast, `eth0` up with multicast.
 
 ## Status
 
 - [x] Repository started: the license, this memory, the tools (`scripts/setup`, `scripts/check`) and the commit checks
-- [ ] CI: lint, tests and per-commit checks (done); hassfest and HACS validation once the manifest exists; a ruleset
-  on `main` once the checks have passed there
+- [ ] CI: lint, tests and per-commit checks (done, first green on #1); hassfest and HACS validation once the manifest
+  exists; a ruleset on `main` once the checks have passed there
 - [ ] mDNS spike on the user's Home Assistant OS: own UDP 5353 socket next to Home Assistant's zeroconf
-- [ ] Engine port with its tests: DNS and eWeLink with press detection (done), mDNS listener, fake Hue bridge, Hue
-  client and pairing, runner, YAML import
+- [ ] Engine port with its tests: DNS, eWeLink with press detection and the mDNS listener (done), fake Hue bridge,
+  Hue client and pairing, runner, YAML import
 - [ ] Home Assistant layer: skeleton, runtime, setup and import flow, switch subentries, entities, diagnostics,
   logbook
 - [ ] Development tooling and end-to-end CI with a real Home Assistant, the fake bridge and a simulated switch
