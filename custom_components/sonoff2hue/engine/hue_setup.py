@@ -98,7 +98,8 @@ async def _discover_mdns(
 
     async def query(listener: MdnsListener) -> None:
         for delay in (0, 1, 2):
-            await asyncio.sleep(delay)
+            if delay > 0:  # as .NET's Task.Delay(0) doesn't wait, the first query goes out at once
+                await asyncio.sleep(delay)
             listener.query(SERVICE_TYPE, DnsRecordType.PTR)
 
     def on_packet(packet: MdnsPacket) -> None:

@@ -12,7 +12,7 @@ import pytest
 
 from custom_components.sonoff2hue.engine import hue_client, hue_setup
 from custom_components.sonoff2hue.engine.config import ConfigError
-from custom_components.sonoff2hue.engine.dns import DnsMessage, DnsRecordType
+from custom_components.sonoff2hue.engine.dns import DnsMessage, DnsRecordType, build_query
 from custom_components.sonoff2hue.engine.errors import UnexpectedError
 from custom_components.sonoff2hue.engine.hue_address import BridgeUrl
 from custom_components.sonoff2hue.engine.hue_client import HttpAnswer, HueApiError, HueBridgeInfo, request_url
@@ -345,6 +345,18 @@ async def test_discovery_finds_bridges_by_mdns_and_in_the_cloud(cloud: list[web.
     ]
     sent = [DnsMessage.parse(data) for data, _ in network.transports[0].sent]
     assert [(q.name, q.type) for q in sent[0].questions] == [("_hue._tcp.local", DnsRecordType.PTR)]
+
+
+async def test_discovery_asks_for_bridges_as_the_socket_opens(cloud: list[web.Response]) -> None:
+    cloud.append(web.json_response([]))
+    network = FakeNetwork()
+    async with aiohttp.ClientSession() as session:
+        task = asyncio.create_task(hue_setup.discover(session, 0.2, lambda: MdnsListener(network.open, network.watch)))
+        transport = await network.next_open()
+
+        # As .NET's Task.Delay(0) doesn't wait, the first query went out before the started callback first waited.
+        assert transport.sent == [(build_query("_hue._tcp.local", DnsRecordType.PTR), "192.0.2.1")]
+        assert await task == []
 
 
 @pytest.mark.parametrize(

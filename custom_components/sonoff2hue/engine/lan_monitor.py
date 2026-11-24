@@ -63,9 +63,11 @@ class LanMonitor:
     async def _query(self, listener: MdnsListener) -> None:
         self._tracker.reset_all()
 
-        # A few quick queries make every device answer with its current state; later ones keep "last seen" fresh.
+        # A few quick queries make every device answer with its current state; later ones keep "last seen" fresh. A
+        # delay of 0 isn't awaited, as .NET's Task.Delay(0) doesn't wait: the first query goes out at once.
         for delay in QUERY_DELAYS:
-            await asyncio.sleep(delay)
+            if delay > 0:
+                await asyncio.sleep(delay)
             listener.query(SERVICE_TYPE, DnsRecordType.PTR)
 
         while True:

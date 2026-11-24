@@ -54,8 +54,10 @@ class Lan:
 
 
 def query_times(transport: FakeTransport, time: VirtualTime) -> list[float]:
-    """When each query went out on the transport's working interface, in seconds of virtual time."""
-    times: list[float] = []
+    """When each query went out on the transport's working interface, in seconds of virtual time. Call it as the
+    socket opens: the queries sent so far went out then, before the started callbacks first waited."""
+    assert all(data == QUERY for data, _ in transport.sent)
+    times: list[float] = [time.elapsed for _ in transport.sent]
     send = transport.send
 
     def timed(data: bytes, interface: str) -> None:
@@ -76,7 +78,10 @@ async def stop(task: asyncio.Task[None]) -> None:
 async def test_queries_at_once_after_one_and_three_seconds_then_every_two_minutes(time: VirtualTime) -> None:
     lan = Lan(time)
     task = asyncio.create_task(lan.monitor.run())
-    sent = query_times(await lan.network.next_open(), time)
+    transport = await lan.network.next_open()
+    # As .NET's Task.Delay(0) doesn't wait, the first query went out before the started callback first waited.
+    assert transport.sent == [(QUERY, "192.0.2.1")]
+    sent = query_times(transport, time)
 
     await asyncio.sleep(250)
 
