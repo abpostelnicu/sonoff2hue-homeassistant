@@ -64,3 +64,6 @@ jobs:
 
       - name: Test (pytest)
         run: .venv/bin/python -m pytest --cov --cov-report=term-missing:skip-covered
+
+      - name: Test the release checks and the Release workflow (release-test.sh)
+        run: .github/scripts/release-test.sh

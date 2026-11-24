@@ -8,4 +8,5 @@ python=${PYTHON:-.venv/bin/python}
 "$python" -m ruff check .
 "$python" -m ruff format --check .
 "$python" -m mypy
+PYTHON=$python .github/scripts/release-test.sh
 "$python" -m pytest "$@"

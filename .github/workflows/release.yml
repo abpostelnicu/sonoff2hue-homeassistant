@@ -1,0 +1,170 @@
+name: Release
+
+# A release (decision 29). Pushing a tag vX.Y.Z on a commit of main whose custom_components/sonoff2hue/manifest.json has
+# the version X.Y.Z creates the GitHub Release "sonoff2hue X.Y.Z". The Marketplace installs a Release from its tag's
+# source archive, so the Release has no files of its own. The checks run first, in a job that may only read; the next
+# job creates the Release and is the only one that may write the repository's contents. Nothing else runs this
+# workflow: not main, not pull requests and not manual runs. .github/scripts/release-test.sh runs both jobs' steps
+# against a stand-in for gh.
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: read
+
+# One release at a time, so that each one sees the Releases made before it when it chooses Latest and where its notes
+# start. A run waits while another one runs; a third tag pushed meanwhile cancels the waiting run, which then has to
+# be run again.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check the tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # For the GitHub Release job: X.Y.Z, whether its Release is Latest, and the highest released version below X.Y.Z,
+    # if there is one.
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+      latest: ${{ steps.releases.outputs.latest }}
+      previous: ${{ steps.releases.outputs.previous }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The tagged commit itself rather than the tag, so that the checks see the commit that gets the Release even
+          # if the tag is moved during the run.
+          ref: ${{ github.sha }}
+          # With main's history, for the check that the tagged commit is on main.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check that the tag is vX.Y.Z
+        id: tag
+        run: |
+          version=$(.github/scripts/release.sh version "$GITHUB_REF")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check that X.Y.Z is the version in manifest.json
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: .github/scripts/release.sh check-version "$VERSION" "$GITHUB_SHA"
+
+      - name: Check that the tagged commit is on main
+        run: .github/scripts/release.sh check-main "$GITHUB_SHA" origin/main
+
+      # Latest goes to the highest released version only, and the notes start at the highest released version below
+      # X.Y.Z. The released versions are the tags vX.Y.Z of the published GitHub Releases: a git tag alone, such as one
+      # the checks refused, changes neither.
+      - name: Choose Latest and where the notes start
+        id: releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          released=$(.github/scripts/release.sh released "$GITHUB_REPOSITORY")
+          latest=$(.github/scripts/release.sh latest "$VERSION" <<< "$released")
+          previous=$(.github/scripts/release.sh previous "$VERSION" <<< "$released")
+          {
+            echo "latest=$latest"
+            echo "previous=$previous"
+          } >> "$GITHUB_OUTPUT"
+
+  release:
+    # Creates the GitHub Release "sonoff2hue X.Y.Z" for the tag vX.Y.Z, with notes that GitHub generates from the pull
+    # requests merged since the previous release. It runs only once the checks have passed, since with immutable
+    # releases a Release locks its tag for good. It's the only job that may write the repository's contents, which a
+    # Release needs. It doesn't check out the repository, so none of the repository's code runs with that permission,
+    # and it never creates or moves a tag.
+    name: GitHub Release
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.check.outputs.version }}
+      LATEST: ${{ needs.check.outputs.latest }}
+      PREVIOUS: ${{ needs.check.outputs.previous }}
+    steps:
+      # The checks saw github.sha, and no ruleset keeps a tag from being moved after it was pushed.
+      - name: Check that vX.Y.Z still names the checked commit
+        run: |
+          strict='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          if [[ ! $VERSION =~ $strict || $GITHUB_REF != "refs/tags/v$VERSION" || ! $LATEST =~ ^(true|false)$ ]] \
+            || [[ -n $PREVIOUS && ! $PREVIOUS =~ $strict ]]; then
+            echo "::error::The check job handed over the version '$VERSION', latest '$LATEST' and previous '$PREVIOUS', which don't fit $GITHUB_REF. No GitHub Release was created."
+            exit 1
+          fi
+          tag=v$VERSION
+          if ! commit=$(gh api "repos/$GITHUB_REPOSITORY/commits/refs/tags/$tag" --jq .sha); then
+            echo "::error::Couldn't read the commit of $tag. No GitHub Release was created. If the tag still exists, run this job again."
+            exit 1
+          fi
+          if [ "$commit" != "$GITHUB_SHA" ]; then
+            echo "::error::$tag names $commit now, not $GITHUB_SHA, which the checks passed: it was moved after it was pushed. No GitHub Release was created."
+            exit 1
+          fi
+          echo "$tag still names $GITHUB_SHA, which the checks passed."
+
+      # --verify-tag stops gh if the tag doesn't exist, instead of creating it. --target matters only if the tag were
+      # deleted between that check and gh's request: the tag would then be made on the checked commit, not elsewhere.
+      - name: Create the GitHub Release
+        run: |
+          tag=v$VERSION
+          # A re-run leaves a Release that exists already as it is: with immutable releases it couldn't be made again.
+          status=0
+          found=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" --jq '"\(.name), \(.html_url)"' 2>&1) \
+            || status=$?
+          if [ "$status" -eq 0 ]; then
+            echo "$tag has a GitHub Release already, $found: this run leaves it as it is."
+            exit 0
+          fi
+          if [[ $found != *"(HTTP 404)"* ]]; then
+            printf '%s\n' "$found"
+            echo "::error::Couldn't find out whether $tag has a GitHub Release already. No GitHub Release was created; run this job again."
+            exit 1
+          fi
+          # Latest goes to the highest released version only. If a higher version has a Release already, this is a
+          # re-run after that version's release, whose check job's outputs GitHub reuses, and Latest stays on it.
+          latest=$LATEST
+          if [ "$latest" = true ]; then
+            if ! releases=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+              --jq '.[] | select((.draft or .prerelease) | not) | .tag_name'); then
+              echo "::error::Couldn't list the GitHub Releases to choose the Latest one. No GitHub Release was created; run this job again."
+              exit 1
+            fi
+            highest=$(printf '%s\n' "$releases" "v$VERSION" \
+              | sed -n -E 's/^v((0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*))$/\1/p' \
+              | sort -t . -k 1,1n -k 2,2n -k 3,3n | tail -n 1)
+            if [ "$highest" != "$VERSION" ]; then
+              echo "Not Latest: v$highest, a higher version, has a GitHub Release already."
+              latest=false
+            fi
+          fi
+          options=(--repo "$GITHUB_REPOSITORY" --verify-tag --target "$GITHUB_SHA" --title "sonoff2hue $VERSION"
+            --generate-notes --latest="$latest")
+          if [ -n "$PREVIOUS" ]; then options+=(--notes-start-tag "v$PREVIOUS"); fi
+          echo "gh release create $tag$(printf ' %q' "${options[@]}")"
+          if ! gh release create "$tag" "${options[@]}"; then
+            echo "::error::gh couldn't create the GitHub Release $tag, for the reason above. Run this job again once that's fixed."
+            exit 1
+          fi
+
+      - name: Show the GitHub Release
+        run: |
+          tag=v$VERSION
+          commit=$(gh api "repos/$GITHUB_REPOSITORY/commits/refs/tags/$tag" --jq .sha)
+          marked=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name 2> /dev/null) || marked=none
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" \
+            --jq '"\(.name): \(.html_url)", "Immutable: \(.immutable // false).", "", .body // ""'
+          echo "Its tag $tag names $commit. Latest release: $marked."
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" --jq '"The GitHub Release: [\(.name)](\(.html_url))"' \
+            >> "$GITHUB_STEP_SUMMARY"
+          if [ "$commit" != "$GITHUB_SHA" ]; then
+            echo "::error::$tag names $commit now, not $GITHUB_SHA, which the checks passed: it was moved while its GitHub Release was created."
+            exit 1
+          fi

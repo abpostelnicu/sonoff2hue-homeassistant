@@ -84,6 +84,22 @@ folder, and `scripts/setup` done.
 - **Press the simulated wall switch** and **Show the fake Hue bridge's lights** (Terminal › Run Task) run
   `scripts/develop press` and `scripts/develop lights`. The state is in `.dev/`, as with `scripts/develop`.
 
+## Releases
+
+Each version is a GitHub Release, "sonoff2hue X.Y.Z" on the tag `vX.Y.Z`. Home Assistant's Marketplace installs and
+updates the integration from these Releases, and shows their notes before an update. A published Release never
+changes: a fix comes as the next version. There is no release yet; the first, 1.0.0, follows the live test on Home
+Assistant OS.
+
+To release, raise `version` in `custom_components/sonoff2hue/manifest.json` through a pull request, then tag the merged
+commit on `main` and push the tag. The Release workflow checks the tag and creates the Release.
+
+```sh
+git switch main && git pull --ff-only
+git tag -a vX.Y.Z -m "sonoff2hue X.Y.Z"
+git push origin vX.Y.Z
+```
+
 ## License
 
 [Apache License 2.0](LICENSE).
