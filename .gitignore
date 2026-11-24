@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# A local Home Assistant for development (scripts/develop) and its state.
+.dev/
+
+# Never commit a sonoff2hue.yaml: it holds the Hue application key and eWeLink device keys.
+sonoff2hue.yaml
+
+# Editors: only the shared debug setup is committed.
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+.idea/
