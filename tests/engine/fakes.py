@@ -2,7 +2,9 @@
 
 import asyncio
 from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 import errno
+from selectors import BaseSelector, SelectorKey
 
 
 class FakeTransport:
@@ -68,3 +70,41 @@ async def until(condition: Callable[[], bool], within: float = 5) -> None:
     async with asyncio.timeout(within):
         while not condition():  # noqa: ASYNC110 - the state under test has no event to wait for
             await asyncio.sleep(0.01)
+
+
+class VirtualTime:
+    """Time on the running event loop that only moves when the loop would wait: it then jumps to the next timer, so
+    sleeps of any length end at once and in order. Real I/O is still polled, and waited for when no timer is left.
+    :meth:`utc` is a wall clock that moves with it, for the engine's ``clock`` parameters."""
+
+    START = datetime(2026, 11, 24, 12, 0, tzinfo=UTC)
+
+    def __init__(self, loop: asyncio.AbstractEventLoop) -> None:
+        self._loop = loop
+        self._time = loop.time
+        self._selector: BaseSelector = loop._selector  # type: ignore[attr-defined]
+        self._select = self._selector.select
+        self.start = self.now = loop.time()
+        loop.time = lambda: self.now  # type: ignore[method-assign]
+        self._selector.select = self._jump  # type: ignore[method-assign]
+
+    @property
+    def elapsed(self) -> float:
+        """Seconds since this virtual time started."""
+        return self.now - self.start
+
+    def utc(self) -> datetime:
+        return self.START + timedelta(seconds=self.elapsed)
+
+    def restore(self) -> None:
+        self._loop.time = self._time  # type: ignore[method-assign]
+        self._selector.select = self._select  # type: ignore[method-assign]
+
+    def _jump(self, timeout: float | None = None) -> list[tuple[SelectorKey, int]]:
+        events = self._select(0)
+        if events or timeout == 0:
+            return events
+        if timeout is None:
+            return self._select(None)
+        self.now += timeout
+        return events
