@@ -22,12 +22,13 @@ from custom_components.sonoff2hue.engine.toggler import ToggleResult
 
 from ..hue import InMemoryBridge, RecordedRequest
 from .fakes import FakeNetwork, until
-from .packets import announcement, probe, to_packet
+from .packets import DnsPacketBuilder, a, announcement, name, probe, srv, to_packet, txt
 
 DEVICE_ID = "1000abcdef"
 OTHER_DEVICE_ID = "1000999999"
 DEVICE_KEY = "qa-only-device-key"
 ADDRESS = "192.0.2.5"
+OTHER_ADDRESS = "192.0.2.6"
 NOW = datetime(2026, 11, 24, 12, 0, tzinfo=UTC)
 BRIDGE_DOWN_503 = "Hue bridge returned 503 Service Unavailable for GET /clip/v2/resource/light"
 PAIR_AGAIN = "reconfigure the sonoff2hue integration to pair the bridge again"
@@ -124,16 +125,32 @@ def hall(device_key: str | None = None) -> SwitchBinding:
 
 
 def create_runner(
-    hue: HueClient, observer: RunnerObserver | None = None, binding: SwitchBinding | None = None
+    hue: HueClient,
+    observer: RunnerObserver | None = None,
+    binding: SwitchBinding | None = None,
+    now: datetime = NOW,
 ) -> Runner:
     binding = binding or hall()
-    return Runner(EngineConfig(switches=[binding.settings]), [binding], hue, observer, clock=lambda: NOW)
+    return Runner(EngineConfig(switches=[binding.settings]), [binding], hue, observer, clock=lambda: now)
 
 
 def plain(seq: int, device_id: str = DEVICE_ID, received_at: datetime = NOW) -> MdnsPacket:
     """Without a device key every new sequence number of a configured switch is a press."""
     data = announcement(device_id, seq, f"payload{seq}", "iv", ip=ADDRESS)
     return to_packet(data, ADDRESS, received_at)
+
+
+def with_other_device(seq: int, other_seq: int) -> MdnsPacket:
+    """One packet with the broadcast of the switch, then that of another device."""
+    packet = DnsPacketBuilder()
+    for device_id, number, ip in ((DEVICE_ID, seq, ADDRESS), (OTHER_DEVICE_ID, other_seq, OTHER_ADDRESS)):
+        instance, host = f"eWeLink_{device_id}._ewelink._tcp.local", f"eWeLink_{device_id}.local"
+        entries = [f"id={device_id}", "type=plug", f"seq={number}", "encrypt=true", "iv=iv", f"data1=payload{number}"]
+        packet.answer("_ewelink._tcp.local", DnsRecordType.PTR, name(instance))
+        packet.answer(instance, DnsRecordType.TXT, txt(*entries), cache_flush=True)
+        packet.additional(instance, DnsRecordType.SRV, srv(8081, host))
+        packet.additional(host, DnsRecordType.A, a(ip))
+    return to_packet(packet.build(), ADDRESS, NOW)
 
 
 def encrypted(
@@ -225,6 +242,43 @@ async def test_a_stale_press_is_dropped_without_calling_the_bridge() -> None:
 
     assert observer.events == ["press Hall seq=101", "dropped Hall"]
     assert bridge.requests == []
+
+
+async def test_a_stale_press_is_dropped_before_handle_packet_returns(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.DEBUG, logger=runner.__name__)
+    bridge = LightBridge()
+    observer = RecordingObserver()
+    switch = create_runner(bridge.client(), observer, now=NOW + timedelta(milliseconds=5001))
+    switch.handle_packet(plain(100))
+
+    switch.handle_packet(plain(101))
+
+    # Nothing awaited: the toggle ran as far as calling ToggleLightsAsync runs it in .NET.
+    assert observer.events == ["press Hall seq=101", "dropped Hall"]
+    assert runner_log(caplog)[-2:] == [
+        (logging.INFO, "Hall (1000abcdef): wall switch operated (seq 101)."),
+        (logging.WARNING, "Hall (1000abcdef): dropped a press that waited more than 5s for the bridge."),
+    ]
+    assert bridge.requests == []
+
+
+async def test_a_toggle_that_needs_no_io_ends_before_the_next_event_of_its_packet(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.DEBUG, logger=runner.__name__)
+    observer = RecordingObserver()
+    switch = create_runner(LightBridge().client(), observer)
+    switch.handle_packet(plain(100))
+
+    switch.handle_packet(with_other_device(101, 5))
+
+    # The bridge answers at once, so the toggle ends inside handle_packet, as in .NET with a handler that does.
+    assert observer.events == ["press Hall seq=101", "bridge up", "toggled Hall on changed=1 unchanged=0 failed=0"]
+    assert runner_log(caplog)[1:] == [
+        (logging.INFO, "Hall (1000abcdef): wall switch operated (seq 101)."),
+        (logging.INFO, "Hall (1000abcdef): turned ON light 'Ceiling' in N ms."),
+        (logging.DEBUG, "Ignoring unconfigured eWeLink device 1000999999 at 192.0.2.6."),
+    ]
 
 
 async def test_pings_report_only_changes_of_the_bridge_state() -> None:
@@ -753,6 +807,16 @@ async def _stop(task: asyncio.Task[None]) -> None:
         await task
 
 
+class LoggingBridge(LightBridge):
+    """A LightBridge that logs each request, so that tests can see it among the runner's log lines."""
+
+    log = logging.getLogger("tests.engine.bridge")
+
+    def _answer(self, request: RecordedRequest) -> tuple[int, str]:
+        self.log.info("%s %s", request.method, request.path)
+        return super()._answer(request)
+
+
 def _broadcast(network: FakeNetwork, seq: int) -> None:
     network.deliver(announcement(DEVICE_ID, seq, f"payload{seq}", "iv", ip=ADDRESS), (ADDRESS, 5353))
 
@@ -857,5 +921,31 @@ async def test_every_restart_of_the_socket_takes_a_new_baseline(network: FakeNet
     await switch.when_toggles_complete()
 
     assert observer.events == ["bridge up", "press Hall seq=102", "toggled Hall on changed=1 unchanged=0 failed=0"]
+    await _stop(running)
+    await _stop(listening)
+
+
+async def test_run_sends_its_first_ping_before_it_first_waits(
+    network: FakeNetwork, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO)
+    bridge = LoggingBridge()
+    observer = RecordingObserver()
+    listener = MdnsListener(network.open, network.watch, clock=lambda: NOW)
+    listening = asyncio.create_task(listener.run())
+    await network.next_open()
+    switch = create_runner(bridge.client(), observer)
+
+    running = asyncio.get_running_loop().create_task(switch.run(listener), eager_start=True)
+
+    # Nothing awaited: run() went as far as RunAsync goes before it first waits.
+    assert [r.getMessage() for r in caplog.records if r.name in (runner.__name__, LoggingBridge.log.name)] == [
+        "Hall (1000abcdef) -> light 'Ceiling'",
+        "Hall (1000abcdef): no deviceKey configured, so every new state broadcast counts as a press (relay/setting "
+        "changes cannot be filtered).",
+        "GET /clip/v2/resource/bridge",
+        "Listening for wall switch presses.",
+    ]
+    assert observer.events == ["bridge up"]
     await _stop(running)
     await _stop(listening)

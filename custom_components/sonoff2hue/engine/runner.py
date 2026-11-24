@@ -141,13 +141,15 @@ class Runner:
                     binding.settings.display_name,
                 )
 
-        # In .NET's order: the keep-alive goes out before the switches are asked for their state.
-        keep_warm = asyncio.create_task(self._keep_bridge_warm())
-        remove_handler = listener.add_packet_handler(self.handle_packet)
+        loop = asyncio.get_running_loop()
+        # As RunAsync calls KeepBridgeWarmAsync: the first ping goes out before anything is awaited. The switches are
+        # asked for their state after the next line, as the .NET runner's own listener opened its socket after it.
+        keep_warm = loop.create_task(self._keep_bridge_warm(), eager_start=True)
+        _LOGGER.info("Listening for wall switch presses.")
         remove_started = listener.add_started(self._discover_switches)
+        remove_handler = listener.add_packet_handler(self.handle_packet)
         try:
-            _LOGGER.info("Listening for wall switch presses.")
-            await asyncio.get_running_loop().create_future()
+            await loop.create_future()
         finally:
             # As cancelling the .NET runner's token does: everything is told to stop before anything is awaited.
             remove_handler()
@@ -159,9 +161,11 @@ class Runner:
     async def _discover_switches(self, listener: MdnsListener) -> None:
         self._tracker.reset_all()
 
-        # A few quick queries make every switch answer with its current state (the baseline).
+        # A few quick queries make every switch answer with its current state (the baseline). A delay of 0 isn't
+        # awaited, as .NET's Task.Delay(0) doesn't wait: the first query goes out at once.
         for delay in DISCOVERY_QUERY_DELAYS:
-            await asyncio.sleep(delay)
+            if delay > 0:
+                await asyncio.sleep(delay)
             listener.query(SERVICE_TYPE, DnsRecordType.PTR)
 
         # Keep asking only while some switch is missing: a switch without a baseline can't cause a false press.
@@ -265,9 +269,12 @@ class Runner:
             self._report_bridge_reachability(True, None)
 
     def _start_toggle(self, binding: SwitchBinding, pressed_at: datetime) -> None:
-        task = asyncio.get_running_loop().create_task(self._toggle_lights(binding, pressed_at))
-        self._toggles.add(task)
-        task.add_done_callback(self._toggles.discard)
+        # Eager, as calling ToggleLightsAsync runs it until it first waits: a stale press is dropped, and a toggle that
+        # needs no I/O ends, before the next event of the packet is handled.
+        toggle = asyncio.get_running_loop().create_task(self._toggle_lights(binding, pressed_at), eager_start=True)
+        if not toggle.done():
+            self._toggles.add(toggle)
+            toggle.add_done_callback(self._toggles.discard)
 
     async def _toggle_lights(self, binding: SwitchBinding, pressed_at: datetime) -> None:
         name = binding.settings.display_name
@@ -311,12 +318,11 @@ class Runner:
                 self._notify(methodcaller("on_toggle_failed", binding, str(err)))
 
     async def _keep_bridge_warm(self) -> None:
-        # The first request goes out right away, so the bridge's state is known from the start.
-        delay = 0.0
+        # The first request goes out right away, so the bridge's state is known from the start; .NET's first
+        # Task.Delay(TimeSpan.Zero) doesn't wait.
         while True:
-            await asyncio.sleep(delay)
-            delay = KEEP_WARM_INTERVAL
             await self.ping_bridge()
+            await asyncio.sleep(KEEP_WARM_INTERVAL)
 
     def _report_bridge_reachability(self, reachable: bool, message: str | None) -> None:
         """Logs and reports changes only: usable or not, or a new reason while not usable."""
