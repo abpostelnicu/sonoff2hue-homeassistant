@@ -453,12 +453,15 @@ The eWeLink LAN protocol and the Hue API, from the .NET app's research (public s
     output decodes to the same pixels as resvg's rendering. `tests/test_brand.py` checks them, and fails for a copy
     with a transparent border.
   - actionlint 1.7.12 finds nothing in `validate.yml`.
+  - On pull request #5 (run 45458068984), *hassfest* (the 2026.11.3 image) found one integration, none invalid and no
+    warnings, and *HACS* validated the branch `ha/skeleton`: all 10 checks passed, `brands` without falling back to
+    the brands repository.
 
 ## Status
 
 - [x] Repository started: the license, this memory, the tools (`scripts/setup`, `scripts/check`) and the commit checks
 - [ ] CI: lint, tests and per-commit checks, required for `main` by ruleset 28003079 (done); hassfest and HACS
-  validation once the manifest exists, then required too
+  validation (`validate.yml`, done), then required too
 - [ ] mDNS spike on the user's Home Assistant OS: own UDP 5353 socket next to Home Assistant's zeroconf
 - [ ] Engine port with its tests: DNS, eWeLink with press detection, the mDNS listener, the Hue client and pairing,
   the fake Hue bridge, the runner (done), YAML import
