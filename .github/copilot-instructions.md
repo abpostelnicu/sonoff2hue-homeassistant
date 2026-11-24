@@ -90,8 +90,11 @@ The user's choices, made on 2026-11-23 when the plan was approved:
 |--------|----------|
 | `custom_components/sonoff2hue` | The integration |
 | `custom_components/sonoff2hue/engine` | Ports of the .NET engine, without Home Assistant imports. `text.py` holds the .NET string and number rules (trim, ordinal case-insensitive comparison, `ToLowerInvariant`, `TryParse`). `dns.py` is `Mdns/DnsMessage.cs`; `mdns.py` is `Mdns/MdnsListener.cs` with the parts of .NET's `NetworkInterface` and `NetworkChange` it uses; `ewelink.py` is `Ewelink/EwelinkAnnouncement.cs` and `EwelinkCrypto.cs`; `press.py` is `Ewelink/PressDetector.cs` and `SwitchTracker.cs`; `config.py` is the model of `Configuration/AppConfig.cs`; `jsonnode.py` reads JSON as System.Text.Json's `JsonNode` does. `hue_address.py` is `Hue/HueBridgeAddress.cs` with the parts of .NET's `Uri`, `IPAddress` and `IdnMapping` it relies on; `hue_client.py` is `Hue/HueClient.cs`, `HueTls.cs` and `HueModels.cs`; `hue_setup.py` is `Hue/HueBridgeSetup.cs` with the pairing loop of `Web/Management/HuePairing.cs`; `errors.py` holds `UnexpectedError` (decision 9) |
-| `tests/engine` | Tests of the engine, ported from the .NET tests. `packets.py` builds raw DNS packets and MINIR4M broadcasts (the .NET tests' `TestPackets.cs`) and `MdnsPacket`s |
+| `tests/engine` | Tests of the engine, ported from the .NET tests. `packets.py` builds raw DNS packets and MINIR4M broadcasts (the .NET tests' `TestPackets.cs`) and `MdnsPacket`s; `fakes.py` has fake multicast transports for `MdnsListener` |
+| `tests` | `hue.py` runs the fake Hue bridge on 127.0.0.1 with a manual clock (the .NET tests' `FakeHueTestHost`); `conftest.py` has its fixtures, `fake_hue` and `fake_hue_pressed`, which enable sockets |
+| `tests/tools` | Tests of the fake Hue bridge (the .NET app's `Sonoff2Hue.FakeHue.Tests`) |
 | `tests/engine/fixtures` | `dotnet_text.json` and `dotnet_engine.json`, made by `tools/dotnet_oracle` from .NET and from the .NET app's own code (decision 7) |
+| `tools/fake_hue` | The fake Hue bridge, a port of the .NET app's `tests/local/FakeHue` (decision 12): `bridge.py` (state, `Fault`s), `server.py` (endpoints, HTTPS, certificate), `__main__.py` (`python -m tools.fake_hue`, settings `FAKE_HUE_BIND`, `FAKE_HUE_PORT`, `FAKE_HUE_LINK_BUTTON`) |
 | `tools/dotnet_oracle` | The generator of those fixtures: a .NET 10 console app (`Program.cs`, `Engine.cs`) that references the app's `Sonoff2Hue.csproj`, the cases it evaluates (`engine_cases.py`) and `generate.sh` |
 | `scripts` | `setup` (the virtual environment) and `check` (lint, formatting, types, tests) |
 | `.github/scripts` | `check-commits.sh` (the .NET repository's, unchanged) and `test-each-commit.sh` |
@@ -119,6 +122,7 @@ The C# tests are ported as the executable form of this table, with recognizable 
 | Pairing | `GET /api/0/config` gives the bridge's id and the pin, read from the same connection, as `GetFromJsonAsync` reads it (keys without regard to case). `POST /api` with devicetype `sonoff2hue#<host up to its first dot, at most 19 letters and digits>` and `generateclientkey`, every 2 s for 60 s. Error 101 means keep waiting, and transient failures are retried; each attempt is reported, as the web UI showed it. After 60 s: "The link button was not pressed within 60 seconds. Try again." A changed certificate, or a refusal other than 101, aborts | `Hue/HueBridgeSetup.cs`, `Web/Management/HuePairing.cs` |
 | Discovery | For 5 s, in parallel: mDNS `_hue._tcp.local` (queries at 0, 1 and 3 s) and `https://discovery.meethue.com/`. Deduplicated by IP and sorted ordinally, each with its source. The cloud's answer is read as `GetFromJsonAsync<JsonArray>` reads it; its failures are only logged at debug level, as .NET catches them, except an `ArgumentException`, which fails the discovery in both | `Hue/HueBridgeSetup.cs` |
 | Bridge address | Accepted exactly when .NET's `Uri` reads `https://<address>/` as a host and a port, and normalized as it does (Research findings): IPv6 gets brackets, IPv4 forms such as `192.168.1` are written out, host names are lowercased only when they have an ASCII capital letter. A scheme, path, user info, query, fragment or spaces are rejected, with the same message | `Hue/HueBridgeAddress.cs` |
+| Fake Hue bridge | The same resources, ids, endpoints, answers and messages, the 30 s link-button window, the request and PUT logs, and the settings. Python adds `Fault`s for tests | `tests/local/FakeHue` |
 | LAN registry | Per device: address, type, encrypted, seq, first and last seen, last event and its time, last press, detached, summary, decode error. Online means heard within the last 5 min | `Web/Monitoring/DeviceRegistry.cs` |
 | Switch validation | Name of at most 64 characters, without control characters. Id of 4-40 ASCII letters and digits, lowercased. Key of at most 128 characters, without whitespace or control characters. Each list holds at most 50 entries of 1-200 characters, with case-insensitive duplicates removed. At least one target, and a unique device id. Targets are checked against the bridge when it can be reached, and only warned about otherwise | `Web/Management/ConfigEndpoints.cs`, the UI's `switcheditor.js` |
 | YAML import | `AppConfig.Parse` and `ValidateForRun`: camelCase keys; unknown and duplicate keys are errors, with line and column; empty values are normalized | `Configuration/AppConfig.cs` |
@@ -297,6 +301,7 @@ The eWeLink LAN protocol and the Hue API, from the .NET app's research (public s
 | 9 | Where the .NET app's code throws an exception it doesn't catch as an expected failure (`NullReferenceException`, `ArgumentException`, `InvalidOperationException` and the like), the port raises `errors.UnexpectedError`, which names .NET's exception and has its message; `jsonnode.JsonAccessError` is one. Lights and groups keep a null id or name where .NET's do | Callers then fail where the app failed: a toggle that `HueToggler` doesn't count as failed, pairing that ends with "Pairing failed: …", discovery that fails as a whole. Python's own exceptions in their place would differ in type and message |
 | 10 | `hue_address.py` ports `HueBridgeAddress` with the parts of `Uri`, `IPAddress.TryParse` and invariant `IdnMapping` it relies on, function by function and on UTF-16 code units, instead of approximating them with `ipaddress` and Python's IDNA codec | The address is typed by the user, stored, and used for every request. The oracle's first 285 addresses showed that Python's libraries differ in a dozen places (`0x`, `+1.1.1.1`, `@bridge`, zones, `::ffff:` forms, case, IDNA 2003); the literal port matched all of them on its first run |
 | 11 | The engine's `pair` asks for a key every 2 s until 60 s have passed, as `HuePairing` does, reports each attempt that didn't pair (`on_attempt`), and ends with the web UI's message, not the command line's | The setup flow replaces the web UI's pairing page, whose message it shows while waiting |
+| 12 | `tools/fake_hue` ports the .NET app's fake bridge, with its ids, endpoints, answers, messages and settings, and adds `Fault`s (a status, body or delay for matching requests) for tests. `tests/hue.py` runs it on 127.0.0.1 over HTTPS with a certificate made at every start, and a manual clock | The client is tested over real HTTPS with a pinned certificate, which the .NET tests did in memory. Development and end-to-end CI need the same bridge without hardware |
 
 ## Record keeping
 
@@ -343,6 +348,14 @@ The eWeLink LAN protocol and the Hue API, from the .NET app's research (public s
   requests they send (the C# `HueTests` client cases among them), 8 pins, 7 status lines, 52 encoding names and .NET's
   60 reason phrases. A first, approximate address module differed from .NET in a dozen places; the literal port
   (decision 10) matched all 285 on its first run. The earlier parity tests now compare .NET's exception types too.
+- 2026-11-24: the fake Hue bridge and the client over HTTPS on 127.0.0.1. 36 tests of the fake bridge (the C#
+  `FakeHueTests`, `FakeHueOptionsTests` and `FakeHueCertificateTests`, a device type of 41 UTF-16 code units, and
+  `Fault`s), 18 of the client (the pin in any notation, another or a malformed pin, no pin, a refused connection, a
+  timeout, a 207 write, a connection closed during the handshake, a host without an IDN form, app keys) and 38 of
+  bridge info, pairing and discovery (the bridge's identity and certificate and its failures, keys without regard to
+  case, each outcome of a pairing attempt, the pairing loop, device types, mDNS and the cloud with .NET's failure
+  handling). A full run showed the mDNS listener's started callbacks cancelled in a set's order, once in a few dozen
+  runs; they are now cancelled in the order they started, a fix squashed into the listener's commit.
 
 ## Status
 
@@ -350,8 +363,8 @@ The eWeLink LAN protocol and the Hue API, from the .NET app's research (public s
 - [ ] CI: lint, tests and per-commit checks (done, first green on #1); hassfest and HACS validation once the manifest
   exists; a ruleset on `main` once the checks have passed there
 - [ ] mDNS spike on the user's Home Assistant OS: own UDP 5353 socket next to Home Assistant's zeroconf
-- [ ] Engine port with its tests: DNS, eWeLink with press detection, the mDNS listener, the Hue client and pairing
-  (done), fake Hue bridge, runner, YAML import
+- [ ] Engine port with its tests: DNS, eWeLink with press detection, the mDNS listener, the Hue client and pairing,
+  the fake Hue bridge (done), runner, YAML import
 - [ ] Home Assistant layer: skeleton, runtime, setup and import flow, switch subentries, entities, diagnostics,
   logbook
 - [ ] Development tooling and end-to-end CI with a real Home Assistant, the fake bridge and a simulated switch
