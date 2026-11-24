@@ -144,6 +144,34 @@ async def test_removing_a_started_callback_stops_it_while_the_listener_goes_on(n
     await _stop(task)
 
 
+async def test_started_callbacks_run_before_the_first_packet_of_their_socket(network: FakeNetwork) -> None:
+    listener = MdnsListener(network.open, network.watch)
+    seen: list[str] = []
+
+    def started(label: str) -> Callable[[MdnsListener], Awaitable[None]]:
+        async def callback(_: MdnsListener) -> None:
+            seen.append(label)
+            await asyncio.sleep(3600)
+
+        return callback
+
+    listener.add_packet_handler(lambda packet: seen.append("packet"))
+    listener.add_started(started("started"))
+    task = asyncio.create_task(listener.run())
+    await network.next_open()
+    network.deliver(QUERY, ("192.0.2.7", 5353))
+    listener.add_started(started("added while open"))
+    assert seen == ["started", "packet", "added while open"]
+
+    network.network_changed()
+    await network.next_open()
+    network.deliver(QUERY, ("192.0.2.7", 5353))
+
+    # As .NET raises Started right after it opens the socket, before it receives anything.
+    assert seen == ["started", "packet", "added while open", "started", "added while open", "packet"]
+    await _stop(task)
+
+
 async def test_failing_started_callback_is_logged(network: FakeNetwork, caplog: pytest.LogCaptureFixture) -> None:
     listener = MdnsListener(network.open, network.watch)
 

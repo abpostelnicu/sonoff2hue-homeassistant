@@ -925,20 +925,21 @@ async def test_every_restart_of_the_socket_takes_a_new_baseline(network: FakeNet
     await _stop(listening)
 
 
-async def test_run_sends_its_first_ping_before_it_first_waits(
-    network: FakeNetwork, caplog: pytest.LogCaptureFixture
+async def test_run_sends_its_first_ping_and_query_before_it_first_waits(
+    network: FakeNetwork, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
+    monkeypatch.setattr(runner, "DISCOVERY_QUERY_DELAYS", (0.0, 1.0, 2.0))
     caplog.set_level(logging.INFO)
     bridge = LoggingBridge()
     observer = RecordingObserver()
     listener = MdnsListener(network.open, network.watch, clock=lambda: NOW)
     listening = asyncio.create_task(listener.run())
-    await network.next_open()
+    transport = await network.next_open()
     switch = create_runner(bridge.client(), observer)
 
     running = asyncio.get_running_loop().create_task(switch.run(listener), eager_start=True)
 
-    # Nothing awaited: run() went as far as RunAsync goes before it first waits.
+    # Nothing awaited: run() went as far as RunAsync goes before it first waits, the first of three queries included.
     assert [r.getMessage() for r in caplog.records if r.name in (runner.__name__, LoggingBridge.log.name)] == [
         "Hall (1000abcdef) -> light 'Ceiling'",
         "Hall (1000abcdef): no deviceKey configured, so every new state broadcast counts as a press (relay/setting "
@@ -947,5 +948,28 @@ async def test_run_sends_its_first_ping_before_it_first_waits(
         "Listening for wall switch presses.",
     ]
     assert observer.events == ["bridge up"]
+    assert transport.sent == [(QUERY, "192.0.2.1")]
+    await _stop(running)
+    await _stop(listening)
+
+
+async def test_a_broadcast_right_after_a_restart_of_the_socket_is_a_new_baseline(network: FakeNetwork) -> None:
+    bridge = LightBridge()
+    observer = RecordingObserver()
+    listener = MdnsListener(network.open, network.watch, clock=lambda: NOW)
+    listening = asyncio.create_task(listener.run())
+    first = await network.next_open()
+    switch = create_runner(bridge.client(), observer)
+    running = asyncio.create_task(switch.run(listener))
+    await until(lambda: len(first.sent) >= 3)  # the switches were asked, after the first socket's reset
+    _broadcast(network, 100)
+
+    network.network_changed()
+    await network.next_open()
+    _broadcast(network, 101)
+
+    # The new socket's started callback reset the baselines before its first packet, as .NET's Started does.
+    assert observer.events == ["bridge up"]
+    assert bridge.paths == ["GET /clip/v2/resource/bridge"]
     await _stop(running)
     await _stop(listening)

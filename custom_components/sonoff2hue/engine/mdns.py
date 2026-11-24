@@ -92,9 +92,11 @@ class MdnsListener:
 
     def add_started(self, callback: StartedCallback) -> Callable[[], Awaitable[None]]:
         """Runs ``callback`` every time the socket was (re)created and joined the multicast group, and right away if it
-        is open. Users reset what they derived from earlier packets and send their queries again there. The callback is
-        cancelled when its socket closes. Returns a coroutine function that removes it, cancels it if it is running,
-        and waits for that to end, so that a user can stop while the listener goes on."""
+        is open. Users reset what they derived from earlier packets and send their queries again there. It runs at once
+        until it first waits, as .NET raises ``Started`` right after it opens the socket, so the reset comes before the
+        socket's first packet. The callback is cancelled when its socket closes. Returns a coroutine function that
+        removes it, cancels it if it is running, and waits for that to end, so that a user can stop while the listener
+        goes on."""
         self._started.append(callback)
         if self._transport is not None:
             self._start(callback)
@@ -125,7 +127,7 @@ class MdnsListener:
 
                 try:
                     self._transport = await self._transport_factory(self._on_datagram, on_error)
-                    for callback in self._started:
+                    for callback in list(self._started):  # a callback runs at once and may add or remove some
                         self._start(callback)
                     await asyncio.wait((restart, errors), return_when=asyncio.FIRST_COMPLETED)
                     if errors.done():
@@ -158,9 +160,10 @@ class MdnsListener:
                 _LOGGER.debug("mDNS query for %s on %s failed: %s", name, interface, _message(err))
 
     def _start(self, callback: StartedCallback) -> None:
-        task = asyncio.get_running_loop().create_task(self._run_started(callback))
-        self._started_tasks[task] = callback
-        task.add_done_callback(lambda done: self._started_tasks.pop(done, None))
+        task = asyncio.get_running_loop().create_task(self._run_started(callback), eager_start=True)
+        if not task.done():
+            self._started_tasks[task] = callback
+            task.add_done_callback(lambda done: self._started_tasks.pop(done, None))
 
     async def _run_started(self, callback: StartedCallback) -> None:
         try:
