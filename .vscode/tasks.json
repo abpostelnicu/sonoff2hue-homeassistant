@@ -1,0 +1,36 @@
+{
+    // The setup for the launch configurations in launch.json, the simulated wall switch and the fake Hue bridge's
+    // state, all through scripts/develop. See "Development" in README.md.
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Set up the development Home Assistant",
+            "detail": "Home Assistant's environment .dev/venv and its configuration folder .dev/config",
+            "type": "process",
+            "command": "${workspaceFolder}/scripts/develop",
+            "args": ["setup"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": []
+        },
+        {
+            "label": "Press the simulated wall switch",
+            "detail": "A press of the MINIR4M 1000abcdef: eWeLink announcements with TTL 0, which stay on this machine",
+            "type": "process",
+            "command": "${workspaceFolder}/scripts/develop",
+            "args": ["press"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "clear": true }
+        },
+        {
+            "label": "Show the fake Hue bridge's lights",
+            "detail": "Its lights, rooms and zones, on or off, and every PUT it received",
+            "type": "process",
+            "command": "${workspaceFolder}/scripts/develop",
+            "args": ["lights"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "clear": true }
+        }
+    ]
+}

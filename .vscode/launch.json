@@ -1,0 +1,57 @@
+{
+    // Debug sonoff2hue in a local Home Assistant without hardware: "sonoff2hue: Home Assistant and fake Hue bridge"
+    // starts both under the debugger. Home Assistant's state goes to .dev/, which git ignores. See "Development" in
+    // README.md.
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Home Assistant",
+            "type": "debugpy",
+            "request": "launch",
+            // .dev/venv with Home Assistant, and its configuration folder .dev/config (scripts/develop setup).
+            "preLaunchTask": "Set up the development Home Assistant",
+            "python": "${workspaceFolder}/.dev/venv/bin/python",
+            // "python -m" from the repository root puts the root first on the module search path, so Home Assistant
+            // loads custom_components.sonoff2hue from this checkout, and breakpoints in its files are hit.
+            "module": "homeassistant",
+            // As scripts/develop runs it: assist_pipeline's requirements have no wheels for Python 3.14.
+            "args": ["--config", "${workspaceFolder}/.dev/config", "--skip-pip-packages", "pymicro-vad,pyspeex-noise"],
+            "cwd": "${workspaceFolder}",
+            "justMyCode": false,
+            "console": "integratedTerminal",
+            // Stop sends Ctrl+C, so that Home Assistant shuts down and saves its state; a second Stop kills it.
+            "onTerminate": "KeyboardInterrupt",
+            "serverReadyAction": {
+                "action": "openExternally",
+                "pattern": "Now listening on port ([0-9]+)",
+                "uriFormat": "http://127.0.0.1:%s/"
+            },
+            "presentation": { "group": "2-services", "order": 1 }
+        },
+        {
+            "name": "Fake Hue bridge",
+            "type": "debugpy",
+            "request": "launch",
+            // The repository's environment (scripts/setup), as for the tests.
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "module": "tools.fake_hue",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                // HTTPS on 127.0.0.1:18443. Its link button is always pressed, so pairing succeeds at once.
+                "FAKE_HUE_BIND": "127.0.0.1",
+                "FAKE_HUE_PORT": "18443",
+                "FAKE_HUE_LINK_BUTTON": "pressed"
+            },
+            "console": "integratedTerminal",
+            "presentation": { "group": "2-services", "order": 2 }
+        }
+    ],
+    "compounds": [
+        {
+            "name": "sonoff2hue: Home Assistant and fake Hue bridge",
+            "configurations": ["Fake Hue bridge", "Home Assistant"],
+            "stopAll": true,
+            "presentation": { "group": "1-all", "order": 1 }
+        }
+    ]
+}

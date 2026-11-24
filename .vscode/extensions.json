@@ -1,0 +1,5 @@
+{
+    // The launch configurations in launch.json use the Python Debugger (type debugpy). Ruff and the Mypy Type Checker
+    // lint, format and check types as scripts/check does.
+    "recommendations": ["ms-python.python", "ms-python.debugpy", "charliermarsh.ruff", "ms-python.mypy-type-checker"]
+}

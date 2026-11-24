@@ -67,6 +67,23 @@ scripts/develop lights     # the fake bridge's lights, rooms and zones, and ever
 - **Start over:** delete `.dev/config` to start again from onboarding, or `.dev` for everything, Home Assistant's
   environment included.
 
+### Debugging in VS Code
+
+[.vscode/launch.json](.vscode/launch.json) runs Home Assistant and the fake Hue bridge under the debugger, on Linux (WSL
+2 included) and macOS. It needs the Python and Python Debugger extensions, which VS Code recommends when you open the
+folder, and `scripts/setup` done.
+
+- **sonoff2hue: Home Assistant and fake Hue bridge** starts both and stops them together. Before Home Assistant starts,
+  the task *Set up the development Home Assistant* runs `scripts/develop setup`; once it listens, VS Code opens it in
+  your browser.
+- Breakpoints in `custom_components/sonoff2hue` and `tools/fake_hue` are hit, as these are the files that run. Just My
+  Code is off for Home Assistant, so you can step into its code too.
+- Stop sends Ctrl+C: Home Assistant shuts down and saves its state, and a second Stop kills it. While it is still
+  starting, as its UI says, Ctrl+C or Stop abandons the start instead, without saving.
+- A restart from Home Assistant's UI ends the debug session: start it again to load code changes.
+- **Press the simulated wall switch** and **Show the fake Hue bridge's lights** (Terminal › Run Task) run
+  `scripts/develop press` and `scripts/develop lights`. The state is in `.dev/`, as with `scripts/develop`.
+
 ## License
 
 [Apache License 2.0](LICENSE).
