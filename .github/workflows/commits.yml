@@ -1,0 +1,110 @@
+name: Commits
+
+# Checks every commit of a pull request on its own, so each one can be checked out, tested and bisected: the message
+# and whitespace of each commit, then scripts/check (lint, formatting, types, tests) per commit.
+# "All commits pass" sums up the result; make that job a required status check.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: commits-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  BASE_SHA: ${{ github.event.pull_request.base.sha }}
+  HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+jobs:
+  messages:
+    name: Commit messages and whitespace
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # The merge commit has the current scripts even when the branch is older than them.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check commits
+        run: .github/scripts/check-commits.sh "$BASE_SHA..$HEAD_SHA"
+
+  list:
+    name: List commits
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      commits: ${{ steps.list.outputs.commits }}
+      count: ${{ steps.list.outputs.count }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: List the commits to test
+        id: list
+        run: |
+          commits=$(git log --reverse --format='%H %s' "$BASE_SHA..$HEAD_SHA" | jq -Rnc '
+            [inputs | capture("^(?<sha>[0-9a-f]+) (?<subject>.*)$")] as $all
+            | ($all | length) as $n
+            | [$all | to_entries[] | {sha: .value.sha, title: "\(.key + 1)/\($n) \(.value.sha[0:7]) \(.value.subject)"}]')
+          count=$(jq length <<< "$commits")
+          if [ "$count" -gt 100 ]; then
+            echo "::error::This pull request has $count commits. At most 100 are tested one by one; squash or split it."
+            exit 1
+          fi
+          echo "Testing $count commit(s) one by one."
+          echo "commits=$commits" >> "$GITHUB_OUTPUT"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+
+  test:
+    name: Test ${{ matrix.commit.title }}
+    needs: list
+    if: needs.list.outputs.count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        commit: ${{ fromJSON(needs.list.outputs.commits) }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ matrix.commit.sha }}
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@v10.4.0
+        with:
+          version: "0.13.7"
+          enable-cache: true
+          cache-dependency-glob: requirements_test.txt
+          cache-python: true
+
+      - name: Set up Python and the tools
+        run: scripts/setup
+
+      - name: Lint, formatting, types and tests (scripts/check)
+        run: scripts/check
+
+  all-commits-pass:
+    name: All commits pass
+    if: always()
+    needs: [messages, list, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check the results
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Commit messages, list, per-commit tests: $RESULTS"
+          for result in $RESULTS; do
+            case $result in
+              success | skipped) ;;
+              *) echo "::error::At least one commit failed its checks; see the jobs above."; exit 1 ;;
+            esac
+          done

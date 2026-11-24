@@ -80,6 +80,11 @@ The user's choices, made on 2026-11-23 when the plan was approved:
   `.git/info/exclude`) and their own branch.
 - Push new commits to a branch, open a pull request and wait for the checks. Then merge by fast-forwarding `main`
   (`git push origin <sha>:main`), which keeps the commit hashes; GitHub then marks the pull request as merged.
+- CI (`.github/workflows/ci.yml`) runs *Lint* (ruff, the formatter, mypy) and *Test* (pytest with coverage) on `main`
+  and on the merge result of each pull request. *Commits* (`commits.yml`) checks every commit of a pull request on its
+  own: the message rules and `git diff --check`, then `scripts/check` per commit, summed up by *All commits pass*. Both
+  install uv 0.13.7 with `astral-sh/setup-uv@v10.4.0` (it publishes only full-version tags) and run `scripts/setup`,
+  with uv's cache keyed on `requirements_test.txt`.
 
 | Folder | Contents |
 |--------|----------|
@@ -88,6 +93,7 @@ The user's choices, made on 2026-11-23 when the plan was approved:
 | `tests/engine` | Tests of the engine, ported from the .NET tests. `packets.py` builds raw DNS packets and MINIR4M broadcasts (the .NET tests' `TestPackets.cs`) |
 | `scripts` | `setup` (the virtual environment) and `check` (lint, formatting, types, tests) |
 | `.github/scripts` | `check-commits.sh` (the .NET repository's, unchanged) and `test-each-commit.sh` |
+| `.github/workflows` | `ci.yml` (*Lint*, *Test*) and `commits.yml` (per-commit checks, *All commits pass*) |
 
 ## Parity with the .NET app
 
@@ -228,7 +234,8 @@ The eWeLink LAN protocol and the Hue API, from the .NET app's research (public s
 ## Status
 
 - [x] Repository started: the license, this memory, the tools (`scripts/setup`, `scripts/check`) and the commit checks
-- [ ] CI (lint, tests, hassfest, HACS validation, per-commit checks) and a ruleset on `main`
+- [ ] CI: lint, tests and per-commit checks (done); hassfest and HACS validation once the manifest exists; a ruleset
+  on `main` once the checks have passed there
 - [ ] mDNS spike on the user's Home Assistant OS: own UDP 5353 socket next to Home Assistant's zeroconf
 - [ ] Engine port with its tests: DNS (done), eWeLink and press detection, mDNS listener, fake Hue bridge, Hue client
   and pairing, runner, YAML import
