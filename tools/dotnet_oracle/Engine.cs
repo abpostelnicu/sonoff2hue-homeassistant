@@ -289,7 +289,7 @@ internal static class Engine
             ["answers"] = input["answers"]!.DeepClone(),
             ["target"] = input["target"]?.DeepClone(),
         };
-        using var client = new HueClient("192.168.1.20", "app-key", handler);
+        using var client = new HueClient("192.0.2.20", "app-key", handler);
         try
         {
             result["result"] = Text(input, "operation") switch

@@ -298,7 +298,7 @@ async def test_hue_client(case: dict[str, Any]) -> None:
         transports.append(_CannedTransport(url, case["answers"]))
         return transports[-1]
 
-    client = hue_client.HueClient("192.168.1.20", "app-key", None, factory)
+    client = hue_client.HueClient("192.0.2.20", "app-key", None, factory)
     result: Any = None
     thrown: Exception | None = None
     try:
