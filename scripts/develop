@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+# Runs a local Home Assistant with this checkout's integration, and the fake Hue bridge, for development without
+# hardware. See "Development" in README.md.
+#
+# Usage: scripts/develop [command]
+#   run         (the default) Home Assistant, with the fake Hue bridge in the background, until Ctrl+C
+#   hass        Home Assistant alone
+#   fake-hue    the fake Hue bridge alone, in the foreground
+#   setup       only prepare .dev/venv and .dev/config, which starting Home Assistant otherwise needs
+#   press [n]   n presses of the simulated wall switch (default 1)
+#   lights      the fake Hue bridge's lights, rooms and zones, and every PUT it received
+#
+# Home Assistant runs from .dev/venv, made with uv from requirements_dev.txt, with its configuration folder .dev/config.
+# It runs from the repository root with "python -m homeassistant", which puts the root first on Python's module search
+# path, so custom_components.sonoff2hue is this checkout's code: no copy and no link. The fake bridge and the simulated
+# switch run from .venv (scripts/setup). The state is in .dev/, which git ignores: delete .dev/config to start again
+# from onboarding, or .dev/ for everything.
+#
+# Settings, from the environment:
+#   SONOFF2HUE_DEV_PORT    Home Assistant's port on 127.0.0.1: 8123 when .dev/config is made, and when set, applied
+#                          again
+#   SONOFF2HUE_DEV_DEVICE  the device id of the simulated MINIR4M (default 1000abcdef)
+#   FAKE_HUE_BIND, FAKE_HUE_PORT, FAKE_HUE_LINK_BUTTON
+#                          the fake bridge's settings (python -m tools.fake_hue help): 127.0.0.1 and 18443 by default,
+#                          and here its link button is always pressed unless FAKE_HUE_LINK_BUTTON says otherwise
+set -euo pipefail
+self=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
+cd "$(dirname "$0")/.."
+
+dev=.dev
+ha_python=$dev/venv/bin/python
+tools_python=.venv/bin/python
+device=${SONOFF2HUE_DEV_DEVICE:-1000abcdef}
+export FAKE_HUE_LINK_BUTTON=${FAKE_HUE_LINK_BUTTON:-pressed}
+# assist_pipeline's requirements have no wheels for Python 3.14 and need a C++ compiler (requirements_dev.txt).
+skip_packages=pymicro-vad,pyspeex-noise
+restart_exit_code=100 # Home Assistant's exit code when it is restarted (from its UI, a service call or SIGHUP)
+fake_hue_pid=
+
+usage() {
+  sed -n '5,11p' "$self" | cut -c3-
+}
+
+need_tools() {
+  if [ ! -x "$tools_python" ]; then
+    echo "No $tools_python: run scripts/setup first." >&2
+    exit 2
+  fi
+}
+
+setup() {
+  uv venv --quiet --allow-existing --python 3.14 "$dev/venv"
+  uv pip install --python "$ha_python" -r requirements_test.txt
+  # The packages that Home Assistant would install at its first start, resolved as it resolves them.
+  local constraints
+  constraints=$("$ha_python" -c \
+    'import homeassistant, pathlib; print(pathlib.Path(homeassistant.__file__).with_name("package_constraints.txt"))')
+  uv pip install --python "$ha_python" -r requirements_dev.txt --constraint "$constraints"
+  "$ha_python" -m tools.develop "$dev/config"
+}
+
+hass() {
+  local status
+  while true; do
+    status=0
+    "$ha_python" -m homeassistant --config "$dev/config" --skip-pip-packages "$skip_packages" || status=$?
+    if [ "$status" -ne "$restart_exit_code" ]; then
+      return "$status"
+    fi
+    echo "Home Assistant asked to be restarted: starting it again."
+  done
+}
+
+fake_hue() {
+  need_tools
+  exec "$tools_python" -m tools.fake_hue
+}
+
+start_fake_hue() {
+  need_tools
+  local log=$dev/fake-hue.log
+  "$tools_python" -m tools.fake_hue > "$log" 2>&1 &
+  fake_hue_pid=$!
+  trap stop_fake_hue EXIT
+  local tries=0
+  while [ $tries -lt 300 ]; do
+    if grep -q "Fake Hue bridge .* on https://" "$log"; then
+      echo "$(grep -o "Fake Hue bridge .* on https://.*" "$log") Its log: $log"
+      return
+    fi
+    if ! kill -0 "$fake_hue_pid" 2> /dev/null; then
+      cat "$log" >&2
+      echo "The fake Hue bridge didn't start. If one runs already, start Home Assistant alone with scripts/develop" \
+        "hass; or choose another FAKE_HUE_PORT." >&2
+      exit 1
+    fi
+    sleep 0.1
+    tries=$((tries + 1))
+  done
+  echo "The fake Hue bridge didn't start within 30 seconds; see $log." >&2
+  exit 1
+}
+
+stop_fake_hue() {
+  # A background job of a script ignores Ctrl+C, so the fake bridge is stopped here.
+  if [ -n "$fake_hue_pid" ]; then
+    kill "$fake_hue_pid" 2> /dev/null || true
+    wait "$fake_hue_pid" 2> /dev/null || true
+  fi
+}
+
+press() {
+  need_tools
+  local count=${1:-1} last next seq
+  if ! [[ $count =~ ^[1-9][0-9]*$ ]]; then
+    echo "usage: scripts/develop press [n], with n a number of presses" >&2
+    exit 2
+  fi
+  mkdir -p "$dev"
+  last=$(cat "$dev/seq" 2> /dev/null || echo 1)
+  if ! [[ $last =~ ^[0-9]+$ ]]; then
+    last=1
+  fi
+  next=$((last + count))
+  echo "$next" > "$dev/seq"
+  # The last seq again, then the next ones: a baseline for a listener that hasn't seen the switch yet (or a repeat
+  # that it ignores), then the presses. TTL 0 on the interface of the default route: the packets loop back to this
+  # machine and never leave it.
+  local seqs=()
+  for ((seq = last; seq <= next; seq++)); do
+    seqs+=("$seq")
+  done
+  exec "$tools_python" tools/send-ewelink-announcements.py 0.0.0.0 "$device" "${seqs[@]}"
+}
+
+lights() {
+  local host=${FAKE_HUE_BIND:-127.0.0.1} port=${FAKE_HUE_PORT:-18443}
+  if [ "$host" = 0.0.0.0 ]; then
+    host=127.0.0.1
+  fi
+  echo "Lights, rooms and zones:"
+  curl -sSk "https://$host:$port/_fake/lights"
+  echo
+  echo "PUTs received:"
+  curl -sSk "https://$host:$port/_fake/puts"
+}
+
+case ${1:-run} in
+  run)
+    setup
+    start_fake_hue
+    hass
+    ;;
+  hass)
+    setup
+    hass
+    ;;
+  fake-hue) fake_hue ;;
+  setup) setup ;;
+  press) press "${2:-1}" ;;
+  lights) lights ;;
+  help | -h | --help) usage ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac

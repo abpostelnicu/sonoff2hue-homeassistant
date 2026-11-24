@@ -15,6 +15,58 @@ wall switch ──S1/S2──> MINIR4M ──mDNS broadcast──> Home Assistan
 **Status: in development.** This integration ports the sonoff2hue app, a .NET service, to Home Assistant 2026.11 and
 later, with the same behavior. It isn't ready for use yet.
 
+## Development
+
+Run `scripts/setup` once: it makes `.venv` with Python 3.14 and the pinned tools, with [uv](https://docs.astral.sh/uv/).
+Then `scripts/check` runs what CI runs: ruff, its formatter, mypy and the tests.
+
+### Running Home Assistant locally
+
+`scripts/develop` runs a local Home Assistant 2026.11 with the integration from this checkout, and a fake Hue bridge
+(`tools/fake_hue`) and a simulated wall switch, so you can work without hardware. It needs `scripts/setup` done, and
+curl.
+
+```sh
+scripts/develop            # Home Assistant on http://127.0.0.1:8123, the fake Hue bridge in the background
+scripts/develop hass       # Home Assistant alone, for example with the fake bridge in another terminal
+scripts/develop fake-hue   # the fake Hue bridge alone, in the foreground
+scripts/develop press      # one press of the simulated wall switch (press 3: three presses)
+scripts/develop lights     # the fake bridge's lights, rooms and zones, and every PUT it received
+```
+
+- The first run makes `.dev/venv` with uv: the Home Assistant release that `requirements_test.txt` pins, and the
+  packages it would otherwise install at its first start (`requirements_dev.txt`), most of all its 117 MB frontend.
+  After that, Home Assistant starts in a few seconds and installs nothing. Ctrl+C stops it, and the fake bridge with it.
+- Open http://127.0.0.1:8123 and create a throwaway user. The integration is under Settings › Devices & services ›
+  Add integration › sonoff2hue; until its setup flow can pair a bridge, adding it only creates its entry.
+- Home Assistant listens on 127.0.0.1 only. `SONOFF2HUE_DEV_PORT=8124 scripts/develop` moves it to another port, also
+  later.
+- It loads `custom_components/sonoff2hue` from this checkout, with nothing copied or linked: it runs from the
+  repository root with `python -m homeassistant`, which puts the root first on Python's module path. So it doesn't load
+  other custom integrations from `.dev/config/custom_components`. After changing the integration's code, restart Home
+  Assistant; when it is restarted from its UI, `scripts/develop` starts it again.
+- Its configuration is `.dev/config/configuration.yaml`, a copy of `tools/develop/configuration.yaml`: the logbook, and
+  the integration's log at debug level. Home Assistant's log goes to the terminal and to
+  `.dev/config/home-assistant.log`.
+- Home Assistant reports that it couldn't set up `assist_pipeline` and `assist_satellite`: their requirements,
+  pymicro-vad and pyspeex-noise, have no wheels for Python 3.14 and need a C++ compiler, so `scripts/develop` has it
+  skip them. Without ffmpeg and libjpeg-turbo on the machine, it also logs errors about those. sonoff2hue needs none of
+  them.
+- The fake Hue bridge listens on https://127.0.0.1:18443, with its link button always pressed: pairing with
+  `127.0.0.1:18443` succeeds at once. It makes a new certificate at every start, so pair again after restarting it.
+  Its log is `.dev/fake-hue.log`; `FAKE_HUE_PORT` and `FAKE_HUE_BIND` change where it listens.
+- `scripts/develop press` sends the eWeLink announcements of a press of the made-up MINIR4M `1000abcdef`
+  (`SONOFF2HUE_DEV_DEVICE` chooses another): the last `seq` again, then the next, which `.dev/seq` keeps. Their
+  multicast TTL is 0, so they loop back to this machine and never reach the network. They come from
+  `tools/send-ewelink-announcements.py`, the .NET app's simulated switch, copied unchanged.
+- Home Assistant itself holds UDP 5353 too: it opens python-zeroconf for name resolution even without the `zeroconf`
+  integration, so the integration shares the port with it, as on a real installation.
+- On macOS, allow your terminal and VS Code under System Settings › Privacy & Security › Local Network: without that,
+  macOS refuses the multicast of the simulated switch and of the integration's mDNS listener with "No route to host".
+  WSL 2's default NAT network doesn't pass on the LAN's multicast, so real switches aren't seen there.
+- **Start over:** delete `.dev/config` to start again from onboarding, or `.dev` for everything, Home Assistant's
+  environment included.
+
 ## License
 
 [Apache License 2.0](LICENSE).

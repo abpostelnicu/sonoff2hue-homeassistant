@@ -1,0 +1,20 @@
+# The Home Assistant that scripts/develop runs, in .dev/venv: the Home Assistant release that requirements_test.txt
+# pins, and what that release installs at its first start with tools/develop/configuration.yaml, pinned as its
+# integrations require them (tests/tools/test_develop.py checks that). scripts/develop installs them with Home
+# Assistant's package_constraints.txt, as Home Assistant itself does; upgrade them together with requirements_test.txt.
+#
+# Not here: pymicro-vad and pyspeex-noise, which assist_pipeline requires. They have no wheels for Python 3.14 and need
+# a C++ compiler, so scripts/develop has Home Assistant skip them (--skip-pip-packages).
+-r requirements_test.txt
+aiohasupervisor==0.8.1  # hassio, an after-dependency of default integrations
+gazetteer-matcher==1.1.0  # conversation
+ha-ffmpeg==3.2.2  # ffmpeg
+hassil==3.12.1  # conversation
+home-assistant-frontend==20261028.8  # frontend
+home-assistant-intents==2026.10.27  # conversation
+infrared-protocols==10.5.0  # infrared
+mutagen==1.48.1  # tts
+pyotp==2.10.0  # the TOTP sign-in module
+PyQRCode==1.2.1  # the TOTP sign-in module
+PyTurboJPEG==1.8.3  # camera
+rf-protocols==4.3.0  # radio_frequency

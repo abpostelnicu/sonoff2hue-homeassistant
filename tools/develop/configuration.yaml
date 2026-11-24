@@ -1,0 +1,16 @@
+# Home Assistant for developing sonoff2hue. scripts/develop copied this file from tools/develop/configuration.yaml
+# when it created this folder; change it as you like. Delete the folder to start again from onboarding.
+#
+# Only what working on the integration needs. Home Assistant 2026.11 always loads the frontend, the config entries UI,
+# repairs and its other default integrations. default_config isn't here: its integrations need many more packages.
+# The HTTP server's address and port are in .storage/http, not here (see tools/develop/__init__.py).
+
+homeassistant:
+  name: sonoff2hue development
+
+logbook:
+
+logger:
+  default: info
+  logs:
+    custom_components.sonoff2hue: debug
