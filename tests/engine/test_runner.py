@@ -110,6 +110,9 @@ class ThrowingObserver(RunnerObserver):
     def on_bridge_reachability(self, reachable: bool, message: str | None) -> None:
         self._fail()
 
+    def on_key_rejected(self) -> None:
+        self._fail()
+
     def _fail(self) -> None:
         self.calls += 1
         raise RuntimeError("observer failure")
@@ -973,3 +976,108 @@ async def test_a_broadcast_right_after_a_restart_of_the_socket_is_a_new_baseline
     assert bridge.paths == ["GET /clip/v2/resource/bridge"]
     await _stop(running)
     await _stop(listening)
+
+
+# A rejected key, reported for Home Assistant's reauthentication; the .NET app's observer has no such call (decision 21).
+
+
+class KeyObserver(RecordingObserver):
+    def on_key_rejected(self) -> None:
+        self.events.append("key rejected")
+
+
+REJECTED = f"The Hue bridge rejected the application key; {PAIR_AGAIN}."
+
+
+async def test_each_ping_that_the_bridge_refuses_the_key_reports_it(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO, logger=runner.__name__)
+    bridge = LightBridge()
+    observer = KeyObserver()
+    switch = create_runner(bridge.client(), observer)
+
+    for status in (200, 401, 401, 403, 503, 200):
+        bridge.status = status
+        await switch.ping_bridge()
+
+    # After each refusal, right after the reachability report, which comes only on changes as before.
+    assert observer.events == [
+        "bridge up",
+        f"bridge down: {REJECTED}",
+        "key rejected",
+        "key rejected",
+        "key rejected",
+        "bridge down: Hue bridge returned 503 Service Unavailable for GET /clip/v2/resource/bridge",
+        "bridge up",
+    ]
+    assert runner_log(caplog) == [
+        (logging.WARNING, f"Hue bridge unavailable: {REJECTED}"),
+        (logging.INFO, "Hue bridge reachable again."),
+    ]
+
+
+async def test_each_toggle_that_the_bridge_refuses_the_key_reports_it(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO, logger=runner.__name__)
+    bridge = LightBridge()
+    observer = KeyObserver()
+    switch = create_runner(bridge.client(), observer)
+    switch.handle_packet(plain(100))
+    caplog.clear()
+
+    for seq, status in ((101, 401), (102, 403), (103, 503)):
+        bridge.status = status
+        switch.handle_packet(plain(seq))
+        await switch.when_toggles_complete()
+
+    bridge_down = "Hue bridge returned 503 Service Unavailable for GET /clip/v2/resource/light"
+    assert observer.events == [
+        "press Hall seq=101",
+        f"bridge down: {REJECTED}",
+        "key rejected",
+        f"toggle failed Hall: {REJECTED}",
+        "press Hall seq=102",
+        "key rejected",
+        f"toggle failed Hall: {REJECTED}",
+        "press Hall seq=103",
+        f"bridge down: {bridge_down}",
+        f"toggle failed Hall: {bridge_down}",
+    ]
+    assert runner_log(caplog) == [
+        (logging.INFO, "Hall (1000abcdef): wall switch operated (seq 101)."),
+        (logging.WARNING, f"Hue bridge unavailable: {REJECTED}"),
+        (logging.ERROR, f"Hall (1000abcdef): could not toggle the lights: {REJECTED}"),
+        (logging.INFO, "Hall (1000abcdef): wall switch operated (seq 102)."),
+        (logging.ERROR, f"Hall (1000abcdef): could not toggle the lights: {REJECTED}"),
+        (logging.INFO, "Hall (1000abcdef): wall switch operated (seq 103)."),
+        (logging.ERROR, f"Hall (1000abcdef): could not toggle the lights: {bridge_down}"),
+    ]
+    assert bridge.lights["l1"] is False
+
+
+async def test_a_refused_write_is_a_failed_target_without_a_rejected_key() -> None:
+    bridge = LightBridge()
+    observer = KeyObserver()
+    switch = create_runner(bridge.client(), observer)
+
+    def refuse_writes(request: RecordedRequest) -> tuple[int, str]:
+        return (401, "{}") if request.method == "PUT" else LightBridge._answer(bridge, request)
+
+    bridge._respond = refuse_writes
+    switch.handle_packet(plain(100))
+    switch.handle_packet(plain(101))
+    await switch.when_toggles_complete()
+
+    # The toggle read the states, so the bridge is up; the refused write is a failed target, as before.
+    assert observer.events == ["press Hall seq=101", "bridge up", "toggled Hall on changed=0 unchanged=0 failed=1"]
+
+
+async def test_the_rejected_key_goes_through_the_observer_guard(caplog: pytest.LogCaptureFixture) -> None:
+    bridge = LightBridge()
+    bridge.status = 403
+    throwing = ThrowingObserver()
+
+    await create_runner(bridge.client(), throwing).ping_bridge()
+    await create_runner(bridge.client(), SilentObserver()).ping_bridge()
+
+    assert throwing.calls == 2
+    failures = [r for r in caplog.records if r.getMessage() == "Runner observer ThrowingObserver failed."]
+    assert len(failures) == 2

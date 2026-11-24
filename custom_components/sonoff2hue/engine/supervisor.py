@@ -16,13 +16,14 @@ What Home Assistant replaces:
 
 Use, for the Home Assistant runtime: run :meth:`BridgeSupervisor.run` as the config entry's background task. Call
 :meth:`BridgeSupervisor.config_changed` from the entry's update listener, before the reload cancels the task. Cancelling
-it stops the runner and closes the Hue client, and leaves the listener running. ``on_key_rejected`` is called when the
-bridge no longer accepts the application key, which is when the runtime starts Home Assistant's reauthentication.
+it stops the runner and closes the Hue client, and leaves the listener running. ``on_key_rejected`` is called whenever
+the bridge rejects the application key, while the supervisor connects to it and while the runner runs, which is when
+the runtime starts Home Assistant's reauthentication.
 """
 
 import asyncio
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 import logging
 from typing import NoReturn
 
@@ -30,8 +31,9 @@ from . import text
 from .config import ConfigError, EngineConfig, HueSettings
 from .hue_client import PAIR_AGAIN, HueApiError, HueClient
 from .mdns import MdnsListener
-from .runner import Runner, resolve_bindings
+from .runner import Runner, RunnerObserver, SwitchBinding, resolve_bindings
 from .status import ServiceState, StatusTracker
+from .toggler import ToggleResult
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -79,11 +81,11 @@ class BridgeSupervisor:
         clock: Callable[[], datetime] = _now,
     ) -> None:
         """``listener`` is the config entry's mDNS listener, which the runner shares and which keeps running when the
-        supervisor stops. ``on_key_rejected`` runs on the event loop, soon after the bridge rejected the application
-        key while the supervisor connected to it, which leaves it in the error state until the next reload; one that
-        raises goes to the loop's exception handler. While the runner runs, a rejected key only makes the bridge
-        unreachable, with the message that says to pair again, as in .NET. ``clock`` is the runner's, for the age of a
-        press, and has to agree with the listener's."""
+        supervisor stops. ``on_key_rejected`` runs on the event loop soon after the bridge rejected the application key:
+        while the supervisor connects to it, which leaves it in the error state until the next change, and after each
+        keep-alive request or toggle that the bridge refuses so while the runner runs, which goes on as in .NET. One
+        that raises goes to the loop's exception handler. ``clock`` is the runner's, for the age of a press, and has to
+        agree with the listener's."""
         self._config = config
         self._listener = listener
         self._status = status
@@ -160,17 +162,23 @@ class BridgeSupervisor:
             except HueApiError as err:
                 self._status.set_bridge_reachability(False, str(err))
                 self._status.set_service(ServiceState.ERROR, KEY_REJECTED if err.is_authentication_error else str(err))
-                if err.is_authentication_error and self._on_key_rejected is not None:
-                    asyncio.get_running_loop().call_soon(self._on_key_rejected)
+                if err.is_authentication_error:
+                    self._report_key_rejected()
                 await _wait_for_change()
 
             if text.is_null_or_white_space(settings.hue.certificate_sha256):
                 _LOGGER.warning(NOT_PINNED)
 
             self._status.set_running(bindings)
-            await Runner(settings, bindings, hue, self._status, self._clock).run(self._listener)
+            observer = _Observer(self._status, self._report_key_rejected)
+            await Runner(settings, bindings, hue, observer, self._clock).run(self._listener)
         finally:
             await hue.close()
+
+    def _report_key_rejected(self) -> None:
+        """Runs the hook on the event loop's next turn, so that one that raises can't stop the supervisor or the runner."""
+        if self._on_key_rejected is not None:
+            asyncio.get_running_loop().call_soon(self._on_key_rejected)
 
     async def _wait_for_bridge(self, hue: HueClient, bridge_ip: str) -> None:
         self._status.set_service(ServiceState.CONNECTING, f"Connecting to the Hue bridge at {bridge_ip}.")
@@ -193,6 +201,34 @@ class BridgeSupervisor:
             else:
                 self._status.set_bridge_reachability(True, None)
                 return
+
+
+class _Observer(RunnerObserver):
+    """The runner's observer: every report goes to the status tracker, as in .NET, and a rejected key to the supervisor's
+    hook as well."""
+
+    def __init__(self, status: StatusTracker, key_rejected: Callable[[], None]) -> None:
+        self._status = status
+        self._key_rejected = key_rejected
+
+    def on_press(self, binding: SwitchBinding, seq: int | None) -> None:
+        self._status.on_press(binding, seq)
+
+    def on_toggled(self, binding: SwitchBinding, result: ToggleResult, elapsed: timedelta) -> None:
+        self._status.on_toggled(binding, result, elapsed)
+
+    def on_toggle_failed(self, binding: SwitchBinding, message: str) -> None:
+        self._status.on_toggle_failed(binding, message)
+
+    def on_press_dropped(self, binding: SwitchBinding) -> None:
+        self._status.on_press_dropped(binding)
+
+    def on_bridge_reachability(self, reachable: bool, message: str | None) -> None:
+        self._status.on_bridge_reachability(reachable, message)
+
+    def on_key_rejected(self) -> None:
+        self._status.on_key_rejected()
+        self._key_rejected()
 
 
 async def _wait_for_change() -> NoReturn:

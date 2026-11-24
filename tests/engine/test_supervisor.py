@@ -5,6 +5,7 @@ import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
 import contextlib
 from datetime import timedelta
+import inspect
 import json
 import logging
 from typing import Any
@@ -17,6 +18,7 @@ from custom_components.sonoff2hue.engine.errors import UnexpectedError
 from custom_components.sonoff2hue.engine.hue_client import HueClient
 from custom_components.sonoff2hue.engine.mdns import MdnsListener
 from custom_components.sonoff2hue.engine.registry import DeviceRegistry
+from custom_components.sonoff2hue.engine.runner import RunnerObserver
 from custom_components.sonoff2hue.engine.status import ServiceState, ServiceStatus, StatusTracker
 from custom_components.sonoff2hue.engine.supervisor import BridgeSupervisor, HueClientFactory, create_hue_client
 
@@ -458,6 +460,57 @@ async def test_other_refusals_show_the_bridges_message(
     assert (harness.status.snapshot().hue.reachable, harness.status.snapshot().hue.message) == (False, message)
     assert rejected == []
     await harness.stop()
+
+
+async def test_a_key_rejected_while_running_calls_the_hook_after_each_refusal(time: VirtualTime) -> None:
+    rejected: list[float] = []
+    harness = Harness(time, EngineConfig(PAIRED, [hall()]), on_key_rejected=lambda: rejected.append(time.elapsed))
+    await harness.start()
+    await asyncio.sleep(1)
+    harness.broadcast(1)
+
+    # The keep-alive requests at 45 and 90 s are refused, the one at 135 s fails otherwise; then a toggle is refused.
+    harness.bridge.fail("/clip/v2/resource/bridge", 403, '{"errors":[{"description":"unauthorized user"}]}', count=2)
+    harness.bridge.fail("/clip/v2/resource/bridge", 503, count=1)
+    await asyncio.sleep(140)
+    harness.bridge.fail("/clip/v2/resource/light", 401)
+    harness.broadcast(2)
+    await asyncio.sleep(1)
+
+    assert rejected == pytest.approx([45, 90, 141])
+    # The bridge goes on running, as in .NET: no restart, no other state, the same reports.
+    assert harness.status.history == [(0, State.CONNECTING, CONNECTING), (0, State.RUNNING, RUNNING)]
+    # The supervisor's ping and the runner's first keep-alive at 0 s, then every 45 s.
+    assert harness.bridge.requested("/clip/v2/resource/bridge") == pytest.approx([0, 0, 45, 90, 135])
+    assert (harness.bridge.created, harness.bridge.closed) == (1, 0)
+    snapshot = harness.status.snapshot()
+    rejected_key = f"The Hue bridge rejected the application key; {PAIR_AGAIN}."
+    assert (snapshot.hue.reachable, snapshot.hue.message) == (False, rejected_key)
+    assert snapshot.switches[0].last_error is not None
+    assert snapshot.switches[0].last_error.message == rejected_key
+    await harness.stop()
+
+
+def test_the_runners_observer_passes_every_report_to_the_tracker() -> None:
+    """Each of the runner's reports reaches the tracker with its arguments, and a rejected key reaches the hook too."""
+    calls: list[tuple[str, tuple[object, ...]]] = []
+
+    class Tracker:
+        def __getattr__(self, name: str) -> Callable[..., None]:
+            return lambda *args: calls.append((name, args))
+
+    hooked: list[bool] = []
+    observer = supervisor._Observer(Tracker(), lambda: hooked.append(True))
+    expected: list[tuple[str, tuple[object, ...]]] = []
+    for name, method in vars(RunnerObserver).items():
+        if callable(method) and not name.startswith("_"):
+            args = tuple(object() for _ in list(inspect.signature(method).parameters)[1:])
+            getattr(observer, name)(*args)
+            expected.append((name, args))
+
+    assert calls == expected
+    assert [name for name, _ in expected][-1] == "on_key_rejected"
+    assert hooked == [True]
 
 
 async def test_a_key_rejected_callback_that_raises_does_not_stop_the_supervisor(time: VirtualTime) -> None:

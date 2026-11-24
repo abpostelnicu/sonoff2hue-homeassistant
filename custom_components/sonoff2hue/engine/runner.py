@@ -70,6 +70,11 @@ class RunnerObserver:
         keep-alive request that :meth:`Runner.run` sends right away; toggle outcomes count too. These calls arrive in
         the order the changes happened."""
 
+    def on_key_rejected(self) -> None:
+        """The bridge rejected the application key (401 or 403): it ended a keep-alive request or a toggle. It comes
+        after each such failure, right after the reachability report, so that Home Assistant can offer to pair the
+        bridge again; the .NET app's observer has no such call, and nothing else changes."""
+
 
 async def resolve_bindings(
     config: EngineConfig, hue: HueClient, logger: logging.Logger = _LOGGER
@@ -265,6 +270,8 @@ class Runner:
             await self._hue.ping()
         except Exception as err:  # noqa: BLE001 - expected or not, the bridge isn't usable now; the keep-alive goes on
             self._report_bridge_reachability(False, str(err))
+            if isinstance(err, HueApiError) and err.is_authentication_error:
+                self._notify(methodcaller("on_key_rejected"))
         else:
             self._report_bridge_reachability(True, None)
 
@@ -311,6 +318,8 @@ class Runner:
             except HueApiError as err:
                 # The bridge state could not be read, so the bridge is unusable right now.
                 self._report_bridge_reachability(False, str(err))
+                if err.is_authentication_error:
+                    self._notify(methodcaller("on_key_rejected"))
                 _LOGGER.error("%s: could not toggle the lights: %s", name, err)  # noqa: TRY400 - .NET logs no trace
                 self._notify(methodcaller("on_toggle_failed", binding, str(err)))
             except Exception as err:
