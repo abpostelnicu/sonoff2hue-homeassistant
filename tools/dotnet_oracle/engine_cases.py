@@ -850,6 +850,215 @@ IP_ADDRESSES = [
     "\u0661.1.1.1",
 ]
 
+# Hue lights and groups as the resolver gets them: ids, names and kinds, any of them null where .NET allows it.
+type Resource = dict[str, str | None]
+
+RESOLVER_LIGHTS: list[Resource] = [
+    {"id": "l1", "name": "Ceiling"},
+    {"id": "l2", "name": "Floor lamp"},
+    {"id": "l3", "name": "Spot"},
+    {"id": "l4", "name": "Spot"},
+]
+RESOLVER_GROUPS: list[Resource] = [
+    {"id": "r1", "name": "Kitchen", "kind": "room", "grouped": "g1"},
+    {"id": "z1", "name": "Kitchen", "kind": "zone", "grouped": "g2"},
+    {"id": "r2", "name": "Hallway", "kind": "room", "grouped": "g3"},
+    {"id": "r3", "name": "Empty", "kind": "room", "grouped": None},
+]
+SORTING_LIGHTS: list[Resource] = [
+    {"id": f"s{i}", "name": name}
+    for i, name in enumerate(
+        [
+            "beta",
+            "Alpha",
+            "alpha",
+            "\u00c4rger",
+            "Zulu",
+            "_x",
+            "\u0131",
+            "I",
+            "i",
+            "\u00e9",
+            "E",
+            "Spot",
+            "spot",
+            "Spot",
+        ]
+    )
+]
+
+
+def resolver_cases() -> list[dict[str, object]]:
+    def case(
+        label: str,
+        lights: list[str],
+        groups: list[str],
+        hue_lights: list[Resource] = RESOLVER_LIGHTS,
+        hue_groups: list[Resource] = RESOLVER_GROUPS,
+        name: str | None = "Hall",
+    ) -> dict[str, object]:
+        return {
+            "label": label,
+            "name": name,
+            "deviceId": " 1000ABCDEF ",
+            "lights": lights,
+            "groups": groups,
+            "hueLights": hue_lights,
+            "hueGroups": hue_groups,
+        }
+
+    return [
+        case("namesAndIds", ["ceiling", "l2", "Ceiling"], ["hallway", "zone:kitchen"], name=None),
+        case("unknownAndAmbiguous", ["Spot", "Nope"], ["Kitchen", "Empty", "Garage"]),
+        case("trimmedAndPrefixed", ["  floor LAMP\u3000"], [" ROOM: Kitchen ", "zone:", "room:zone:x", "Zone:KITCHEN"]),
+        case("duplicates", ["Ceiling", "l1", "L1", "ceiling"], ["r2", "Hallway", "room:hallway", "g3"]),
+        case("knownListOrder", ["nothing"], ["nothing"], hue_lights=SORTING_LIGHTS),
+        case("noLights", ["x"], ["y"], hue_lights=[], hue_groups=[]),
+        case("paddedName", ["Spot light"], [], hue_lights=[{"id": "x1", "name": "  Spot light "}]),
+        case("nullName", ["x"], [], hue_lights=[{"id": "n1", "name": None}]),
+        case("nullNameMatchedById", ["N1"], [], hue_lights=[{"id": "n1", "name": None}]),
+        case("nullId", ["Lamp"], [], hue_lights=[{"id": None, "name": "Lamp"}]),
+        case("nullIdUnknown", ["x"], [], hue_lights=[{"id": None, "name": "Lamp"}, {"id": None, "name": "Lamp"}]),
+        case(
+            "nullGroupName",
+            [],
+            ["r9", "x"],
+            hue_groups=[{"id": "r9", "name": None, "kind": "room", "grouped": "g9"}, *RESOLVER_GROUPS],
+        ),
+        case("turkishI", ["\u0131d", "ID"], [], hue_lights=[{"id": "id", "name": "x"}, {"id": "\u0131d", "name": "y"}]),
+        case("nameEqualsOtherId", ["l2"], [], hue_lights=[{"id": "l1", "name": "l2"}, {"id": "l2", "name": "Desk"}]),
+        case("sameIdForALightAndAGroup", ["g1"], ["r1"], hue_lights=[{"id": "g1", "name": "Lamp"}]),
+        case(
+            "nullIdsAmbiguous",
+            ["Lamp"],
+            [],
+            hue_lights=[{"id": "b", "name": "Lamp"}, {"id": None, "name": "Lamp"}, {"id": "A", "name": "Lamp"}],
+        ),
+        case(
+            "blankNames",
+            [" "],
+            ["room:"],
+            hue_lights=[{"id": "x1", "name": "  "}],
+            hue_groups=[{"id": "r1", "name": "\u3000", "kind": "room", "grouped": "g1"}],
+        ),
+        # Code point order, not UTF-16 order: characters outside the Basic Multilingual Plane sort after U+FF21.
+        case(
+            "knownListCodePointOrder",
+            ["nothing"],
+            [],
+            hue_lights=[
+                {"id": f"u{i}", "name": name}
+                for i, name in enumerate(["\uff21", "\U0001d400", "\ue000", "\U00010428", "\U00010400", "\u00ff", "a"])
+            ],
+        ),
+    ]
+
+
+# StringComparer.OrdinalIgnoreCase.Compare, which orders the names that the resolver's messages list. The strings go to
+# .NET as UTF-16 code units, so that lone surrogates survive the JSON file.
+COMPARISONS: list[tuple[str | None, str | None]] = [
+    ("a", "B"),
+    ("B", "a"),
+    ("a", "A"),
+    ("_x", "alpha"),
+    ("a", "ab"),
+    ("", ""),
+    ("", "a"),
+    ("abc\x00", "abc"),
+    ("\u0131", "i"),
+    ("\u017f", "s"),
+    ("\u212a", "k"),
+    ("\u00df", "ss"),
+    ("\u00e9", "E"),
+    ("\u00ff", "\u0178"),
+    ("\u01c5", "\u01c4"),
+    ("\u03c3", "\u03c2"),
+    ("\uff21", "\U00010428"),
+    ("\U00010428", "\U00010400"),
+    ("\U0001d400", "\ue000"),
+    ("\U0001d400", "\uffff"),
+    ("\U00010400", "\ud801"),
+    ("\ud801", "\ud801\udc00"),
+    ("\ud801x", "\ud801y"),
+    ("\udc00", "\ue000"),
+    ("\udc00", "\U00010000"),
+    ("\udc00\ud801", "\udc00"),
+    ("x\U00010428y", "X\U00010400Z"),
+    (None, "a"),
+    ("a", None),
+    (None, None),
+]
+
+
+def utf16_units(value: str | None) -> list[int] | None:
+    if value is None:
+        return None
+    data = value.encode("utf-16-le", "surrogatepass")
+    return [data[i] | data[i + 1] << 8 for i in range(0, len(data), 2)]
+
+
+def states(*resources: tuple[str, bool]) -> str:
+    """A CLIP v2 answer with the on state of each resource."""
+    data = [{"id": resource, "on": {"on": on}} for resource, on in resources]
+    return json.dumps({"errors": [], "data": data}, separators=(",", ":"))
+
+
+def toggle_cases() -> list[dict[str, object]]:
+    """``HueToggler.ToggleAsync`` on a client with canned answers: name → (targets as [kind, id, name], the answers in
+    order, the last repeated)."""
+    ceiling, desk, hall = ("Light", "l1", "Ceiling"), ("Light", "l2", "Desk"), ("GroupedLight", "g1", "Hall")
+    off = answer(200, states(("l1", False), ("l2", False)))
+    rejected = answer(403, '{"errors":[{"description":"unauthorized user"}]}')
+    cases: dict[str, tuple[list[tuple[str, str | None, str | None]], list[dict[str, object]]]] = {
+        "allOff": ([ceiling, desk, hall], [off, answer(200, states(("g1", False))), answer(200, PUT_OK)]),
+        "anyOn": (
+            [ceiling, desk, hall],
+            [answer(200, states(("l1", False), ("l2", True))), answer(200, states(("g1", False))), answer(200, PUT_OK)],
+        ),
+        "allOn": ([ceiling, hall], [answer(200, states(("l1", True))), answer(200, states(("g1", True)))]),
+        "stateIgnoresCase": ([("Light", "L1", "Ceiling")], [answer(200, states(("l1", True))), answer(200, PUT_OK)]),
+        "unknownState": (
+            [ceiling, ("Light", "gone", "Gone")],
+            [answer(200, states(("l1", True))), answer(200, PUT_OK)],
+        ),
+        "duplicateTargets": ([ceiling, ceiling], [off, answer(200, PUT_OK)]),
+        "noTargets": ([], [answer(200, PUT_OK)]),
+        "onlyGroups": ([hall], [answer(200, states(("g1", False))), answer(200, PUT_OK)]),
+        "retriedWrite": ([ceiling, desk], [off, answer(503, "{}"), answer(200, PUT_OK)]),
+        "failedWrite": ([ceiling, desk], [off, answer(503, "{}"), answer(503, "{}"), answer(200, PUT_OK)]),
+        "rateLimitedWrite": (
+            [ceiling],
+            [off, answer(429, '{"errors":[{"description":"rate limit"}]}'), answer(200, PUT_OK)],
+        ),
+        "rejectedWrite": (
+            [ceiling, desk],
+            [off, answer(404, '{"errors":[{"description":"not found"}],"data":[]}'), answer(200, PUT_OK)],
+        ),
+        "multiStatusWrite": ([ceiling, desk], [off, answer(207, MAY_NOT_HAVE_EFFECT), answer(200, PUT_OK)]),
+        "keyRejectedWrite": ([ceiling, desk], [off, rejected]),
+        "retriedRead": ([ceiling], [answer(503, ""), off, answer(200, PUT_OK)]),
+        "malformedReadRetried": (
+            [ceiling],
+            [answer(200, '{"data":[{"id":"l1","on":{"on":"true"}}]}'), off, answer(200, PUT_OK)],
+        ),
+        "failedRead": ([ceiling], [answer(503, "")]),
+        "rejectedRead": ([ceiling], [rejected]),
+        "failedGroupRead": ([ceiling, hall], [off, answer(502, "")]),
+        "nullTargetId": ([("Light", None, "Lamp")], [off]),
+        "nullTargetIdAfterAnOnTarget": (
+            [ceiling, ("Light", None, "Lamp")],
+            [answer(200, states(("l1", True))), answer(200, PUT_OK)],
+        ),
+        "nullTargetName": ([("Light", "l1", None)], [off, answer(503, "")]),
+        "nullInTheStates": ([ceiling], [answer(200, '{"data":[null]}')]),
+        "duplicateStateIds": (
+            [ceiling],
+            [answer(200, '{"data":[{"id":"l1","on":{"on":true}},{"id":"L1","on":{"on":false}}]}')],
+        ),
+    }
+    return [{"name": name, "targets": targets, "answers": answers} for name, (targets, answers) in cases.items()]
+
+
 ENCODINGS = [
     "utf-8",
     "UTF-8",
@@ -1090,6 +1299,9 @@ def main() -> None:
         "statusLine": [{"status": status, "reason": reason} for status, reason in STATUS_LINES],
         "encodings": [{"name": name} for name in ENCODINGS],
         "ipAddress": [{"address": address} for address in IP_ADDRESSES],
+        "targets": resolver_cases(),
+        "toggle": toggle_cases(),
+        "compareIgnoreCase": [{"left": utf16_units(a), "right": utf16_units(b)} for a, b in COMPARISONS],
     }
     out = Path(sys.argv[1])
     out.write_text(json.dumps(cases, ensure_ascii=False, indent=1), encoding="utf-8")

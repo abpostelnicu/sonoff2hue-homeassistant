@@ -91,9 +91,9 @@ The user's choices, made on 2026-11-23 when the plan was approved:
 | Folder | Contents |
 |--------|----------|
 | `custom_components/sonoff2hue` | The integration |
-| `custom_components/sonoff2hue/engine` | Ports of the .NET engine, without Home Assistant imports. `text.py` holds the .NET string and number rules (trim, ordinal case-insensitive comparison, `ToLowerInvariant`, `TryParse`). `dns.py` is `Mdns/DnsMessage.cs`; `mdns.py` is `Mdns/MdnsListener.cs` with the parts of .NET's `NetworkInterface` and `NetworkChange` it uses; `ewelink.py` is `Ewelink/EwelinkAnnouncement.cs` and `EwelinkCrypto.cs`; `press.py` is `Ewelink/PressDetector.cs` and `SwitchTracker.cs`; `config.py` is the model of `Configuration/AppConfig.cs`; `jsonnode.py` reads JSON as System.Text.Json's `JsonNode` does. `hue_address.py` is `Hue/HueBridgeAddress.cs` with the parts of .NET's `Uri`, `IPAddress` and `IdnMapping` it relies on; `hue_client.py` is `Hue/HueClient.cs`, `HueTls.cs` and `HueModels.cs`; `hue_setup.py` is `Hue/HueBridgeSetup.cs` with the pairing loop of `Web/Management/HuePairing.cs`; `errors.py` holds `UnexpectedError` (decision 9) |
+| `custom_components/sonoff2hue/engine` | Ports of the .NET engine, without Home Assistant imports. `text.py` holds the .NET string and number rules (trim, ordinal case-insensitive comparison and ordering, `ToLowerInvariant`, `TryParse`). `dns.py` is `Mdns/DnsMessage.cs`; `mdns.py` is `Mdns/MdnsListener.cs` with the parts of .NET's `NetworkInterface` and `NetworkChange` it uses; `ewelink.py` is `Ewelink/EwelinkAnnouncement.cs` and `EwelinkCrypto.cs`; `press.py` is `Ewelink/PressDetector.cs` and `SwitchTracker.cs`; `config.py` is the model of `Configuration/AppConfig.cs`; `jsonnode.py` reads JSON as System.Text.Json's `JsonNode` does. `hue_address.py` is `Hue/HueBridgeAddress.cs` with the parts of .NET's `Uri`, `IPAddress` and `IdnMapping` it relies on; `hue_client.py` is `Hue/HueClient.cs`, `HueTls.cs` and `HueModels.cs`; `hue_setup.py` is `Hue/HueBridgeSetup.cs` with the pairing loop of `Web/Management/HuePairing.cs`; `errors.py` holds `UnexpectedError` (decision 9). `targets.py` is `Bridge/TargetResolver.cs`; `toggler.py` is `Bridge/HueToggler.cs` |
 | `tests/engine` | Tests of the engine, ported from the .NET tests. `packets.py` builds raw DNS packets and MINIR4M broadcasts (the .NET tests' `TestPackets.cs`) and `MdnsPacket`s; `fakes.py` has fake multicast transports for `MdnsListener` |
-| `tests` | `hue.py` runs the fake Hue bridge on 127.0.0.1 with a manual clock (the .NET tests' `FakeHueTestHost`); `conftest.py` has its fixtures, `fake_hue` and `fake_hue_pressed`, which enable sockets |
+| `tests` | `hue.py` runs the fake Hue bridge on 127.0.0.1 with a manual clock (the .NET tests' `FakeHueTestHost`), and has `InMemoryBridge`, which answers and records requests without sockets (the .NET tests' `FakeHttpHandler`); `conftest.py` has its fixtures, `fake_hue` and `fake_hue_pressed`, which enable sockets |
 | `tests/tools` | Tests of the fake Hue bridge (the .NET app's `Sonoff2Hue.FakeHue.Tests`) |
 | `tests/engine/fixtures` | `dotnet_text.json` and `dotnet_engine.json`, made by `tools/dotnet_oracle` from .NET and from the .NET app's own code (decision 7) |
 | `tools/fake_hue` | The fake Hue bridge, a port of the .NET app's `tests/local/FakeHue` (decision 12): `bridge.py` (state, `Fault`s), `server.py` (endpoints, HTTPS, certificate), `__main__.py` (`python -m tools.fake_hue`, settings `FAKE_HUE_BIND`, `FAKE_HUE_PORT`, `FAKE_HUE_LINK_BUTTON`) |
@@ -116,7 +116,7 @@ The C# tests are ported as the executable form of this table, with recognizable 
 | Rejoin | A query with authority records for `eWeLink_<id>…` (a probe) resets that device's baseline | same, `Ewelink/SwitchTracker.cs` |
 | Press rule | Baseline / Duplicate / SequenceReset / RelayChanged / SettingsChanged / Press, decided as `PressDetector` does: its setting keys, relay parsing (`switches[]` and `switch`), the payload compare when `seq` is missing, and `relaySeparation` for detached mode | `Ewelink/PressDetector.cs` |
 | Decryption | AES-128-CBC/PKCS7, key MD5(trimmed device key), 16-byte IV. The same error strings, e.g. "iv has N bytes instead of 16". Never raises | `Ewelink/EwelinkCrypto.cs` |
-| Targets | Names or ids, case-insensitive, with an optional `room:`/`zone:` prefix. Exactly one match is required, and a group without `grouped_light` is an error. Duplicates are removed by (kind, id). The same messages | `Bridge/TargetResolver.cs` |
+| Targets | Names or ids, case-insensitive, with an optional `room:`/`zone:` prefix. Exactly one match is required, and a group without `grouped_light` is an error. Duplicates are removed by (kind, id). The same messages, which list the known names in `StringComparer.OrdinalIgnoreCase` order (by code point) | `Bridge/TargetResolver.cs` |
 | Toggle | If any target is on, all go off; otherwise all go on. It reads the light and/or grouped_light states, with one retry after 300 ms on a transient error. PUTs are sequential, targets already in the wanted state are skipped, and failures are counted per target | `Bridge/HueToggler.cs` |
 | Runner | Toggles of one switch are serialized. A press that waited more than 5 s since it was received is dropped. Keep-alive `GET /clip/v2/resource/bridge` at once, then every 45 s. Reachability is reported on changes only. Stopping waits for the socket, the keep-alive and every toggle. The same log lines | `Bridge/Sonoff2HueRunner.cs` |
 | HTTP | 5 s timeout, 4 s connect. Idle connections are kept 5 min by its own connector. Header `hue-application-key`, and no Accept, Accept-Encoding or User-Agent. Requests go to `Uri.IdnHost`, ids escaped as `Uri.EscapeDataString` does and dot segments removed. The pin is the SHA-256 of the leaf certificate's DER, normalized as `HueTls.Normalize` does. A 2xx with `errors[]` is a failure, and 401/403 means the key was rejected. Transient means no status, or 429/500/502/503/504. Answers are decoded as `ReadAsStringAsync` does (charset, byte order marks) and read as `JsonSerializer` with Web defaults reads `HueEnvelope`; a reason phrase the status line lacks is .NET's. Where .NET throws something other than `HueApiException` for a malformed answer, the port raises `UnexpectedError` with .NET's exception and message. The same messages | `Hue/HueClient.cs`, `Hue/HueTls.cs`, `Hue/HueModels.cs` |
@@ -212,6 +212,10 @@ app runs; `tools/dotnet_oracle` keeps them as fixtures):
   aren't), objects without regard to order, and never `true` with `1`. Before it unescapes a string, it compares UTF-8
   lengths and the text before the first escape, so a string with a lone surrogate escape can compare as unequal without
   throwing.
+- `StringComparer.OrdinalIgnoreCase.Compare`, which orders the names that the target resolver's messages list, compares
+  code points, each as `ToUpperInvariant` maps it, and then the UTF-16 lengths; a lone surrogate counts as itself
+  (`InvariantModeCasing.CompareStringIgnoreCase` in dotnet/runtime's release/10.0). So `'𐐨'` (U+10428) sorts after
+  `'Ａ'` (U+FF21), where UTF-16 code units would put it first. LINQ's `Order` sorts stably.
 
 .NET on Linux, from dotnet/runtime's release/10.0 sources (2026-11-24), for the listener:
 
@@ -362,6 +366,14 @@ The eWeLink LAN protocol and the Hue API, from the .NET app's research (public s
 - 2026-11-24: after the first green runs on `main` (71d226a, 77da7d5), ruleset 28003079 "main: require CI and per-commit
   checks" was created like the .NET repository's: *Lint*, *Test* and *All commits pass*, an admin bypass.
   `gh api repos/abpostelnicu/sonoff2hue-homeassistant/rules/branches/main` lists the three checks.
+- 2026-11-24: the target resolver and the toggler, against the .NET oracle (the same build of the app), in three new
+  sections: 18 `targets` cases (the C# `ConfigurationTests` resolver tests among them), 24 `toggle` cases (`HueToggler`
+  on canned answers, with the requests it sends and the lines it logs) and 30 `compareIgnoreCase` cases. The first
+  `targets` run showed that .NET orders the known names by code point: the port sorted them by UTF-16 code units, so
+  names outside the Basic Multilingual Plane came first; `text.compare_ignore_case` ports .NET's comparison now. The
+  toggler's tests port `HueTests`' five toggler cases and `FakeHueTests`' toggle of a light and a room on the fake bridge
+  over HTTPS, and cancel a toggle during its retry delay. Breaking the toggler on purpose (retrying every error, not
+  retrying, a case-sensitive state lookup, reading the light states for a group alone) failed the matching oracle cases.
 
 ## Status
 

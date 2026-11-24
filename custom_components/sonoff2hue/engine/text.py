@@ -7,6 +7,7 @@ underscores in numbers, context-dependent case mappings), so the port uses these
 """
 
 import re
+import struct
 
 # char.IsWhiteSpace: Unicode categories Zs, Zl and Zp, plus U+0009-U+000D and U+0085. Python's str.isspace() also
 # counts U+001C-U+001F, which .NET doesn't trim.
@@ -86,6 +87,39 @@ def lower_invariant(value: str) -> str:
     if value.isascii():
         return value.lower()
     return "".join(lower if len(lower := char.lower()) == 1 else char for char in value)
+
+
+def compare_ignore_case(left: str | None, right: str | None) -> int:
+    """``StringComparer.OrdinalIgnoreCase.Compare``: negative, zero or positive, with null first. With invariant
+    globalization .NET compares code points, each mapped as ``ToUpperInvariant`` maps it, then the UTF-16 lengths; a
+    lone surrogate counts as itself. So a character outside the Basic Multilingual Plane sorts after U+FFFF, not between
+    U+D7FF and U+E000 as its UTF-16 code units would."""
+    if left is None or right is None:
+        return (left is not None) - (right is not None)
+    units_left, units_right = _utf16_units(left), _utf16_units(right)
+    index = 0
+    while index < min(len(units_left), len(units_right)):
+        code_left, size = _scalar(units_left, index)
+        code_right, _ = _scalar(units_right, index)
+        if code_left != code_right:
+            upper_left, upper_right = ord(fold(chr(code_left))), ord(fold(chr(code_right)))
+            if upper_left != upper_right:
+                return upper_left - upper_right
+        index += size
+    return len(units_left) - len(units_right)
+
+
+def _utf16_units(value: str) -> tuple[int, ...]:
+    data = value.encode("utf-16-le", "surrogatepass")
+    return struct.unpack(f"<{len(data) // 2}H", data)
+
+
+def _scalar(units: tuple[int, ...], index: int) -> tuple[int, int]:
+    """The code point at ``index`` and its number of code units: two for a surrogate pair."""
+    unit = units[index]
+    if 0xD800 <= unit <= 0xDBFF and index < len(units) - 1 and 0xDC00 <= units[index + 1] <= 0xDFFF:
+        return 0x10000 + ((unit - 0xD800) << 10) + (units[index + 1] - 0xDC00), 2
+    return unit, 1
 
 
 def utf16_length(value: str) -> int:

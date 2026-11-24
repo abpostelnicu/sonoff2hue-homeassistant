@@ -5,12 +5,24 @@ import base64
 from datetime import UTC, datetime
 from ipaddress import IPv4Address, IPv6Address
 import json
+import logging
 from pathlib import Path
+import struct
 from typing import Any
 
 import pytest
 
-from custom_components.sonoff2hue.engine import ewelink, hue_address, hue_client, hue_setup, jsonnode
+from custom_components.sonoff2hue.engine import (
+    ewelink,
+    hue_address,
+    hue_client,
+    hue_setup,
+    jsonnode,
+    targets,
+    text,
+    toggler,
+)
+from custom_components.sonoff2hue.engine.config import SwitchSettings
 from custom_components.sonoff2hue.engine.dns import DnsFormatError, DnsMessage, DnsResourceRecord
 from custom_components.sonoff2hue.engine.errors import UnexpectedError
 from custom_components.sonoff2hue.engine.ewelink import EwelinkAnnouncement
@@ -361,3 +373,70 @@ def test_encoding_names(case: dict[str, Any]) -> None:
 @pytest.mark.parametrize("case", _cases("ipAddress"), ids=lambda case: repr(case["address"]))
 def test_ip_address(case: dict[str, Any]) -> None:
     assert hue_address.is_ip_address(case["address"]) == case["valid"]
+
+
+@pytest.mark.parametrize("case", _cases("targets"), ids=lambda case: case["label"])
+def test_targets(case: dict[str, Any]) -> None:
+    settings = SwitchSettings(case["deviceId"], case["name"], None, case["lights"], case["groups"])
+    lights = [hue_client.HueLight(light["id"], light["name"], False) for light in case["hueLights"]]
+    groups = [hue_client.HueGroup(g["id"], g["name"], g["kind"], g["grouped"]) for g in case["hueGroups"]]
+    errors: list[str] = []
+
+    if "throws" in case:
+        with pytest.raises(UnexpectedError) as err:
+            targets.resolve(settings, lights, groups, errors)
+        assert _thrown(err.value) == case["throws"]
+    else:
+        resolved = targets.resolve(settings, lights, groups, errors)
+        assert [[t.kind.value, t.id, t.name] for t in resolved] == case["targets"]
+        assert errors == case["errors"]
+
+
+def _from_utf16(units: list[int] | None) -> str | None:
+    return None if units is None else struct.pack(f"<{len(units)}H", *units).decode("utf-16-le", "surrogatepass")
+
+
+@pytest.mark.parametrize("case", _cases("compareIgnoreCase"), ids=lambda case: f"{case['left']}-{case['right']}")
+def test_compare_ignore_case(case: dict[str, Any]) -> None:
+    order = text.compare_ignore_case(_from_utf16(case["left"]), _from_utf16(case["right"]))
+
+    assert (order > 0) - (order < 0) == case["sign"]
+
+
+# .NET's names of the log levels the toggler uses.
+_LEVELS = {logging.ERROR: "Error", logging.WARNING: "Warning", logging.INFO: "Information", logging.DEBUG: "Debug"}
+
+
+@pytest.mark.parametrize("case", _cases("toggle"), ids=lambda case: case["name"])
+async def test_toggle(case: dict[str, Any], monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+    monkeypatch.setattr(toggler, "RETRY_DELAY", 0)
+    transports: list[_CannedTransport] = []
+
+    def factory(url: BridgeUrl, pin: str | None, on_certificate: Any) -> _CannedTransport:
+        transports.append(_CannedTransport(url, case["answers"]))
+        return transports[-1]
+
+    client = hue_client.HueClient("192.0.2.20", "app-key", None, factory)
+    resolved = [hue_client.HueTarget(hue_client.HueTargetKind(kind), id_, name) for kind, id_, name in case["targets"]]
+    logger = logging.getLogger("tests.engine.toggle")
+    caplog.set_level(logging.DEBUG, logger=logger.name)
+
+    result: toggler.ToggleResult | None = None
+    thrown: Exception | None = None
+    try:
+        result = await toggler.HueToggler(client, logger).toggle(resolved)
+    except (hue_client.HueApiError, UnexpectedError) as err:
+        thrown = err
+
+    if "throws" in case:
+        assert thrown is not None, result
+        assert _hue_thrown(thrown) == case["throws"]
+    else:
+        assert result is not None, thrown
+        assert [result.turned_on, result.changed, result.unchanged, result.failed] == case["result"]
+    assert transports[0].requests == case["requests"]
+    log = [record for record in caplog.records if record.name == logger.name]
+    assert [
+        f"{_LEVELS[record.levelno]}: {record.getMessage().replace(hue_client.PAIR_AGAIN, _PAIR_AGAIN)}"
+        for record in log
+    ] == case["log"]

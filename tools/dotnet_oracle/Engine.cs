@@ -5,6 +5,9 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.Logging;
+using Sonoff2Hue.Bridge;
+using Sonoff2Hue.Configuration;
 using Sonoff2Hue.Ewelink;
 using Sonoff2Hue.Hue;
 using Sonoff2Hue.Mdns;
@@ -34,6 +37,9 @@ internal static class Engine
             ["statusLine"] = Map(cases["statusLine"]!, StatusLine),
             ["encodings"] = Map(cases["encodings"]!, EncodingCase),
             ["ipAddress"] = Map(cases["ipAddress"]!, IpAddressCase),
+            ["targets"] = Map(cases["targets"]!, TargetsCase),
+            ["toggle"] = Map(cases["toggle"]!, ToggleCase),
+            ["compareIgnoreCase"] = Map(cases["compareIgnoreCase"]!, CompareIgnoreCase),
             ["reasonPhrases"] = ReasonPhrases(),
         };
         var options = new JsonSerializerOptions { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
@@ -389,6 +395,85 @@ internal static class Engine
         }
 
         return result;
+    }
+
+    private static JsonObject TargetsCase(JsonObject input)
+    {
+        var settings = new SwitchSettings
+        {
+            Name = Text(input, "name"),
+            DeviceId = Text(input, "deviceId")!,
+            Lights = [.. input["lights"]!.AsArray().Select(n => n!.GetValue<string>())],
+            Groups = [.. input["groups"]!.AsArray().Select(n => n!.GetValue<string>())],
+        };
+        var lights = input["hueLights"]!.AsArray()
+            .Select(n => new HueLight(Text(n!.AsObject(), "id")!, Text(n.AsObject(), "name")!, false))
+            .ToList();
+        var groups = input["hueGroups"]!.AsArray()
+            .Select(n => new HueGroup(Text(n!.AsObject(), "id")!, Text(n.AsObject(), "name")!, Text(n.AsObject(), "kind")!, Text(n.AsObject(), "grouped")))
+            .ToList();
+        var result = (JsonObject)input.DeepClone();
+        var errors = new List<string>();
+        try
+        {
+            var targets = TargetResolver.Resolve(settings, lights, groups, errors);
+            result["targets"] = new JsonArray([.. targets.Select(t => (JsonNode)new JsonArray(t.Kind.ToString(), t.Id, t.Name))]);
+            result["errors"] = new JsonArray([.. errors.Select(e => (JsonNode)e)]);
+        }
+        catch (Exception ex)
+        {
+            result["throws"] = Thrown(ex);
+        }
+
+        return result;
+    }
+
+    private static JsonObject ToggleCase(JsonObject input)
+    {
+        var handler = new CannedHandler(input["answers"]!.AsArray());
+        var logger = new RecordingLogger();
+        var targets = input["targets"]!.AsArray()
+            .Select(n => new HueTarget(Enum.Parse<HueTargetKind>(n![0]!.GetValue<string>()), n[1]?.GetValue<string>()!, n[2]?.GetValue<string>()!))
+            .ToList();
+        var result = (JsonObject)input.DeepClone();
+        using var client = new HueClient("192.0.2.20", "app-key", handler);
+        try
+        {
+            var toggled = new HueToggler(client, logger).ToggleAsync(targets, CancellationToken.None).GetAwaiter().GetResult();
+            result["result"] = new JsonArray(toggled.TurnedOn, toggled.Changed, toggled.Unchanged, toggled.Failed);
+        }
+        catch (Exception ex)
+        {
+            result["throws"] = Thrown(ex);
+        }
+
+        result["requests"] = handler.Requests;
+        result["log"] = logger.Lines;
+        return result;
+    }
+
+    private static JsonObject CompareIgnoreCase(JsonObject input)
+    {
+        var result = (JsonObject)input.DeepClone();
+        result["sign"] = Math.Sign(StringComparer.OrdinalIgnoreCase.Compare(Utf16(input["left"]), Utf16(input["right"])));
+        return result;
+    }
+
+    private static string? Utf16(JsonNode? units) =>
+        units is null ? null : new string([.. units.AsArray().Select(unit => (char)unit!.GetValue<int>())]);
+
+    /// <summary>Records each line logged, as "&lt;level&gt;: &lt;message&gt;".</summary>
+    private sealed class RecordingLogger : ILogger
+    {
+        public JsonArray Lines { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Lines.Add((JsonNode)$"{logLevel}: {formatter(state, exception)}");
     }
 
     private static JsonObject IpAddressCase(JsonObject input)

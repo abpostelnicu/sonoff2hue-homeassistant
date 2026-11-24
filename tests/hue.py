@@ -1,12 +1,15 @@
 """The fake Hue bridge over real HTTPS on 127.0.0.1, for tests (``tools/fake_hue``); a port of the .NET app's
 ``FakeHueTestHost``. Tests that use it need sockets: ``pytest.mark.usefixtures("socket_enabled")``."""
 
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 import json
 from typing import Any, Self
 
 import aiohttp
 
-from custom_components.sonoff2hue.engine.hue_client import HueClient
+from custom_components.sonoff2hue.engine.hue_address import BridgeUrl
+from custom_components.sonoff2hue.engine.hue_client import HttpAnswer, HueClient
 from custom_components.sonoff2hue.engine.hue_setup import build_device_type
 from tools.fake_hue.bridge import FakeBridge, Fault
 from tools.fake_hue.server import RunningBridge, start
@@ -89,3 +92,50 @@ class FakeHueHost:
     async def stop(self) -> None:
         await self._session.close()
         await self.running.stop()
+
+
+@dataclass(frozen=True, slots=True)
+class RecordedRequest:
+    method: str
+    path: str
+    body: str | None
+    headers: dict[str, str]
+
+    @property
+    def on(self) -> bool:
+        """The ``on.on`` of a PUT's body, which must be exactly ``{"on":{"on":<bool>}}``."""
+        body = json.loads(self.body or "")
+        assert list(body) == ["on"]
+        assert list(body["on"]) == ["on"]
+        on: bool = body["on"]["on"]
+        return on
+
+
+type Respond = Callable[[RecordedRequest], tuple[int, str] | Awaitable[tuple[int, str]]]
+
+
+class InMemoryBridge:
+    """A stand-in for the Hue bridge without sockets (the .NET tests' ``FakeHttpHandler``): every request gets the
+    status and body that ``respond`` returns for it, and is recorded."""
+
+    def __init__(self, respond: Respond) -> None:
+        self._respond = respond
+        self.requests: list[RecordedRequest] = []
+
+    def client(self, app_key: str = "app-key") -> HueClient:
+        return HueClient("bridge.test", app_key, None, self._transport)
+
+    def _transport(self, url: BridgeUrl, pin: str | None, report: Any) -> InMemoryBridge:
+        return self
+
+    async def send(
+        self, method: str, path: str, body: bytes | None, headers: dict[str, str] | None = None
+    ) -> HttpAnswer:
+        request = RecordedRequest(method, "/" + path, None if body is None else body.decode(), dict(headers or {}))
+        self.requests.append(request)
+        answer = self._respond(request)
+        status, text = answer if isinstance(answer, tuple) else await answer
+        return HttpAnswer(status, None, text.encode())
+
+    async def close(self) -> None:
+        pass

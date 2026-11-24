@@ -9698,6 +9698,2629 @@
       "valid": false
     }
   ],
+  "targets": [
+    {
+      "label": "namesAndIds",
+      "name": null,
+      "deviceId": " 1000ABCDEF ",
+      "lights": [
+        "ceiling",
+        "l2",
+        "Ceiling"
+      ],
+      "groups": [
+        "hallway",
+        "zone:kitchen"
+      ],
+      "hueLights": [
+        {
+          "id": "l1",
+          "name": "Ceiling"
+        },
+        {
+          "id": "l2",
+          "name": "Floor lamp"
+        },
+        {
+          "id": "l3",
+          "name": "Spot"
+        },
+        {
+          "id": "l4",
+          "name": "Spot"
+        }
+      ],
+      "hueGroups": [
+        {
+          "id": "r1",
+          "name": "Kitchen",
+          "kind": "room",
+          "grouped": "g1"
+        },
+        {
+          "id": "z1",
+          "name": "Kitchen",
+          "kind": "zone",
+          "grouped": "g2"
+        },
+        {
+          "id": "r2",
+          "name": "Hallway",
+          "kind": "room",
+          "grouped": "g3"
+        },
+        {
+          "id": "r3",
+          "name": "Empty",
+          "kind": "room",
+          "grouped": null
+        }
+      ],
+      "targets": [
+        [
+          "Light",
+          "l1",
+          "Ceiling"
+        ],
+        [
+          "Light",
+          "l2",
+          "Floor lamp"
+        ],
+        [
+          "GroupedLight",
+          "g3",
+          "Hallway"
+        ],
+        [
+          "GroupedLight",
+          "g2",
+          "Kitchen"
+        ]
+      ],
+      "errors": []
+    },
+    {
+      "label": "unknownAndAmbiguous",
+      "name": "Hall",
+      "deviceId": " 1000ABCDEF ",
+      "lights": [
+        "Spot",
+        "Nope"
+      ],
+      "groups": [
+        "Kitchen",
+        "Empty",
+        "Garage"
+      ],
+      "hueLights": [
+        {
+          "id": "l1",
+          "name": "Ceiling"
+        },
+        {
+          "id": "l2",
+          "name": "Floor lamp"
+        },
+        {
+          "id": "l3",
+          "name": "Spot"
+        },
+        {
+          "id": "l4",
+          "name": "Spot"
+        }
+      ],
+      "hueGroups": [
+        {
+          "id": "r1",
+          "name": "Kitchen",
+          "kind": "room",
+          "grouped": "g1"
+        },
+        {
+          "id": "z1",
+          "name": "Kitchen",
+          "kind": "zone",
+          "grouped": "g2"
+        },
+        {
+          "id": "r2",
+          "name": "Hallway",
+          "kind": "room",
+          "grouped": "g3"
+        },
+        {
+          "id": "r3",
+          "name": "Empty",
+          "kind": "room",
+          "grouped": null
+        }
+      ],
+      "targets": [],
+      "errors": [
+        "Hall (1000abcdef): 2 lights are named 'Spot'; use the light id instead ('l3', 'l4').",
+        "Hall (1000abcdef): no Hue light named 'Nope'. Known lights: 'Ceiling', 'Floor lamp', 'Spot'",
+        "Hall (1000abcdef): 'Kitchen' matches 'room:Kitchen', 'zone:Kitchen'; prefix it with 'room:' or 'zone:'.",
+        "Hall (1000abcdef): room 'Empty' has no lights.",
+        "Hall (1000abcdef): no Hue room or zone named 'Garage'. Known: 'room:Empty', 'room:Hallway', 'room:Kitchen', 'zone:Kitchen'"
+      ]
+    },
+    {
+      "label": "trimmedAndPrefixed",
+      "name": "Hall",
+      "deviceId": " 1000ABCDEF ",
+      "lights": [
+        "  floor LAMP\u3000"
+      ],
+      "groups": [
+        " ROOM: Kitchen ",
+        "zone:",
+        "room:zone:x",
+        "Zone:KITCHEN"
+      ],
+      "hueLights": [
+        {
+          "id": "l1",
+          "name": "Ceiling"
+        },
+        {
+          "id": "l2",
+          "name": "Floor lamp"
+        },
+        {
+          "id": "l3",
+          "name": "Spot"
+        },
+        {
+          "id": "l4",
+          "name": "Spot"
+        }
+      ],
+      "hueGroups": [
+        {
+          "id": "r1",
+          "name": "Kitchen",
+          "kind": "room",
+          "grouped": "g1"
+        },
+        {
+          "id": "z1",
+          "name": "Kitchen",
+          "kind": "zone",
+          "grouped": "g2"
+        },
+        {
+          "id": "r2",
+          "name": "Hallway",
+          "kind": "room",
+          "grouped": "g3"
+        },
+        {
+          "id": "r3",
+          "name": "Empty",
+          "kind": "room",
+          "grouped": null
+        }
+      ],
+      "targets": [
+        [
+          "Light",
+          "l2",
+          "Floor lamp"
+        ],
+        [
+          "GroupedLight",
+          "g1",
+          "Kitchen"
+        ],
+        [
+          "GroupedLight",
+          "g2",
+          "Kitchen"
+        ]
+      ],
+      "errors": [
+        "Hall (1000abcdef): no Hue room or zone named 'zone:'. Known: 'room:Empty', 'room:Hallway', 'room:Kitchen', 'zone:Kitchen'",
+        "Hall (1000abcdef): no Hue room or zone named 'room:zone:x'. Known: 'room:Empty', 'room:Hallway', 'room:Kitchen', 'zone:Kitchen'"
+      ]
+    },
+    {
+      "label": "duplicates",
+      "name": "Hall",
+      "deviceId": " 1000ABCDEF ",
+      "lights": [
+        "Ceiling",
+        "l1",
+        "L1",
+        "ceiling"
+      ],
+      "groups": [
+        "r2",
+        "Hallway",
+        "room:hallway",
+        "g3"
+      ],
+      "hueLights": [
+        {
+          "id": "l1",
+          "name": "Ceiling"
+        },
+        {
+          "id": "l2",
+          "name": "Floor lamp"
+        },
+        {
+          "id": "l3",
+          "name": "Spot"
+        },
+        {
+          "id": "l4",
+          "name": "Spot"
+        }
+      ],
+      "hueGroups": [
+        {
+          "id": "r1",
+          "name": "Kitchen",
+          "kind": "room",
+          "grouped": "g1"
+        },
+        {
+          "id": "z1",
+          "name": "Kitchen",
+          "kind": "zone",
+          "grouped": "g2"
+        },
+        {
+          "id": "r2",
+          "name": "Hallway",
+          "kind": "room",
+          "grouped": "g3"
+        },
+        {
+          "id": "r3",
+          "name": "Empty",
+          "kind": "room",
+          "grouped": null
+        }
+      ],
+      "targets": [
+        [
+          "Light",
+          "l1",
+          "Ceiling"
+        ],
+        [
+          "GroupedLight",
+          "g3",
+          "Hallway"
+        ]
+      ],
+      "errors": [
+        "Hall (1000abcdef): no Hue room or zone named 'g3'. Known: 'room:Empty', 'room:Hallway', 'room:Kitchen', 'zone:Kitchen'"
+      ]
+    },
+    {
+      "label": "knownListOrder",
+      "name": "Hall",
+      "deviceId": " 1000ABCDEF ",
+      "lights": [
+        "nothing"
+      ],
+      "groups": [
+        "nothing"
+      ],
+      "hueLights": [
+        {
+          "id": "s0",
+          "name": "beta"
+        },
+        {
+          "id": "s1",
+          "name": "Alpha"
+        },
+        {
+          "id": "s2",
+          "name": "alpha"
+        },
+        {
+          "id": "s3",
+          "name": "Ärger"
+        },
+        {
+          "id": "s4",
+          "name": "Zulu"
+        },
+        {
+          "id": "s5",
+          "name": "_x"
+        },
+        {
+          "id": "s6",
+          "name": "ı"
+        },
+        {
+          "id": "s7",
+          "name": "I"
+        },
+        {
+          "id": "s8",
+          "name": "i"
+        },
+        {
+          "id": "s9",
+          "name": "é"
+        },
+        {
+          "id": "s10",
+          "name": "E"
+        },
+        {
+          "id": "s11",
+          "name": "Spot"
+        },
+        {
+          "id": "s12",
+          "name": "spot"
+        },
+        {
+          "id": "s13",
+          "name": "Spot"
+        }
+      ],
+      "hueGroups": [
+        {
+          "id": "r1",
+          "name": "Kitchen",
+          "kind": "room",
+          "grouped": "g1"
+        },
+        {
+          "id": "z1",
+          "name": "Kitchen",
+          "kind": "zone",
+          "grouped": "g2"
+        },
+        {
+          "id": "r2",
+          "name": "Hallway",
+          "kind": "room",
+          "grouped": "g3"
+        },
+        {
+          "id": "r3",
+          "name": "Empty",
+          "kind": "room",
+          "grouped": null
+        }
+      ],
+      "targets": [],
+      "errors": [
+        "Hall (1000abcdef): no Hue light named 'nothing'. Known lights: 'Alpha', 'alpha', 'beta', 'E', 'I', 'i', 'Spot', 'spot', 'Zulu', '_x', 'Ärger', 'é', 'ı'",
+        "Hall (1000abcdef): no Hue room or zone named 'nothing'. Known: 'room:Empty', 'room:Hallway', 'room:Kitchen', 'zone:Kitchen'"
+      ]
+    },
+    {
+      "label": "noLights",
+      "name": "Hall",
+      "deviceId": " 1000ABCDEF ",
+      "lights": [
+        "x"
+      ],
+      "groups": [
+        "y"
+      ],
+      "hueLights": [],
+      "hueGroups": [],
+      "targets": [],
+      "errors": [
+        "Hall (1000abcdef): no Hue light named 'x'. Known lights: (none)",
+        "Hall (1000abcdef): no Hue room or zone named 'y'. Known: (none)"
+      ]
+    },
+    {
+      "label": "paddedName",
+      "name": "Hall",
+      "deviceId": " 1000ABCDEF ",
+      "lights": [
+        "Spot light"
+      ],
+      "groups": [],
+      "hueLights": [
+        {
+          "id": "x1",
+          "name": "  Spot light "
+        }
+      ],
+      "hueGroups": [
+        {
+          "id": "r1",
+          "name": "Kitchen",
+          "kind": "room",
+          "grouped": "g1"
+        },
+        {
+          "id": "z1",
+          "name": "Kitchen",
+          "kind": "zone",
+          "grouped": "g2"
+        },
+        {
+          "id": "r2",
+          "name": "Hallway",
+          "kind": "room",
+          "grouped": "g3"
+        },
+        {
+          "id": "r3",
+          "name": "Empty",
+          "kind": "room",
+          "grouped": null
+        }
+      ],
+      "targets": [
+        [
+          "Light",
+          "x1",
+          "  Spot light "
+        ]
+      ],
+      "errors": []
+    },
+    {
+      "label": "nullName",
+      "name": "Hall",
+      "deviceId": " 1000ABCDEF ",
+      "lights": [
+        "x"
+      ],
+      "groups": [],
+      "hueLights": [
+        {
+          "id": "n1",
+          "name": null
+        }
+      ],
+      "hueGroups": [
+        {
+          "id": "r1",
+          "name": "Kitchen",
+          "kind": "room",
+          "grouped": "g1"
+        },
+        {
+          "id": "z1",
+          "name": "Kitchen",
+          "kind": "zone",
+          "grouped": "g2"
+        },
+        {
+          "id": "r2",
+          "name": "Hallway",
+          "kind": "room",
+          "grouped": "g3"
+        },
+        {
+          "id": "r3",
+          "name": "Empty",
+          "kind": "room",
+          "grouped": null
+        }
+      ],
+      "throws": "NullReferenceException: Object reference not set to an instance of an object."
+    },
+    {
+      "label": "nullNameMatchedById",
+      "name": "Hall",
+      "deviceId": " 1000ABCDEF ",
+      "lights": [
+        "N1"
+      ],
+      "groups": [],
+      "hueLights": [
+        {
+          "id": "n1",
+          "name": null
+        }
+      ],
+      "hueGroups": [
+        {
+          "id": "r1",
+          "name": "Kitchen",
+          "kind": "room",
+          "grouped": "g1"
+        },
+        {
+          "id": "z1",
+          "name": "Kitchen",
+          "kind": "zone",
+          "grouped": "g2"
+        },
+        {
+          "id": "r2",
+          "name": "Hallway",
+          "kind": "room",
+          "grouped": "g3"
+        },
+        {
+          "id": "r3",
+          "name": "Empty",
+          "kind": "room",
+          "grouped": null
+        }
+      ],
+      "targets": [
+        [
+          "Light",
+          "n1",
+          null
+        ]
+      ],
+      "errors": []
+    },
+    {
+      "label": "nullId",
+      "name": "Hall",
+      "deviceId": " 1000ABCDEF ",
+      "lights": [
+        "Lamp"
+      ],
+      "groups": [],
+      "hueLights": [
+        {
+          "id": null,
+          "name": "Lamp"
+        }
+      ],
+      "hueGroups": [
+        {
+          "id": "r1",
+          "name": "Kitchen",
+          "kind": "room",
+          "grouped": "g1"
+        },
+        {
+          "id": "z1",
+          "name": "Kitchen",
+          "kind": "zone",
+          "grouped": "g2"
+        },
+        {
+          "id": "r2",
+          "name": "Hallway",
+          "kind": "room",
+          "grouped": "g3"
+        },
+        {
+          "id": "r3",
+          "name": "Empty",
+          "kind": "room",
+          "grouped": null
+        }
+      ],
+      "targets": [
+        [
+          "Light",
+          null,
+          "Lamp"
+        ]
+      ],
+      "errors": []
+    },
+    {
+      "label": "nullIdUnknown",
+      "name": "Hall",
+      "deviceId": " 1000ABCDEF ",
+      "lights": [
+        "x"
+      ],
+      "groups": [],
+      "hueLights": [
+        {
+          "id": null,
+          "name": "Lamp"
+        },
+        {
+          "id": null,
+          "name": "Lamp"
+        }
+      ],
+      "hueGroups": [
+        {
+          "id": "r1",
+          "name": "Kitchen",
+          "kind": "room",
+          "grouped": "g1"
+        },
+        {
+          "id": "z1",
+          "name": "Kitchen",
+          "kind": "zone",
+          "grouped": "g2"
+        },
+        {
+          "id": "r2",
+          "name": "Hallway",
+          "kind": "room",
+          "grouped": "g3"
+        },
+        {
+          "id": "r3",
+          "name": "Empty",
+          "kind": "room",
+          "grouped": null
+        }
+      ],
+      "targets": [],
+      "errors": [
+        "Hall (1000abcdef): no Hue light named 'x'. Known lights: 'Lamp'"
+      ]
+    },
+    {
+      "label": "nullGroupName",
+      "name": "Hall",
+      "deviceId": " 1000ABCDEF ",
+      "lights": [],
+      "groups": [
+        "r9",
+        "x"
+      ],
+      "hueLights": [
+        {
+          "id": "l1",
+          "name": "Ceiling"
+        },
+        {
+          "id": "l2",
+          "name": "Floor lamp"
+        },
+        {
+          "id": "l3",
+          "name": "Spot"
+        },
+        {
+          "id": "l4",
+          "name": "Spot"
+        }
+      ],
+      "hueGroups": [
+        {
+          "id": "r9",
+          "name": null,
+          "kind": "room",
+          "grouped": "g9"
+        },
+        {
+          "id": "r1",
+          "name": "Kitchen",
+          "kind": "room",
+          "grouped": "g1"
+        },
+        {
+          "id": "z1",
+          "name": "Kitchen",
+          "kind": "zone",
+          "grouped": "g2"
+        },
+        {
+          "id": "r2",
+          "name": "Hallway",
+          "kind": "room",
+          "grouped": "g3"
+        },
+        {
+          "id": "r3",
+          "name": "Empty",
+          "kind": "room",
+          "grouped": null
+        }
+      ],
+      "throws": "NullReferenceException: Object reference not set to an instance of an object."
+    },
+    {
+      "label": "turkishI",
+      "name": "Hall",
+      "deviceId": " 1000ABCDEF ",
+      "lights": [
+        "ıd",
+        "ID"
+      ],
+      "groups": [],
+      "hueLights": [
+        {
+          "id": "id",
+          "name": "x"
+        },
+        {
+          "id": "ıd",
+          "name": "y"
+        }
+      ],
+      "hueGroups": [
+        {
+          "id": "r1",
+          "name": "Kitchen",
+          "kind": "room",
+          "grouped": "g1"
+        },
+        {
+          "id": "z1",
+          "name": "Kitchen",
+          "kind": "zone",
+          "grouped": "g2"
+        },
+        {
+          "id": "r2",
+          "name": "Hallway",
+          "kind": "room",
+          "grouped": "g3"
+        },
+        {
+          "id": "r3",
+          "name": "Empty",
+          "kind": "room",
+          "grouped": null
+        }
+      ],
+      "targets": [
+        [
+          "Light",
+          "ıd",
+          "y"
+        ],
+        [
+          "Light",
+          "id",
+          "x"
+        ]
+      ],
+      "errors": []
+    },
+    {
+      "label": "nameEqualsOtherId",
+      "name": "Hall",
+      "deviceId": " 1000ABCDEF ",
+      "lights": [
+        "l2"
+      ],
+      "groups": [],
+      "hueLights": [
+        {
+          "id": "l1",
+          "name": "l2"
+        },
+        {
+          "id": "l2",
+          "name": "Desk"
+        }
+      ],
+      "hueGroups": [
+        {
+          "id": "r1",
+          "name": "Kitchen",
+          "kind": "room",
+          "grouped": "g1"
+        },
+        {
+          "id": "z1",
+          "name": "Kitchen",
+          "kind": "zone",
+          "grouped": "g2"
+        },
+        {
+          "id": "r2",
+          "name": "Hallway",
+          "kind": "room",
+          "grouped": "g3"
+        },
+        {
+          "id": "r3",
+          "name": "Empty",
+          "kind": "room",
+          "grouped": null
+        }
+      ],
+      "targets": [],
+      "errors": [
+        "Hall (1000abcdef): 2 lights are named 'l2'; use the light id instead ('l1', 'l2')."
+      ]
+    },
+    {
+      "label": "sameIdForALightAndAGroup",
+      "name": "Hall",
+      "deviceId": " 1000ABCDEF ",
+      "lights": [
+        "g1"
+      ],
+      "groups": [
+        "r1"
+      ],
+      "hueLights": [
+        {
+          "id": "g1",
+          "name": "Lamp"
+        }
+      ],
+      "hueGroups": [
+        {
+          "id": "r1",
+          "name": "Kitchen",
+          "kind": "room",
+          "grouped": "g1"
+        },
+        {
+          "id": "z1",
+          "name": "Kitchen",
+          "kind": "zone",
+          "grouped": "g2"
+        },
+        {
+          "id": "r2",
+          "name": "Hallway",
+          "kind": "room",
+          "grouped": "g3"
+        },
+        {
+          "id": "r3",
+          "name": "Empty",
+          "kind": "room",
+          "grouped": null
+        }
+      ],
+      "targets": [
+        [
+          "Light",
+          "g1",
+          "Lamp"
+        ],
+        [
+          "GroupedLight",
+          "g1",
+          "Kitchen"
+        ]
+      ],
+      "errors": []
+    },
+    {
+      "label": "nullIdsAmbiguous",
+      "name": "Hall",
+      "deviceId": " 1000ABCDEF ",
+      "lights": [
+        "Lamp"
+      ],
+      "groups": [],
+      "hueLights": [
+        {
+          "id": "b",
+          "name": "Lamp"
+        },
+        {
+          "id": null,
+          "name": "Lamp"
+        },
+        {
+          "id": "A",
+          "name": "Lamp"
+        }
+      ],
+      "hueGroups": [
+        {
+          "id": "r1",
+          "name": "Kitchen",
+          "kind": "room",
+          "grouped": "g1"
+        },
+        {
+          "id": "z1",
+          "name": "Kitchen",
+          "kind": "zone",
+          "grouped": "g2"
+        },
+        {
+          "id": "r2",
+          "name": "Hallway",
+          "kind": "room",
+          "grouped": "g3"
+        },
+        {
+          "id": "r3",
+          "name": "Empty",
+          "kind": "room",
+          "grouped": null
+        }
+      ],
+      "targets": [],
+      "errors": [
+        "Hall (1000abcdef): 3 lights are named 'Lamp'; use the light id instead ('', 'A', 'b')."
+      ]
+    },
+    {
+      "label": "blankNames",
+      "name": "Hall",
+      "deviceId": " 1000ABCDEF ",
+      "lights": [
+        " "
+      ],
+      "groups": [
+        "room:"
+      ],
+      "hueLights": [
+        {
+          "id": "x1",
+          "name": "  "
+        }
+      ],
+      "hueGroups": [
+        {
+          "id": "r1",
+          "name": "\u3000",
+          "kind": "room",
+          "grouped": "g1"
+        }
+      ],
+      "targets": [
+        [
+          "Light",
+          "x1",
+          "  "
+        ],
+        [
+          "GroupedLight",
+          "g1",
+          "\u3000"
+        ]
+      ],
+      "errors": []
+    },
+    {
+      "label": "knownListCodePointOrder",
+      "name": "Hall",
+      "deviceId": " 1000ABCDEF ",
+      "lights": [
+        "nothing"
+      ],
+      "groups": [],
+      "hueLights": [
+        {
+          "id": "u0",
+          "name": "Ａ"
+        },
+        {
+          "id": "u1",
+          "name": "\uD835\uDC00"
+        },
+        {
+          "id": "u2",
+          "name": "\uE000"
+        },
+        {
+          "id": "u3",
+          "name": "\uD801\uDC28"
+        },
+        {
+          "id": "u4",
+          "name": "\uD801\uDC00"
+        },
+        {
+          "id": "u5",
+          "name": "ÿ"
+        },
+        {
+          "id": "u6",
+          "name": "a"
+        }
+      ],
+      "hueGroups": [
+        {
+          "id": "r1",
+          "name": "Kitchen",
+          "kind": "room",
+          "grouped": "g1"
+        },
+        {
+          "id": "z1",
+          "name": "Kitchen",
+          "kind": "zone",
+          "grouped": "g2"
+        },
+        {
+          "id": "r2",
+          "name": "Hallway",
+          "kind": "room",
+          "grouped": "g3"
+        },
+        {
+          "id": "r3",
+          "name": "Empty",
+          "kind": "room",
+          "grouped": null
+        }
+      ],
+      "targets": [],
+      "errors": [
+        "Hall (1000abcdef): no Hue light named 'nothing'. Known lights: 'a', 'ÿ', '\uE000', 'Ａ', '\uD801\uDC28', '\uD801\uDC00', '\uD835\uDC00'"
+      ]
+    }
+  ],
+  "toggle": [
+    {
+      "name": "allOff",
+      "targets": [
+        [
+          "Light",
+          "l1",
+          "Ceiling"
+        ],
+        [
+          "Light",
+          "l2",
+          "Desk"
+        ],
+        [
+          "GroupedLight",
+          "g1",
+          "Hall"
+        ]
+      ],
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"l1\",\"on\":{\"on\":false}},{\"id\":\"l2\",\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"g1\",\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "result": [
+        true,
+        3,
+        0,
+        0
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/grouped_light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l2",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/grouped_light/g1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ],
+      "log": []
+    },
+    {
+      "name": "anyOn",
+      "targets": [
+        [
+          "Light",
+          "l1",
+          "Ceiling"
+        ],
+        [
+          "Light",
+          "l2",
+          "Desk"
+        ],
+        [
+          "GroupedLight",
+          "g1",
+          "Hall"
+        ]
+      ],
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"l1\",\"on\":{\"on\":false}},{\"id\":\"l2\",\"on\":{\"on\":true}}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"g1\",\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "result": [
+        false,
+        1,
+        2,
+        0
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/grouped_light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l2",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":false}}"
+        }
+      ],
+      "log": []
+    },
+    {
+      "name": "allOn",
+      "targets": [
+        [
+          "Light",
+          "l1",
+          "Ceiling"
+        ],
+        [
+          "GroupedLight",
+          "g1",
+          "Hall"
+        ]
+      ],
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"l1\",\"on\":{\"on\":true}}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"g1\",\"on\":{\"on\":true}}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "result": [
+        false,
+        2,
+        0,
+        0
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/grouped_light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":false}}"
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/grouped_light/g1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":false}}"
+        }
+      ],
+      "log": []
+    },
+    {
+      "name": "stateIgnoresCase",
+      "targets": [
+        [
+          "Light",
+          "L1",
+          "Ceiling"
+        ]
+      ],
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"l1\",\"on\":{\"on\":true}}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "result": [
+        false,
+        1,
+        0,
+        0
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/L1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":false}}"
+        }
+      ],
+      "log": []
+    },
+    {
+      "name": "unknownState",
+      "targets": [
+        [
+          "Light",
+          "l1",
+          "Ceiling"
+        ],
+        [
+          "Light",
+          "gone",
+          "Gone"
+        ]
+      ],
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"l1\",\"on\":{\"on\":true}}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "result": [
+        false,
+        2,
+        0,
+        0
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":false}}"
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/gone",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":false}}"
+        }
+      ],
+      "log": []
+    },
+    {
+      "name": "duplicateTargets",
+      "targets": [
+        [
+          "Light",
+          "l1",
+          "Ceiling"
+        ],
+        [
+          "Light",
+          "l1",
+          "Ceiling"
+        ]
+      ],
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"l1\",\"on\":{\"on\":false}},{\"id\":\"l2\",\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "result": [
+        true,
+        2,
+        0,
+        0
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ],
+      "log": []
+    },
+    {
+      "name": "noTargets",
+      "targets": [],
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "result": [
+        true,
+        0,
+        0,
+        0
+      ],
+      "requests": [],
+      "log": []
+    },
+    {
+      "name": "onlyGroups",
+      "targets": [
+        [
+          "GroupedLight",
+          "g1",
+          "Hall"
+        ]
+      ],
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"g1\",\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "result": [
+        true,
+        1,
+        0,
+        0
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/grouped_light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/grouped_light/g1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ],
+      "log": []
+    },
+    {
+      "name": "retriedWrite",
+      "targets": [
+        [
+          "Light",
+          "l1",
+          "Ceiling"
+        ],
+        [
+          "Light",
+          "l2",
+          "Desk"
+        ]
+      ],
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"l1\",\"on\":{\"on\":false}},{\"id\":\"l2\",\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 503,
+          "body": "{}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "result": [
+        true,
+        2,
+        0,
+        0
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l2",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ],
+      "log": []
+    },
+    {
+      "name": "failedWrite",
+      "targets": [
+        [
+          "Light",
+          "l1",
+          "Ceiling"
+        ],
+        [
+          "Light",
+          "l2",
+          "Desk"
+        ]
+      ],
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"l1\",\"on\":{\"on\":false}},{\"id\":\"l2\",\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 503,
+          "body": "{}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 503,
+          "body": "{}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "result": [
+        true,
+        1,
+        0,
+        1
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l2",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ],
+      "log": [
+        "Error: Could not switch light 'Ceiling' on: Hue bridge returned 503 Service Unavailable for PUT /clip/v2/resource/light/l1"
+      ]
+    },
+    {
+      "name": "rateLimitedWrite",
+      "targets": [
+        [
+          "Light",
+          "l1",
+          "Ceiling"
+        ]
+      ],
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"l1\",\"on\":{\"on\":false}},{\"id\":\"l2\",\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 429,
+          "body": "{\"errors\":[{\"description\":\"rate limit\"}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "result": [
+        true,
+        1,
+        0,
+        0
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ],
+      "log": []
+    },
+    {
+      "name": "rejectedWrite",
+      "targets": [
+        [
+          "Light",
+          "l1",
+          "Ceiling"
+        ],
+        [
+          "Light",
+          "l2",
+          "Desk"
+        ]
+      ],
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"l1\",\"on\":{\"on\":false}},{\"id\":\"l2\",\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 404,
+          "body": "{\"errors\":[{\"description\":\"not found\"}],\"data\":[]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "result": [
+        true,
+        1,
+        0,
+        1
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l2",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ],
+      "log": [
+        "Error: Could not switch light 'Ceiling' on: Hue bridge returned 404 Not Found for PUT /clip/v2/resource/light/l1: not found"
+      ]
+    },
+    {
+      "name": "multiStatusWrite",
+      "targets": [
+        [
+          "Light",
+          "l1",
+          "Ceiling"
+        ],
+        [
+          "Light",
+          "l2",
+          "Desk"
+        ]
+      ],
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"l1\",\"on\":{\"on\":false}},{\"id\":\"l2\",\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 207,
+          "body": "{\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}],\"errors\":[{\"description\":\"device (light) has communication issues, command (.on.on) may not have effect\"}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "result": [
+        true,
+        1,
+        0,
+        1
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l2",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ],
+      "log": [
+        "Error: Could not switch light 'Ceiling' on: The Hue bridge reported errors for PUT /clip/v2/resource/light/l1: device (light) has communication issues, command (.on.on) may not have effect"
+      ]
+    },
+    {
+      "name": "keyRejectedWrite",
+      "targets": [
+        [
+          "Light",
+          "l1",
+          "Ceiling"
+        ],
+        [
+          "Light",
+          "l2",
+          "Desk"
+        ]
+      ],
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"l1\",\"on\":{\"on\":false}},{\"id\":\"l2\",\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 403,
+          "body": "{\"errors\":[{\"description\":\"unauthorized user\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "result": [
+        true,
+        0,
+        0,
+        2
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l2",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ],
+      "log": [
+        "Error: Could not switch light 'Ceiling' on: The Hue bridge rejected the application key (unauthorized user); run 'sonoff2hue hue-pair' again.",
+        "Error: Could not switch light 'Desk' on: The Hue bridge rejected the application key (unauthorized user); run 'sonoff2hue hue-pair' again."
+      ]
+    },
+    {
+      "name": "retriedRead",
+      "targets": [
+        [
+          "Light",
+          "l1",
+          "Ceiling"
+        ]
+      ],
+      "answers": [
+        {
+          "status": 503,
+          "body": "",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"l1\",\"on\":{\"on\":false}},{\"id\":\"l2\",\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "result": [
+        true,
+        1,
+        0,
+        0
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ],
+      "log": []
+    },
+    {
+      "name": "malformedReadRetried",
+      "targets": [
+        [
+          "Light",
+          "l1",
+          "Ceiling"
+        ]
+      ],
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"l1\",\"on\":{\"on\":\"true\"}}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"l1\",\"on\":{\"on\":false}},{\"id\":\"l2\",\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "result": [
+        true,
+        1,
+        0,
+        0
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ],
+      "log": []
+    },
+    {
+      "name": "failedRead",
+      "targets": [
+        [
+          "Light",
+          "l1",
+          "Ceiling"
+        ]
+      ],
+      "answers": [
+        {
+          "status": 503,
+          "body": "",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "throws": "HueApiException: Hue bridge returned 503 Service Unavailable for GET /clip/v2/resource/light",
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ],
+      "log": []
+    },
+    {
+      "name": "rejectedRead",
+      "targets": [
+        [
+          "Light",
+          "l1",
+          "Ceiling"
+        ]
+      ],
+      "answers": [
+        {
+          "status": 403,
+          "body": "{\"errors\":[{\"description\":\"unauthorized user\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "throws": "HueApiException: The Hue bridge rejected the application key (unauthorized user); run 'sonoff2hue hue-pair' again.",
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ],
+      "log": []
+    },
+    {
+      "name": "failedGroupRead",
+      "targets": [
+        [
+          "Light",
+          "l1",
+          "Ceiling"
+        ],
+        [
+          "GroupedLight",
+          "g1",
+          "Hall"
+        ]
+      ],
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"l1\",\"on\":{\"on\":false}},{\"id\":\"l2\",\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 502,
+          "body": "",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "throws": "HueApiException: Hue bridge returned 502 Bad Gateway for GET /clip/v2/resource/grouped_light",
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/grouped_light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/grouped_light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ],
+      "log": []
+    },
+    {
+      "name": "nullTargetId",
+      "targets": [
+        [
+          "Light",
+          null,
+          "Lamp"
+        ]
+      ],
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"l1\",\"on\":{\"on\":false}},{\"id\":\"l2\",\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "throws": "ArgumentNullException: Value cannot be null. (Parameter 'key')",
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ],
+      "log": []
+    },
+    {
+      "name": "nullTargetIdAfterAnOnTarget",
+      "targets": [
+        [
+          "Light",
+          "l1",
+          "Ceiling"
+        ],
+        [
+          "Light",
+          null,
+          "Lamp"
+        ]
+      ],
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"l1\",\"on\":{\"on\":true}}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"rid\":\"l1\",\"rtype\":\"light\"}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "throws": "ArgumentNullException: Value cannot be null. (Parameter 'key')",
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":false}}"
+        }
+      ],
+      "log": []
+    },
+    {
+      "name": "nullTargetName",
+      "targets": [
+        [
+          "Light",
+          "l1",
+          null
+        ]
+      ],
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"errors\":[],\"data\":[{\"id\":\"l1\",\"on\":{\"on\":false}},{\"id\":\"l2\",\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": null
+        },
+        {
+          "status": 503,
+          "body": "",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "result": [
+        true,
+        0,
+        0,
+        1
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        },
+        {
+          "method": "PUT",
+          "uri": "https://192.0.2.20/clip/v2/resource/light/l1",
+          "key": "app-key",
+          "contentType": "application/json; charset=utf-8",
+          "body": "{\"on\":{\"on\":true}}"
+        }
+      ],
+      "log": [
+        "Error: Could not switch light '' on: Hue bridge returned 503 Service Unavailable for PUT /clip/v2/resource/light/l1"
+      ]
+    },
+    {
+      "name": "nullInTheStates",
+      "targets": [
+        [
+          "Light",
+          "l1",
+          "Ceiling"
+        ]
+      ],
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[null]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "throws": "NullReferenceException: Object reference not set to an instance of an object.",
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ],
+      "log": []
+    },
+    {
+      "name": "duplicateStateIds",
+      "targets": [
+        [
+          "Light",
+          "l1",
+          "Ceiling"
+        ]
+      ],
+      "answers": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"l1\",\"on\":{\"on\":true}},{\"id\":\"L1\",\"on\":{\"on\":false}}]}",
+          "reason": null,
+          "contentType": null
+        }
+      ],
+      "throws": "ArgumentException: An item with the same key has already been added. Key: L1",
+      "requests": [
+        {
+          "method": "GET",
+          "uri": "https://192.0.2.20/clip/v2/resource/light",
+          "key": "app-key",
+          "contentType": null,
+          "body": null
+        }
+      ],
+      "log": []
+    }
+  ],
+  "compareIgnoreCase": [
+    {
+      "left": [
+        97
+      ],
+      "right": [
+        66
+      ],
+      "sign": -1
+    },
+    {
+      "left": [
+        66
+      ],
+      "right": [
+        97
+      ],
+      "sign": 1
+    },
+    {
+      "left": [
+        97
+      ],
+      "right": [
+        65
+      ],
+      "sign": 0
+    },
+    {
+      "left": [
+        95,
+        120
+      ],
+      "right": [
+        97,
+        108,
+        112,
+        104,
+        97
+      ],
+      "sign": 1
+    },
+    {
+      "left": [
+        97
+      ],
+      "right": [
+        97,
+        98
+      ],
+      "sign": -1
+    },
+    {
+      "left": [],
+      "right": [],
+      "sign": 0
+    },
+    {
+      "left": [],
+      "right": [
+        97
+      ],
+      "sign": -1
+    },
+    {
+      "left": [
+        97,
+        98,
+        99,
+        0
+      ],
+      "right": [
+        97,
+        98,
+        99
+      ],
+      "sign": 1
+    },
+    {
+      "left": [
+        305
+      ],
+      "right": [
+        105
+      ],
+      "sign": 1
+    },
+    {
+      "left": [
+        383
+      ],
+      "right": [
+        115
+      ],
+      "sign": 1
+    },
+    {
+      "left": [
+        8490
+      ],
+      "right": [
+        107
+      ],
+      "sign": 1
+    },
+    {
+      "left": [
+        223
+      ],
+      "right": [
+        115,
+        115
+      ],
+      "sign": 1
+    },
+    {
+      "left": [
+        233
+      ],
+      "right": [
+        69
+      ],
+      "sign": 1
+    },
+    {
+      "left": [
+        255
+      ],
+      "right": [
+        376
+      ],
+      "sign": 0
+    },
+    {
+      "left": [
+        453
+      ],
+      "right": [
+        452
+      ],
+      "sign": 0
+    },
+    {
+      "left": [
+        963
+      ],
+      "right": [
+        962
+      ],
+      "sign": 0
+    },
+    {
+      "left": [
+        65313
+      ],
+      "right": [
+        55297,
+        56360
+      ],
+      "sign": -1
+    },
+    {
+      "left": [
+        55297,
+        56360
+      ],
+      "right": [
+        55297,
+        56320
+      ],
+      "sign": 0
+    },
+    {
+      "left": [
+        55349,
+        56320
+      ],
+      "right": [
+        57344
+      ],
+      "sign": 1
+    },
+    {
+      "left": [
+        55349,
+        56320
+      ],
+      "right": [
+        65535
+      ],
+      "sign": 1
+    },
+    {
+      "left": [
+        55297,
+        56320
+      ],
+      "right": [
+        55297
+      ],
+      "sign": 1
+    },
+    {
+      "left": [
+        55297
+      ],
+      "right": [
+        55297,
+        56320
+      ],
+      "sign": -1
+    },
+    {
+      "left": [
+        55297,
+        120
+      ],
+      "right": [
+        55297,
+        121
+      ],
+      "sign": -1
+    },
+    {
+      "left": [
+        56320
+      ],
+      "right": [
+        57344
+      ],
+      "sign": -1
+    },
+    {
+      "left": [
+        56320
+      ],
+      "right": [
+        55296,
+        56320
+      ],
+      "sign": -1
+    },
+    {
+      "left": [
+        56320,
+        55297
+      ],
+      "right": [
+        56320
+      ],
+      "sign": 1
+    },
+    {
+      "left": [
+        120,
+        55297,
+        56360,
+        121
+      ],
+      "right": [
+        88,
+        55297,
+        56320,
+        90
+      ],
+      "sign": -1
+    },
+    {
+      "left": null,
+      "right": [
+        97
+      ],
+      "sign": -1
+    },
+    {
+      "left": [
+        97
+      ],
+      "right": null,
+      "sign": 1
+    },
+    {
+      "left": null,
+      "right": null,
+      "sign": 0
+    }
+  ],
   "reasonPhrases": {
     "100": "Continue",
     "101": "Switching Protocols",
