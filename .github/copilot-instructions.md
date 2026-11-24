@@ -89,8 +89,8 @@ The user's choices, made on 2026-11-23 when the plan was approved:
 | Folder | Contents |
 |--------|----------|
 | `custom_components/sonoff2hue` | The integration |
-| `custom_components/sonoff2hue/engine` | Ports of the .NET engine, without Home Assistant imports. `text.py` holds the .NET string and number rules (trim, ordinal case-insensitive comparison, `ToLowerInvariant`, `TryParse`); `dns.py` is `Mdns/DnsMessage.cs` |
-| `tests/engine` | Tests of the engine, ported from the .NET tests. `packets.py` builds raw DNS packets and MINIR4M broadcasts (the .NET tests' `TestPackets.cs`) |
+| `custom_components/sonoff2hue/engine` | Ports of the .NET engine, without Home Assistant imports. `text.py` holds the .NET string and number rules (trim, ordinal case-insensitive comparison, `ToLowerInvariant`, `TryParse`). `dns.py` is `Mdns/DnsMessage.cs`; `mdns.py` has `MdnsPacket` (`Mdns/MdnsListener.cs`); `ewelink.py` is `Ewelink/EwelinkAnnouncement.cs` and `EwelinkCrypto.cs`; `press.py` is `Ewelink/PressDetector.cs` and `SwitchTracker.cs`; `config.py` is the model of `Configuration/AppConfig.cs`; `jsonnode.py` reads JSON as System.Text.Json's `JsonNode` does |
+| `tests/engine` | Tests of the engine, ported from the .NET tests. `packets.py` builds raw DNS packets and MINIR4M broadcasts (the .NET tests' `TestPackets.cs`) and `MdnsPacket`s |
 | `scripts` | `setup` (the virtual environment) and `check` (lint, formatting, types, tests) |
 | `.github/scripts` | `check-commits.sh` (the .NET repository's, unchanged) and `test-each-commit.sh` |
 | `.github/workflows` | `ci.yml` (*Lint*, *Test*) and `commits.yml` (per-commit checks, *All commits pass*) |
@@ -230,6 +230,10 @@ The eWeLink LAN protocol and the Hue API, from the .NET app's research (public s
 - 2026-11-24: the DNS port (`engine/dns.py`, `engine/text.py`). The six cases of `DnsMessageTests` and three new ones
   pass (TXT keys, unknown record types, overruns, long names, unsupported labels), and ruff, the formatter and mypy
   (strict) find nothing.
+- 2026-11-24: the eWeLink port: announcements and probes, payload decryption, `PressDetector` and `SwitchTracker`,
+  with `jsonnode.py` for the payload's JSON. The cases of `EwelinkTests` and `PressDetectorTests` and the engine cases of
+  `QaRegressionTests` pass, with the openssl reference vector, plus new ones for the fallbacks (no `id`, no address
+  records), the missing IV and payloads that aren't JSON objects. Tests use made-up device ids.
 
 ## Status
 
@@ -237,8 +241,8 @@ The eWeLink LAN protocol and the Hue API, from the .NET app's research (public s
 - [ ] CI: lint, tests and per-commit checks (done); hassfest and HACS validation once the manifest exists; a ruleset
   on `main` once the checks have passed there
 - [ ] mDNS spike on the user's Home Assistant OS: own UDP 5353 socket next to Home Assistant's zeroconf
-- [ ] Engine port with its tests: DNS (done), eWeLink and press detection, mDNS listener, fake Hue bridge, Hue client
-  and pairing, runner, YAML import
+- [ ] Engine port with its tests: DNS and eWeLink with press detection (done), mDNS listener, fake Hue bridge, Hue
+  client and pairing, runner, YAML import
 - [ ] Home Assistant layer: skeleton, runtime, setup and import flow, switch subentries, entities, diagnostics,
   logbook
 - [ ] Development tooling and end-to-end CI with a real Home Assistant, the fake bridge and a simulated switch

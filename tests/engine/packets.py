@@ -3,10 +3,12 @@
 A port of the .NET tests' ``TestPackets.cs``: names are written uncompressed.
 """
 
+from datetime import UTC, datetime
 from ipaddress import IPv4Address
 import struct
 
-from custom_components.sonoff2hue.engine.dns import DnsRecordType
+from custom_components.sonoff2hue.engine.dns import DnsMessage, DnsRecordType
+from custom_components.sonoff2hue.engine.mdns import MdnsPacket
 
 
 def name(value: str) -> bytes:
@@ -132,3 +134,7 @@ def probe(device_id: str, ip: str = "10.0.0.5") -> bytes:
         .authority(f"eWeLink_{device_id}.local", DnsRecordType.A, a(ip))
         .build()
     )
+
+
+def to_packet(data: bytes, sender: str = "10.0.0.5", received_at: datetime | None = None) -> MdnsPacket:
+    return MdnsPacket(DnsMessage.parse(data), (sender, 5353), received_at or datetime.now(UTC))
