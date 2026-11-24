@@ -1,0 +1,41 @@
+name: Validate
+
+# Validates the integration as the Home Assistant Marketplace requires: hassfest, Home Assistant's own validator, and
+# the HACS action, which checks the repository on GitHub (for a pull request, its branch). Both actions run their
+# validators' current images (hassfest: the latest Home Assistant release), so they are referenced as their
+# documentation says; a pinned tag would pin only the wrapper, not the checks. Nothing is ignored.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hassfest:
+    name: hassfest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Validate with hassfest
+        uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    name: HACS
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Validate with the HACS action
+        uses: hacs/action@main
+        with:
+          category: integration
