@@ -42,6 +42,8 @@ internal static class Engine
             ["compareIgnoreCase"] = Map(cases["compareIgnoreCase"]!, CompareIgnoreCase),
             ["switchValidation"] = Map(cases["switchValidation"]!, Switches.Validation),
             ["switchWrites"] = Map(cases["switchWrites"]!, Switches.Writes),
+            ["yaml"] = Yaml.Run(casesPath, cases["yaml"]!.AsArray().Count),
+            ["wellFormedUri"] = Map(cases["wellFormedUri"]!, Yaml.WellFormedUri),
             ["reasonPhrases"] = ReasonPhrases(),
         };
         var options = new JsonSerializerOptions { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };

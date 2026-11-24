@@ -15,7 +15,7 @@ def resolve(
     """The targets of a switch. A name or id that matches no resource, or several, is added to ``errors`` with the
     names that would match; a room or zone without a grouped light is too."""
     targets: list[HueTarget] = []
-    for reference in (text.trim(light) for light in settings.lights):
+    for reference in (_trim(light) for light in settings.lights):
         matches = [light for light in lights if _matches(reference, light.id, light.name)]
         if len(matches) == 1:
             targets.append(HueTarget(HueTargetKind.LIGHT, matches[0].id, matches[0].name))
@@ -28,7 +28,7 @@ def resolve(
                 f"{settings.display_name}: {len(matches)} lights are named '{reference}'; use the light id instead ({ids})."
             )
 
-    for raw in (text.trim(group) for group in settings.groups):
+    for raw in (_trim(group) for group in settings.groups):
         # Optional "room:" / "zone:" prefix when a room and a zone share a name.
         kind, reference = _split_kind(raw)
         found = [g for g in groups if (kind is None or g.kind == kind) and _matches(reference, g.id, g.name)]
@@ -50,6 +50,13 @@ def resolve(
     for target in targets:
         distinct.setdefault((target.kind, target.id), target)
     return list(distinct.values())
+
+
+def _trim(value: str | None) -> str:
+    """``value.Trim()``, which throws for a null entry of an imported ``sonoff2hue.yaml``."""
+    if value is None:
+        raise dotnet.null_reference()
+    return text.trim(value)
 
 
 def _matches(reference: str, resource_id: str | None, name: str | None) -> bool:

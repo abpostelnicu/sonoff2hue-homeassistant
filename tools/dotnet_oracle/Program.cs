@@ -1,7 +1,16 @@
 // "text": writes tests/engine/fixtures/dotnet_text.json, the .NET string rules that engine/text.py reproduces, for
 // every code point. "engine <cases> <output> <app version>": evaluates engine_cases.py's cases with the app's code
-// (Engine.cs). Run from the repository root through generate.sh.
+// (Engine.cs). Run from the repository root through generate.sh. "yaml-child <cases> <first>" is the child process
+// that evaluates the "yaml" cases from the given one on (Yaml.cs).
 using System.Text.Json;
+
+if (args is ["yaml-child", var yamlCases, var first])
+{
+#if SONOFF2HUE
+    Yaml.Child(yamlCases, int.Parse(first, System.Globalization.CultureInfo.InvariantCulture));
+#endif
+    return;
+}
 
 if (args is ["engine", var cases, var output, var appVersion])
 {

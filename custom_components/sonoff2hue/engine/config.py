@@ -4,6 +4,7 @@ A port of the model in the .NET app's ``Configuration/AppConfig.cs``. Home Assis
 entry and its subentries; ``yaml_import`` reads them from a ``sonoff2hue.yaml``.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from . import text
@@ -30,9 +31,10 @@ class SwitchSettings:
     device_key: str | None = None
     """The optional eWeLink device key. It lets the engine decrypt the broadcasts and ignore relay toggles and setting
     changes; without it, every new broadcast counts as a press."""
-    lights: list[str] = field(default_factory=list)
-    """Hue lights, by name or resource id."""
-    groups: list[str] = field(default_factory=list)
+    lights: Sequence[str | None] = field(default_factory=list)
+    """Hue lights, by name or resource id. An imported ``sonoff2hue.yaml`` can hold a null entry (``- ~``), as .NET's
+    ``List<string>`` can; ``validate_for_run`` reports it as an empty name."""
+    groups: Sequence[str | None] = field(default_factory=list)
     """Hue rooms or zones, by name or resource id, optionally prefixed with ``room:`` or ``zone:``."""
 
     @property

@@ -3,6 +3,7 @@ running the app's own code, must come out the same here."""
 
 import base64
 from datetime import UTC, datetime
+import hashlib
 from ipaddress import IPv4Address, IPv6Address
 import json
 import logging
@@ -21,8 +22,11 @@ from custom_components.sonoff2hue.engine import (
     targets,
     text,
     toggler,
+    yaml_import,
+    yaml_parser,
+    yaml_uri,
 )
-from custom_components.sonoff2hue.engine.config import SwitchSettings
+from custom_components.sonoff2hue.engine.config import ConfigError, EngineConfig, SwitchSettings
 from custom_components.sonoff2hue.engine.dns import DnsFormatError, DnsMessage, DnsResourceRecord
 from custom_components.sonoff2hue.engine.errors import UnexpectedError
 from custom_components.sonoff2hue.engine.ewelink import EwelinkAnnouncement
@@ -440,3 +444,137 @@ async def test_toggle(case: dict[str, Any], monkeypatch: pytest.MonkeyPatch, cap
         f"{_LEVELS[record.levelno]}: {record.getMessage().replace(hue_client.PAIR_AGAIN, _PAIR_AGAIN)}"
         for record in log
     ] == case["log"]
+
+
+# The YAML import: YamlDotNet's parsing events for each text, and what AppConfig.Parse makes of it.
+
+# Where the port knowingly differs (decision 15). A value tagged !!float or !!timestamp is read by .NET with
+# double.Parse or DateTime.Parse, which the port doesn't reproduce: it refuses the value.
+_YAML_KNOWN_DIFFERENCES = {"tagFloat", "tagTimestamp"}
+
+
+def _yaml_text(case: dict[str, Any]) -> str:
+    if "units" in case:
+        return yaml_parser.from_utf16("".join(chr(unit) for unit in case["units"]))
+    text_value: str = case["text"]
+    return text_value
+
+
+def _escape(value: str) -> str:
+    """Yaml.cs's ``Escape``: printable ASCII, with every other UTF-16 code unit, a quote and a backslash as \\uXXXX."""
+    return "".join(
+        f"\\u{ord(unit):04x}" if not " " <= unit <= "~" or unit in '"\\' else unit
+        for unit in yaml_parser.to_utf16(value)
+    )
+
+
+def _mark(mark: yaml_parser.Mark) -> str:
+    return f"{mark.line}:{mark.column}:{mark.index}"
+
+
+def _event_line(event: yaml_parser.ParsingEvent) -> str:
+    """Yaml.cs's ``Describe``: an event on one line."""
+    line = f"{event.dotnet_name} {_mark(event.start)}-{_mark(event.end)}"
+    if isinstance(event, yaml_parser.NodeEvent):
+        line += "" if event.anchor is None else f" &{_escape(yaml_parser.from_utf16(event.anchor))}"
+        line += "" if event.tag is None else f" !{_escape(yaml_parser.from_utf16(event.tag))}"
+    match event:
+        case yaml_parser.Scalar():
+            flags = [event.style.dotnet_name]
+            flags += ["plain"] if event.is_plain_implicit else []
+            flags += ["quoted"] if event.is_quoted_implicit else []
+            flags += ["key"] if event.is_key else []
+            line += f' {" ".join(flags)} "{_escape(yaml_parser.from_utf16(event.value))}"'
+        case yaml_parser.SequenceStart() | yaml_parser.MappingStart():
+            line += f" {event.style.value}{' implicit' if event.is_implicit else ''}"
+        case yaml_parser.Alias():
+            line += f" *{_escape(yaml_parser.from_utf16(event.value))}"
+        case yaml_parser.DocumentStart():
+            line += " implicit" if event.is_implicit else ""
+            line += "" if event.version is None else f" %YAML {event.version[0]}.{event.version[1]}"
+            line += "".join(
+                f" %TAG {_escape(yaml_parser.from_utf16(handle))} {_escape(yaml_parser.from_utf16(prefix))}"
+                for handle, prefix in event.tags
+            )
+        case yaml_parser.DocumentEnd():
+            line += " implicit" if event.is_implicit else ""
+    return line
+
+
+@pytest.mark.parametrize("case", _cases("yaml"), ids=lambda case: case["name"])
+def test_yaml_events(case: dict[str, Any]) -> None:
+    lines: list[str] = []
+    error: dict[str, str] | None = None
+    parser = yaml_parser.Parser(_yaml_text(case))
+    try:
+        while parser.move_next():
+            assert parser.current is not None
+            lines.append(_event_line(parser.current))
+    except yaml_parser.YamlError as err:
+        message = _escape(yaml_parser.from_utf16(err.message))
+        error = {"type": err.kind, "message": message, "start": _mark(err.start), "end": _mark(err.end)}
+    except UnexpectedError as err:
+        error = {"type": err.dotnet_type, "message": _escape(str(err))}
+
+    listing = "\n".join(lines)
+    if "eventsSha256" in case:
+        assert (len(lines), hashlib.sha256(listing.encode("ascii")).hexdigest()) == (
+            case["eventCount"],
+            case["eventsSha256"],
+        )
+    else:
+        assert listing == case["events"]
+    assert error == case.get("parseError")
+
+
+def _yaml_config(config: EngineConfig) -> dict[str, Any]:
+    def escaped(value: str | None) -> str | None:
+        return None if value is None else _escape(value)
+
+    hue = config.hue
+    return {
+        "hue": {
+            "bridgeIp": escaped(hue.bridge_ip),
+            "bridgeId": escaped(hue.bridge_id),
+            "appKey": escaped(hue.app_key),
+            "certificateSha256": escaped(hue.certificate_sha256),
+        },
+        "switches": [
+            {
+                "name": escaped(switch.name),
+                "deviceId": escaped(switch.device_id),
+                "deviceKey": escaped(switch.device_key),
+                "lights": [escaped(light) for light in switch.lights],
+                "groups": [escaped(group) for group in switch.groups],
+            }
+            for switch in config.switches
+        ],
+    }
+
+
+@pytest.mark.parametrize("case", _cases("yaml"), ids=lambda case: case["name"])
+def test_yaml_import(case: dict[str, Any]) -> None:
+    outcome: dict[str, Any]
+    try:
+        outcome = {"config": _yaml_config(yaml_import.parse(_yaml_text(case)))}
+    except ConfigError as err:
+        outcome = {"error": _escape(f"ConfigException: {err}")}
+    except UnexpectedError as err:
+        if err.dotnet_type == "StackOverflowException":
+            outcome = {"crash": "Stack overflow."}
+        else:
+            outcome = {"error": _escape(f"{err.dotnet_type}: {err}")}
+
+    if case["name"] in _YAML_KNOWN_DIFFERENCES:
+        assert "config" in case
+        assert outcome["error"].endswith(" are not supported. Write the value without the tag.")
+        return
+    expected = {key: case[key] for key in ("config", "error", "crash") if key in case}
+    assert outcome == expected
+
+
+@pytest.mark.parametrize("case", _cases("wellFormedUri"), ids=lambda case: ascii(_from_utf16(case["units"]))[:40])
+def test_well_formed_uri(case: dict[str, Any]) -> None:
+    units = "".join(chr(unit) for unit in case["units"])
+
+    assert yaml_uri.is_well_formed_uri_string(units) == case["wellFormed"]
