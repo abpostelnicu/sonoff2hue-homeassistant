@@ -12321,6 +12321,5131 @@
       "sign": 0
     }
   ],
+  "switchValidation": [
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": "",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": "   ",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": "Hall",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": "Hall",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": "  Hall\u3000",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": "Hall",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "name": [
+          "Use at most 64 characters."
+        ]
+      },
+      "settings": {
+        "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": " xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx ",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\uD83D\uDE00",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\uD83D\uDE00",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\uD83D\uDE00",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "name": [
+          "Use at most 64 characters."
+        ]
+      },
+      "settings": {
+        "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\uD83D\uDE00",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": "Ha\u0007ll",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "name": [
+          "The name contains control characters."
+        ]
+      },
+      "settings": {
+        "name": "Ha\u0007ll",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": "Hall\u0085",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": "Hall",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": "Ha\u0085ll",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "name": [
+          "The name contains control characters."
+        ]
+      },
+      "settings": {
+        "name": "Ha\u0085ll",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": "Ha\u007Fll",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "name": [
+          "The name contains control characters."
+        ]
+      },
+      "settings": {
+        "name": "Ha\u007Fll",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": "Ha\u009Fll",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "name": [
+          "The name contains control characters."
+        ]
+      },
+      "settings": {
+        "name": "Ha\u009Fll",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": "Ha\u00A0ll",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": "Ha\u00A0ll",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": "\uFEFFHall",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": "\uFEFFHall",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": "Ha​ll",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": "Ha​ll",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": "Hall\u2028",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": "Hall",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": "Ha\u2028ll",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": "Ha\u2028ll",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": "\u001CHall",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "name": [
+          "The name contains control characters."
+        ]
+      },
+      "settings": {
+        "name": "\u001CHall",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": "İstanbul",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": "İstanbul",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": "\t\n",
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": null,
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "deviceId": [
+          "Choose a device or enter its device id."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "deviceId": [
+          "Choose a device or enter its device id."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "  ",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "deviceId": [
+          "Choose a device or enter its device id."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "abc",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "deviceId": [
+          "A device id has 4 to 40 letters and digits, e.g. 1000abcdef."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "abc",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "abcd",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "abcd",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "ABCD",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "abcd",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": " 1000ABCDEF ",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "deviceId": [
+          "A device id has 4 to 40 letters and digits, e.g. 1000abcdef."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef\u0085",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "\u00A01000abcdef\u3000",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "\uFEFF1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "deviceId": [
+          "A device id has 4 to 40 letters and digits, e.g. 1000abcdef."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "\uFEFF1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef​",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "deviceId": [
+          "A device id has 4 to 40 letters and digits, e.g. 1000abcdef."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef​",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000Kabc",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000kabc",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000İabc",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "deviceId": [
+          "A device id has 4 to 40 letters and digits, e.g. 1000abcdef."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000İabc",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000ıabc",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "deviceId": [
+          "A device id has 4 to 40 letters and digits, e.g. 1000abcdef."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000ıabc",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "１000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "deviceId": [
+          "A device id has 4 to 40 letters and digits, e.g. 1000abcdef."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "１000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000-abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "deviceId": [
+          "A device id has 4 to 40 letters and digits, e.g. 1000abcdef."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000-abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000 abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "deviceId": [
+          "A device id has 4 to 40 letters and digits, e.g. 1000abcdef."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000 abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000_abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "deviceId": [
+          "A device id has 4 to 40 letters and digits, e.g. 1000abcdef."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000_abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef\uD83D\uDE00",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "deviceId": [
+          "A device id has 4 to 40 letters and digits, e.g. 1000abcdef."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef\uD83D\uDE00",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "ǅ123",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "deviceId": [
+          "A device id has 4 to 40 letters and digits, e.g. 1000abcdef."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "ǆ123",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000\u0000abc",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "deviceId": [
+          "A device id has 4 to 40 letters and digits, e.g. 1000abcdef."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000\u0000abc",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "  ",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "secret",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "secret",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": " secret\u3000",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "secret",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "deviceKey": [
+          "A device key has at most 128 characters and no spaces."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\uD83D\uDE00",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\uD83D\uDE00",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\uD83D\uDE00",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "deviceKey": [
+          "A device key has at most 128 characters and no spaces."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\uD83D\uDE00",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "se cret",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "deviceKey": [
+          "A device key has at most 128 characters and no spaces."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "se cret",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "se\tcret",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "deviceKey": [
+          "A device key has at most 128 characters and no spaces."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "se\tcret",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "se\u00A0cret",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "deviceKey": [
+          "A device key has at most 128 characters and no spaces."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "se\u00A0cret",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "se​cret",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "se​cret",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "se\u0085cret",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "deviceKey": [
+          "A device key has at most 128 characters and no spaces."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "se\u0085cret",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "se\u0000cret",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "deviceKey": [
+          "A device key has at most 128 characters and no spaces."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "se\u0000cret",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "se\u2028cret",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "deviceKey": [
+          "A device key has at most 128 characters and no spaces."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "se\u2028cret",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "\uFEFFsecret",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "\uFEFFsecret",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "secret\u0085",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "secret",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "sécrèt",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": "sécrèt",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": null
+      },
+      "errors": {
+        "targets": [
+          "Choose at least one light, room or zone."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": null
+      },
+      "errors": {
+        "targets": [
+          "Choose at least one light, room or zone."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          ""
+        ],
+        "groups": null
+      },
+      "errors": {
+        "lights": [
+          "Each entry needs 1 to 200 characters."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          ""
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "  "
+        ],
+        "groups": null
+      },
+      "errors": {
+        "lights": [
+          "Each entry needs 1 to 200 characters."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          ""
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          null
+        ],
+        "groups": null
+      },
+      "errors": {
+        "lights": [
+          "Each entry needs 1 to 200 characters."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          ""
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          " Ceiling ",
+          "ceiling",
+          "CEILING",
+          "Floor lamp"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling",
+          "Floor lamp"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Straße",
+          "STRASSE",
+          "STRAẞE",
+          "strasse"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Straße",
+          "STRASSE",
+          "STRAẞE"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "ΟΔΟΣ",
+          "οδος",
+          "οδοσ"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "ΟΔΟΣ"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "ı",
+          "I",
+          "i"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "ı",
+          "I"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "K",
+          "k",
+          "K"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "K",
+          "k"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "µ",
+          "Μ",
+          "μ"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "µ"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "İ",
+          "i̇",
+          "İ"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "İ",
+          "i̇"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "ſ",
+          "S",
+          "s"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "ſ",
+          "S"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "lights": [
+          "Each entry needs 1 to 200 characters."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\uD83D\uDE00"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "lights": [
+          "Each entry needs 1 to 200 characters."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\uD83D\uDE00"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\uD83D\uDE00"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\uD83D\uDE00"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ce\u0007iling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "lights": [
+          "Each entry needs 1 to 200 characters."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ce\u0007iling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling\u0085",
+          "\u0085Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "\uFEFFCeiling",
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "\uFEFFCeiling",
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling\u2028",
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "room:Hallway",
+          "ROOM:hallway",
+          "zone:Hallway"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "room:Hallway",
+          "zone:Hallway"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "lights": [
+          "Use at most 50 entries."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Light 0",
+          "Light 1",
+          "Light 2",
+          "Light 3",
+          "Light 4",
+          "Light 5",
+          "Light 6",
+          "Light 7",
+          "Light 8",
+          "Light 9",
+          "Light 10",
+          "Light 11",
+          "Light 12",
+          "Light 13",
+          "Light 14",
+          "Light 15",
+          "Light 16",
+          "Light 17",
+          "Light 18",
+          "Light 19",
+          "Light 20",
+          "Light 21",
+          "Light 22",
+          "Light 23",
+          "Light 24",
+          "Light 25",
+          "Light 26",
+          "Light 27",
+          "Light 28",
+          "Light 29",
+          "Light 30",
+          "Light 31",
+          "Light 32",
+          "Light 33",
+          "Light 34",
+          "Light 35",
+          "Light 36",
+          "Light 37",
+          "Light 38",
+          "Light 39",
+          "Light 40",
+          "Light 41",
+          "Light 42",
+          "Light 43",
+          "Light 44",
+          "Light 45",
+          "Light 46",
+          "Light 47",
+          "Light 48",
+          "Light 49"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Light 0",
+          "Light 1",
+          "Light 2",
+          "Light 3",
+          "Light 4",
+          "Light 5",
+          "Light 6",
+          "Light 7",
+          "Light 8",
+          "Light 9",
+          "Light 10",
+          "Light 11",
+          "Light 12",
+          "Light 13",
+          "Light 14",
+          "Light 15",
+          "Light 16",
+          "Light 17",
+          "Light 18",
+          "Light 19",
+          "Light 20",
+          "Light 21",
+          "Light 22",
+          "Light 23",
+          "Light 24",
+          "Light 25",
+          "Light 26",
+          "Light 27",
+          "Light 28",
+          "Light 29",
+          "Light 30",
+          "Light 31",
+          "Light 32",
+          "Light 33",
+          "Light 34",
+          "Light 35",
+          "Light 36",
+          "Light 37",
+          "Light 38",
+          "Light 39",
+          "Light 40",
+          "Light 41",
+          "Light 42",
+          "Light 43",
+          "Light 44",
+          "Light 45",
+          "Light 46",
+          "Light 47",
+          "Light 48",
+          "Light 49"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Light 0",
+          "Light 1",
+          "Light 2",
+          "Light 3",
+          "Light 4",
+          "Light 5",
+          "Light 6",
+          "Light 7",
+          "Light 8",
+          "Light 9",
+          "Light 10",
+          "Light 11",
+          "Light 12",
+          "Light 13",
+          "Light 14",
+          "Light 15",
+          "Light 16",
+          "Light 17",
+          "Light 18",
+          "Light 19",
+          "Light 20",
+          "Light 21",
+          "Light 22",
+          "Light 23",
+          "Light 24",
+          "Light 25",
+          "Light 26",
+          "Light 27",
+          "Light 28",
+          "Light 29",
+          "Light 30",
+          "Light 31",
+          "Light 32",
+          "Light 33",
+          "Light 34",
+          "Light 35",
+          "Light 36",
+          "Light 37",
+          "Light 38",
+          "Light 39",
+          "Light 40",
+          "Light 41",
+          "Light 42",
+          "Light 43",
+          "Light 44",
+          "Light 45",
+          "Light 46",
+          "Light 47",
+          "Light 48",
+          "Light 49",
+          "Light 50"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "lights": [
+          "Use at most 50 entries."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Light 0",
+          "Light 1",
+          "Light 2",
+          "Light 3",
+          "Light 4",
+          "Light 5",
+          "Light 6",
+          "Light 7",
+          "Light 8",
+          "Light 9",
+          "Light 10",
+          "Light 11",
+          "Light 12",
+          "Light 13",
+          "Light 14",
+          "Light 15",
+          "Light 16",
+          "Light 17",
+          "Light 18",
+          "Light 19",
+          "Light 20",
+          "Light 21",
+          "Light 22",
+          "Light 23",
+          "Light 24",
+          "Light 25",
+          "Light 26",
+          "Light 27",
+          "Light 28",
+          "Light 29",
+          "Light 30",
+          "Light 31",
+          "Light 32",
+          "Light 33",
+          "Light 34",
+          "Light 35",
+          "Light 36",
+          "Light 37",
+          "Light 38",
+          "Light 39",
+          "Light 40",
+          "Light 41",
+          "Light 42",
+          "Light 43",
+          "Light 44",
+          "Light 45",
+          "Light 46",
+          "Light 47",
+          "Light 48",
+          "Light 49",
+          "Light 50"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "a",
+          "",
+          "b"
+        ],
+        "groups": null
+      },
+      "errors": {
+        "lights": [
+          "Each entry needs 1 to 200 characters."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "a",
+          "",
+          "b"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "a",
+          null
+        ],
+        "groups": null
+      },
+      "errors": {
+        "lights": [
+          "Each entry needs 1 to 200 characters."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "a",
+          ""
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "\uD801\uDC00",
+          "\uD801\uDC28"
+        ],
+        "groups": null
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "\uD801\uDC00"
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": null
+      },
+      "errors": {
+        "targets": [
+          "Choose at least one light, room or zone."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": []
+      },
+      "errors": {
+        "targets": [
+          "Choose at least one light, room or zone."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          ""
+        ]
+      },
+      "errors": {
+        "groups": [
+          "Each entry needs 1 to 200 characters."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          ""
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "  "
+        ]
+      },
+      "errors": {
+        "groups": [
+          "Each entry needs 1 to 200 characters."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          ""
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          null
+        ]
+      },
+      "errors": {
+        "groups": [
+          "Each entry needs 1 to 200 characters."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          ""
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "Ceiling"
+        ]
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "Ceiling"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          " Ceiling ",
+          "ceiling",
+          "CEILING",
+          "Floor lamp"
+        ]
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "Ceiling",
+          "Floor lamp"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "Straße",
+          "STRASSE",
+          "STRAẞE",
+          "strasse"
+        ]
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "Straße",
+          "STRASSE",
+          "STRAẞE"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "ΟΔΟΣ",
+          "οδος",
+          "οδοσ"
+        ]
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "ΟΔΟΣ"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "ı",
+          "I",
+          "i"
+        ]
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "ı",
+          "I"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "K",
+          "k",
+          "K"
+        ]
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "K",
+          "k"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "µ",
+          "Μ",
+          "μ"
+        ]
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "µ"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "İ",
+          "i̇",
+          "İ"
+        ]
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "İ",
+          "i̇"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "ſ",
+          "S",
+          "s"
+        ]
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "ſ",
+          "S"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        ]
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        ]
+      },
+      "errors": {
+        "groups": [
+          "Each entry needs 1 to 200 characters."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\uD83D\uDE00"
+        ]
+      },
+      "errors": {
+        "groups": [
+          "Each entry needs 1 to 200 characters."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\uD83D\uDE00"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\uD83D\uDE00"
+        ]
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\uD83D\uDE00"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "Ce\u0007iling"
+        ]
+      },
+      "errors": {
+        "groups": [
+          "Each entry needs 1 to 200 characters."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "Ce\u0007iling"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "Ceiling\u0085",
+          "\u0085Ceiling"
+        ]
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "Ceiling"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "\uFEFFCeiling",
+          "Ceiling"
+        ]
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "\uFEFFCeiling",
+          "Ceiling"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "Ceiling\u2028",
+          "Ceiling"
+        ]
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "Ceiling"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "room:Hallway",
+          "ROOM:hallway",
+          "zone:Hallway"
+        ]
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "room:Hallway",
+          "zone:Hallway"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling"
+        ]
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "Ceiling"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling"
+        ]
+      },
+      "errors": {
+        "groups": [
+          "Use at most 50 entries."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "Ceiling"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "Light 0",
+          "Light 1",
+          "Light 2",
+          "Light 3",
+          "Light 4",
+          "Light 5",
+          "Light 6",
+          "Light 7",
+          "Light 8",
+          "Light 9",
+          "Light 10",
+          "Light 11",
+          "Light 12",
+          "Light 13",
+          "Light 14",
+          "Light 15",
+          "Light 16",
+          "Light 17",
+          "Light 18",
+          "Light 19",
+          "Light 20",
+          "Light 21",
+          "Light 22",
+          "Light 23",
+          "Light 24",
+          "Light 25",
+          "Light 26",
+          "Light 27",
+          "Light 28",
+          "Light 29",
+          "Light 30",
+          "Light 31",
+          "Light 32",
+          "Light 33",
+          "Light 34",
+          "Light 35",
+          "Light 36",
+          "Light 37",
+          "Light 38",
+          "Light 39",
+          "Light 40",
+          "Light 41",
+          "Light 42",
+          "Light 43",
+          "Light 44",
+          "Light 45",
+          "Light 46",
+          "Light 47",
+          "Light 48",
+          "Light 49"
+        ]
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "Light 0",
+          "Light 1",
+          "Light 2",
+          "Light 3",
+          "Light 4",
+          "Light 5",
+          "Light 6",
+          "Light 7",
+          "Light 8",
+          "Light 9",
+          "Light 10",
+          "Light 11",
+          "Light 12",
+          "Light 13",
+          "Light 14",
+          "Light 15",
+          "Light 16",
+          "Light 17",
+          "Light 18",
+          "Light 19",
+          "Light 20",
+          "Light 21",
+          "Light 22",
+          "Light 23",
+          "Light 24",
+          "Light 25",
+          "Light 26",
+          "Light 27",
+          "Light 28",
+          "Light 29",
+          "Light 30",
+          "Light 31",
+          "Light 32",
+          "Light 33",
+          "Light 34",
+          "Light 35",
+          "Light 36",
+          "Light 37",
+          "Light 38",
+          "Light 39",
+          "Light 40",
+          "Light 41",
+          "Light 42",
+          "Light 43",
+          "Light 44",
+          "Light 45",
+          "Light 46",
+          "Light 47",
+          "Light 48",
+          "Light 49"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "Light 0",
+          "Light 1",
+          "Light 2",
+          "Light 3",
+          "Light 4",
+          "Light 5",
+          "Light 6",
+          "Light 7",
+          "Light 8",
+          "Light 9",
+          "Light 10",
+          "Light 11",
+          "Light 12",
+          "Light 13",
+          "Light 14",
+          "Light 15",
+          "Light 16",
+          "Light 17",
+          "Light 18",
+          "Light 19",
+          "Light 20",
+          "Light 21",
+          "Light 22",
+          "Light 23",
+          "Light 24",
+          "Light 25",
+          "Light 26",
+          "Light 27",
+          "Light 28",
+          "Light 29",
+          "Light 30",
+          "Light 31",
+          "Light 32",
+          "Light 33",
+          "Light 34",
+          "Light 35",
+          "Light 36",
+          "Light 37",
+          "Light 38",
+          "Light 39",
+          "Light 40",
+          "Light 41",
+          "Light 42",
+          "Light 43",
+          "Light 44",
+          "Light 45",
+          "Light 46",
+          "Light 47",
+          "Light 48",
+          "Light 49",
+          "Light 50"
+        ]
+      },
+      "errors": {
+        "groups": [
+          "Use at most 50 entries."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "Light 0",
+          "Light 1",
+          "Light 2",
+          "Light 3",
+          "Light 4",
+          "Light 5",
+          "Light 6",
+          "Light 7",
+          "Light 8",
+          "Light 9",
+          "Light 10",
+          "Light 11",
+          "Light 12",
+          "Light 13",
+          "Light 14",
+          "Light 15",
+          "Light 16",
+          "Light 17",
+          "Light 18",
+          "Light 19",
+          "Light 20",
+          "Light 21",
+          "Light 22",
+          "Light 23",
+          "Light 24",
+          "Light 25",
+          "Light 26",
+          "Light 27",
+          "Light 28",
+          "Light 29",
+          "Light 30",
+          "Light 31",
+          "Light 32",
+          "Light 33",
+          "Light 34",
+          "Light 35",
+          "Light 36",
+          "Light 37",
+          "Light 38",
+          "Light 39",
+          "Light 40",
+          "Light 41",
+          "Light 42",
+          "Light 43",
+          "Light 44",
+          "Light 45",
+          "Light 46",
+          "Light 47",
+          "Light 48",
+          "Light 49",
+          "Light 50"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "a",
+          "",
+          "b"
+        ]
+      },
+      "errors": {
+        "groups": [
+          "Each entry needs 1 to 200 characters."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "a",
+          "",
+          "b"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "a",
+          null
+        ]
+      },
+      "errors": {
+        "groups": [
+          "Each entry needs 1 to 200 characters."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "a",
+          ""
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "\uD801\uDC00",
+          "\uD801\uDC28"
+        ]
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "\uD801\uDC00"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": null,
+        "groups": [
+          "room:Hallway"
+        ]
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "room:Hallway"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "room:Hallway"
+        ]
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          "room:Hallway"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          ""
+        ],
+        "groups": [
+          "room:Hallway"
+        ]
+      },
+      "errors": {
+        "lights": [
+          "Each entry needs 1 to 200 characters."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          ""
+        ],
+        "groups": [
+          "room:Hallway"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "  "
+        ],
+        "groups": [
+          "room:Hallway"
+        ]
+      },
+      "errors": {
+        "lights": [
+          "Each entry needs 1 to 200 characters."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          ""
+        ],
+        "groups": [
+          "room:Hallway"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          null
+        ],
+        "groups": [
+          "room:Hallway"
+        ]
+      },
+      "errors": {
+        "lights": [
+          "Each entry needs 1 to 200 characters."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          ""
+        ],
+        "groups": [
+          "room:Hallway"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": [
+          "room:Hallway"
+        ]
+      },
+      "errors": {},
+      "settings": {
+        "name": null,
+        "deviceId": "1000abcdef",
+        "deviceKey": null,
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": [
+          "room:Hallway"
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "deviceId": "x",
+        "deviceKey": "se cret",
+        "lights": [
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling",
+          "Ceiling"
+        ],
+        "groups": [
+          ""
+        ]
+      },
+      "errors": {
+        "name": [
+          "Use at most 64 characters."
+        ],
+        "deviceId": [
+          "A device id has 4 to 40 letters and digits, e.g. 1000abcdef."
+        ],
+        "deviceKey": [
+          "A device key has at most 128 characters and no spaces."
+        ],
+        "lights": [
+          "Use at most 50 entries."
+        ],
+        "groups": [
+          "Each entry needs 1 to 200 characters."
+        ]
+      },
+      "settings": {
+        "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "deviceId": "x",
+        "deviceKey": "se cret",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": [
+          ""
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": "Ha\u0007ll",
+        "deviceId": "",
+        "deviceKey": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "lights": [],
+        "groups": []
+      },
+      "errors": {
+        "name": [
+          "The name contains control characters."
+        ],
+        "deviceId": [
+          "Choose a device or enter its device id."
+        ],
+        "deviceKey": [
+          "A device key has at most 128 characters and no spaces."
+        ],
+        "targets": [
+          "Choose at least one light, room or zone."
+        ]
+      },
+      "settings": {
+        "name": "Ha\u0007ll",
+        "deviceId": "",
+        "deviceKey": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "lights": [],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": "Ha\u0007ll",
+        "deviceId": null,
+        "deviceKey": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "lights": null,
+        "groups": null
+      },
+      "errors": {
+        "name": [
+          "The name contains control characters."
+        ],
+        "deviceId": [
+          "Choose a device or enter its device id."
+        ],
+        "deviceKey": [
+          "A device key has at most 128 characters and no spaces."
+        ],
+        "targets": [
+          "Choose at least one light, room or zone."
+        ]
+      },
+      "settings": {
+        "name": "Ha\u0007ll",
+        "deviceId": "",
+        "deviceKey": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "lights": [],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "abc",
+        "deviceKey": null,
+        "lights": [
+          ""
+        ],
+        "groups": []
+      },
+      "errors": {
+        "deviceId": [
+          "A device id has 4 to 40 letters and digits, e.g. 1000abcdef."
+        ],
+        "lights": [
+          "Each entry needs 1 to 200 characters."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "abc",
+        "deviceKey": null,
+        "lights": [
+          ""
+        ],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "abc",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          ""
+        ]
+      },
+      "errors": {
+        "deviceId": [
+          "A device id has 4 to 40 letters and digits, e.g. 1000abcdef."
+        ],
+        "groups": [
+          "Each entry needs 1 to 200 characters."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "abc",
+        "deviceKey": null,
+        "lights": [],
+        "groups": [
+          ""
+        ]
+      }
+    },
+    {
+      "input": {
+        "name": null,
+        "deviceId": "abc",
+        "deviceKey": null,
+        "lights": [],
+        "groups": null
+      },
+      "errors": {
+        "deviceId": [
+          "A device id has 4 to 40 letters and digits, e.g. 1000abcdef."
+        ],
+        "targets": [
+          "Choose at least one light, room or zone."
+        ]
+      },
+      "settings": {
+        "name": null,
+        "deviceId": "abc",
+        "deviceKey": null,
+        "lights": [],
+        "groups": []
+      }
+    },
+    {
+      "input": {
+        "name": "Hall",
+        "deviceId": " 1000ABCDEF ",
+        "deviceKey": " secret ",
+        "lights": [
+          " Ceiling ",
+          "ceiling"
+        ],
+        "groups": [
+          "room:Hallway ",
+          " ROOM:hallway"
+        ]
+      },
+      "errors": {},
+      "settings": {
+        "name": "Hall",
+        "deviceId": "1000abcdef",
+        "deviceKey": "secret",
+        "lights": [
+          "Ceiling"
+        ],
+        "groups": [
+          "room:Hallway"
+        ]
+      }
+    }
+  ],
+  "switchWrites": [
+    {
+      "name": "create",
+      "hue": {
+        "bridgeIp": null,
+        "appKey": null
+      },
+      "switches": [],
+      "steps": [
+        {
+          "op": "create",
+          "input": {
+            "name": " Hall ",
+            "deviceId": " 1000ABCDEF ",
+            "deviceKey": " k1 ",
+            "lights": [
+              "Ceiling",
+              "ceiling",
+              " Floor lamp "
+            ],
+            "groups": [
+              "room:Hallway"
+            ]
+          },
+          "result": {
+            "status": 201,
+            "warnings": [
+              "The Hue bridge is not paired yet, so the light names were not checked."
+            ]
+          },
+          "switches": [
+            {
+              "name": "Hall",
+              "deviceId": "1000abcdef",
+              "deviceKey": "k1",
+              "lights": [
+                "Ceiling",
+                "Floor lamp"
+              ],
+              "groups": [
+                "room:Hallway"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "create",
+          "input": {
+            "name": null,
+            "deviceId": " 1000ABCDEF ",
+            "deviceKey": null,
+            "lights": [
+              "Desk"
+            ],
+            "groups": null
+          },
+          "result": {
+            "status": 409,
+            "detail": "Device 1000abcdef is already configured. Edit that switch instead."
+          },
+          "switches": [
+            {
+              "name": "Hall",
+              "deviceId": "1000abcdef",
+              "deviceKey": "k1",
+              "lights": [
+                "Ceiling",
+                "Floor lamp"
+              ],
+              "groups": [
+                "room:Hallway"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "create",
+          "input": {
+            "name": null,
+            "deviceId": "x",
+            "deviceKey": null,
+            "lights": null,
+            "groups": null
+          },
+          "result": {
+            "status": 400,
+            "errors": {
+              "deviceId": [
+                "A device id has 4 to 40 letters and digits, e.g. 1000abcdef."
+              ],
+              "targets": [
+                "Choose at least one light, room or zone."
+              ]
+            }
+          },
+          "switches": [
+            {
+              "name": "Hall",
+              "deviceId": "1000abcdef",
+              "deviceKey": "k1",
+              "lights": [
+                "Ceiling",
+                "Floor lamp"
+              ],
+              "groups": [
+                "room:Hallway"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "create",
+          "input": {
+            "name": null,
+            "deviceId": "1000999999",
+            "deviceKey": "",
+            "lights": [
+              "Desk"
+            ],
+            "groups": null
+          },
+          "result": {
+            "status": 201,
+            "warnings": [
+              "The Hue bridge is not paired yet, so the light names were not checked."
+            ]
+          },
+          "switches": [
+            {
+              "name": "Hall",
+              "deviceId": "1000abcdef",
+              "deviceKey": "k1",
+              "lights": [
+                "Ceiling",
+                "Floor lamp"
+              ],
+              "groups": [
+                "room:Hallway"
+              ]
+            },
+            {
+              "name": null,
+              "deviceId": "1000999999",
+              "deviceKey": null,
+              "lights": [
+                "Desk"
+              ],
+              "groups": []
+            }
+          ]
+        },
+        {
+          "op": "create",
+          "input": {
+            "name": null,
+            "deviceId": "1000999999",
+            "deviceKey": null,
+            "lights": [
+              "Desk"
+            ],
+            "groups": null
+          },
+          "result": {
+            "status": 409,
+            "detail": "Device 1000999999 is already configured. Edit that switch instead."
+          },
+          "switches": [
+            {
+              "name": "Hall",
+              "deviceId": "1000abcdef",
+              "deviceKey": "k1",
+              "lights": [
+                "Ceiling",
+                "Floor lamp"
+              ],
+              "groups": [
+                "room:Hallway"
+              ]
+            },
+            {
+              "name": null,
+              "deviceId": "1000999999",
+              "deviceKey": null,
+              "lights": [
+                "Desk"
+              ],
+              "groups": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "update",
+      "hue": {
+        "bridgeIp": "  ",
+        "appKey": "test-app-key"
+      },
+      "switches": [
+        {
+          "name": "Hall",
+          "deviceId": "1000abcdef",
+          "deviceKey": "k1",
+          "lights": [
+            "Ceiling"
+          ],
+          "groups": []
+        },
+        {
+          "name": null,
+          "deviceId": "1000999999",
+          "deviceKey": null,
+          "lights": [
+            "Desk"
+          ],
+          "groups": []
+        }
+      ],
+      "steps": [
+        {
+          "op": "update",
+          "deviceId": "1000ABCDEF ",
+          "input": {
+            "name": "Hall",
+            "deviceId": "1000abcdef",
+            "deviceKey": null,
+            "lights": [
+              "Floor lamp"
+            ],
+            "groups": null
+          },
+          "result": {
+            "status": 200,
+            "warnings": [
+              "The Hue bridge is not paired yet, so the light names were not checked."
+            ]
+          },
+          "switches": [
+            {
+              "name": "Hall",
+              "deviceId": "1000abcdef",
+              "deviceKey": "k1",
+              "lights": [
+                "Floor lamp"
+              ],
+              "groups": []
+            },
+            {
+              "name": null,
+              "deviceId": "1000999999",
+              "deviceKey": null,
+              "lights": [
+                "Desk"
+              ],
+              "groups": []
+            }
+          ]
+        },
+        {
+          "op": "update",
+          "deviceId": "1000abcdef",
+          "input": {
+            "name": "Hall",
+            "deviceId": "1000abcdef",
+            "deviceKey": "k2",
+            "lights": [
+              "Floor lamp"
+            ],
+            "groups": null
+          },
+          "result": {
+            "status": 200,
+            "warnings": [
+              "The Hue bridge is not paired yet, so the light names were not checked."
+            ]
+          },
+          "switches": [
+            {
+              "name": "Hall",
+              "deviceId": "1000abcdef",
+              "deviceKey": "k2",
+              "lights": [
+                "Floor lamp"
+              ],
+              "groups": []
+            },
+            {
+              "name": null,
+              "deviceId": "1000999999",
+              "deviceKey": null,
+              "lights": [
+                "Desk"
+              ],
+              "groups": []
+            }
+          ]
+        },
+        {
+          "op": "update",
+          "deviceId": "1000abcdef",
+          "input": {
+            "name": "Hall",
+            "deviceId": "1000abcdef",
+            "deviceKey": "  ",
+            "lights": [
+              "Floor lamp"
+            ],
+            "groups": null
+          },
+          "result": {
+            "status": 200,
+            "warnings": [
+              "The Hue bridge is not paired yet, so the light names were not checked."
+            ]
+          },
+          "switches": [
+            {
+              "name": "Hall",
+              "deviceId": "1000abcdef",
+              "deviceKey": null,
+              "lights": [
+                "Floor lamp"
+              ],
+              "groups": []
+            },
+            {
+              "name": null,
+              "deviceId": "1000999999",
+              "deviceKey": null,
+              "lights": [
+                "Desk"
+              ],
+              "groups": []
+            }
+          ]
+        },
+        {
+          "op": "update",
+          "deviceId": "1000abcdef",
+          "input": {
+            "name": null,
+            "deviceId": "1000abcdef",
+            "deviceKey": "k3",
+            "lights": [
+              "Ceiling"
+            ],
+            "groups": null
+          },
+          "result": {
+            "status": 200,
+            "warnings": [
+              "The Hue bridge is not paired yet, so the light names were not checked."
+            ]
+          },
+          "switches": [
+            {
+              "name": null,
+              "deviceId": "1000abcdef",
+              "deviceKey": "k3",
+              "lights": [
+                "Ceiling"
+              ],
+              "groups": []
+            },
+            {
+              "name": null,
+              "deviceId": "1000999999",
+              "deviceKey": null,
+              "lights": [
+                "Desk"
+              ],
+              "groups": []
+            }
+          ]
+        },
+        {
+          "op": "update",
+          "deviceId": "1000abcdef",
+          "input": {
+            "name": null,
+            "deviceId": "1000AAAAAA",
+            "deviceKey": null,
+            "lights": [
+              "Ceiling"
+            ],
+            "groups": null
+          },
+          "result": {
+            "status": 200,
+            "warnings": [
+              "The Hue bridge is not paired yet, so the light names were not checked."
+            ]
+          },
+          "switches": [
+            {
+              "name": null,
+              "deviceId": "1000aaaaaa",
+              "deviceKey": null,
+              "lights": [
+                "Ceiling"
+              ],
+              "groups": []
+            },
+            {
+              "name": null,
+              "deviceId": "1000999999",
+              "deviceKey": null,
+              "lights": [
+                "Desk"
+              ],
+              "groups": []
+            }
+          ]
+        },
+        {
+          "op": "update",
+          "deviceId": "1000aaaaaa",
+          "input": {
+            "name": null,
+            "deviceId": "1000aaaaaa",
+            "deviceKey": "k4",
+            "lights": [
+              "Ceiling"
+            ],
+            "groups": null
+          },
+          "result": {
+            "status": 200,
+            "warnings": [
+              "The Hue bridge is not paired yet, so the light names were not checked."
+            ]
+          },
+          "switches": [
+            {
+              "name": null,
+              "deviceId": "1000aaaaaa",
+              "deviceKey": "k4",
+              "lights": [
+                "Ceiling"
+              ],
+              "groups": []
+            },
+            {
+              "name": null,
+              "deviceId": "1000999999",
+              "deviceKey": null,
+              "lights": [
+                "Desk"
+              ],
+              "groups": []
+            }
+          ]
+        },
+        {
+          "op": "update",
+          "deviceId": "1000aaaaaa",
+          "input": {
+            "name": null,
+            "deviceId": " 1000AAAAAA ",
+            "deviceKey": null,
+            "lights": [
+              "Ceiling"
+            ],
+            "groups": null
+          },
+          "result": {
+            "status": 200,
+            "warnings": [
+              "The Hue bridge is not paired yet, so the light names were not checked."
+            ]
+          },
+          "switches": [
+            {
+              "name": null,
+              "deviceId": "1000aaaaaa",
+              "deviceKey": "k4",
+              "lights": [
+                "Ceiling"
+              ],
+              "groups": []
+            },
+            {
+              "name": null,
+              "deviceId": "1000999999",
+              "deviceKey": null,
+              "lights": [
+                "Desk"
+              ],
+              "groups": []
+            }
+          ]
+        },
+        {
+          "op": "update",
+          "deviceId": "1000aaaaaa",
+          "input": {
+            "name": null,
+            "deviceId": "1000999999",
+            "deviceKey": null,
+            "lights": [
+              "Ceiling"
+            ],
+            "groups": null
+          },
+          "result": {
+            "status": 409,
+            "detail": "Device 1000999999 is already configured by another switch."
+          },
+          "switches": [
+            {
+              "name": null,
+              "deviceId": "1000aaaaaa",
+              "deviceKey": "k4",
+              "lights": [
+                "Ceiling"
+              ],
+              "groups": []
+            },
+            {
+              "name": null,
+              "deviceId": "1000999999",
+              "deviceKey": null,
+              "lights": [
+                "Desk"
+              ],
+              "groups": []
+            }
+          ]
+        },
+        {
+          "op": "update",
+          "deviceId": "1000bbbbbb",
+          "input": {
+            "name": null,
+            "deviceId": "1000bbbbbb",
+            "deviceKey": null,
+            "lights": [
+              "Ceiling"
+            ],
+            "groups": null
+          },
+          "result": {
+            "status": 404,
+            "detail": "No switch with device id 1000bbbbbb is configured."
+          },
+          "switches": [
+            {
+              "name": null,
+              "deviceId": "1000aaaaaa",
+              "deviceKey": "k4",
+              "lights": [
+                "Ceiling"
+              ],
+              "groups": []
+            },
+            {
+              "name": null,
+              "deviceId": "1000999999",
+              "deviceKey": null,
+              "lights": [
+                "Desk"
+              ],
+              "groups": []
+            }
+          ]
+        },
+        {
+          "op": "update",
+          "deviceId": "1000bbbbbb",
+          "input": {
+            "name": null,
+            "deviceId": "",
+            "deviceKey": null,
+            "lights": [
+              "Ceiling"
+            ],
+            "groups": null
+          },
+          "result": {
+            "status": 400,
+            "errors": {
+              "deviceId": [
+                "Choose a device or enter its device id."
+              ]
+            }
+          },
+          "switches": [
+            {
+              "name": null,
+              "deviceId": "1000aaaaaa",
+              "deviceKey": "k4",
+              "lights": [
+                "Ceiling"
+              ],
+              "groups": []
+            },
+            {
+              "name": null,
+              "deviceId": "1000999999",
+              "deviceKey": null,
+              "lights": [
+                "Desk"
+              ],
+              "groups": []
+            }
+          ]
+        },
+        {
+          "op": "update",
+          "deviceId": " 1000999999 ",
+          "input": {
+            "name": "Desk",
+            "deviceId": "1000999999",
+            "deviceKey": "",
+            "lights": null,
+            "groups": [
+              "zone:Upstairs"
+            ]
+          },
+          "result": {
+            "status": 200,
+            "warnings": [
+              "The Hue bridge is not paired yet, so the light names were not checked."
+            ]
+          },
+          "switches": [
+            {
+              "name": null,
+              "deviceId": "1000aaaaaa",
+              "deviceKey": "k4",
+              "lights": [
+                "Ceiling"
+              ],
+              "groups": []
+            },
+            {
+              "name": "Desk",
+              "deviceId": "1000999999",
+              "deviceKey": null,
+              "lights": [],
+              "groups": [
+                "zone:Upstairs"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "update",
+          "deviceId": "1000999999",
+          "input": {
+            "name": null,
+            "deviceId": "1000999999",
+            "deviceKey": null,
+            "lights": [],
+            "groups": null
+          },
+          "result": {
+            "status": 400,
+            "errors": {
+              "targets": [
+                "Choose at least one light, room or zone."
+              ]
+            }
+          },
+          "switches": [
+            {
+              "name": null,
+              "deviceId": "1000aaaaaa",
+              "deviceKey": "k4",
+              "lights": [
+                "Ceiling"
+              ],
+              "groups": []
+            },
+            {
+              "name": "Desk",
+              "deviceId": "1000999999",
+              "deviceKey": null,
+              "lights": [],
+              "groups": [
+                "zone:Upstairs"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "update",
+          "deviceId": "1000aaaaaa",
+          "input": {
+            "name": null,
+            "deviceId": "1000aaaaaa",
+            "deviceKey": "",
+            "lights": [
+              "Ceiling"
+            ],
+            "groups": null
+          },
+          "result": {
+            "status": 200,
+            "warnings": [
+              "The Hue bridge is not paired yet, so the light names were not checked."
+            ]
+          },
+          "switches": [
+            {
+              "name": null,
+              "deviceId": "1000aaaaaa",
+              "deviceKey": null,
+              "lights": [
+                "Ceiling"
+              ],
+              "groups": []
+            },
+            {
+              "name": "Desk",
+              "deviceId": "1000999999",
+              "deviceKey": null,
+              "lights": [],
+              "groups": [
+                "zone:Upstairs"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "storedIds",
+      "hue": {
+        "bridgeIp": null,
+        "appKey": null
+      },
+      "switches": [
+        {
+          "name": "Spaced",
+          "deviceId": " 1000ABCDEF ",
+          "deviceKey": "k1",
+          "lights": [
+            "Ceiling"
+          ],
+          "groups": []
+        },
+        {
+          "name": "Final sigma",
+          "deviceId": "abcς",
+          "deviceKey": null,
+          "lights": [
+            "Ceiling"
+          ],
+          "groups": []
+        },
+        {
+          "name": "Kelvin",
+          "deviceId": "1000K99",
+          "deviceKey": null,
+          "lights": [
+            "Ceiling"
+          ],
+          "groups": []
+        }
+      ],
+      "steps": [
+        {
+          "op": "create",
+          "input": {
+            "name": null,
+            "deviceId": "1000abcdef",
+            "deviceKey": null,
+            "lights": [
+              "Desk"
+            ],
+            "groups": null
+          },
+          "result": {
+            "status": 409,
+            "detail": "Device 1000abcdef is already configured. Edit that switch instead."
+          },
+          "switches": [
+            {
+              "name": "Spaced",
+              "deviceId": " 1000ABCDEF ",
+              "deviceKey": "k1",
+              "lights": [
+                "Ceiling"
+              ],
+              "groups": []
+            },
+            {
+              "name": "Final sigma",
+              "deviceId": "abcς",
+              "deviceKey": null,
+              "lights": [
+                "Ceiling"
+              ],
+              "groups": []
+            },
+            {
+              "name": "Kelvin",
+              "deviceId": "1000K99",
+              "deviceKey": null,
+              "lights": [
+                "Ceiling"
+              ],
+              "groups": []
+            }
+          ]
+        },
+        {
+          "op": "update",
+          "deviceId": "1000ABCDEF",
+          "input": {
+            "name": "Spaced",
+            "deviceId": "1000abcdef",
+            "deviceKey": null,
+            "lights": [
+              "Desk"
+            ],
+            "groups": null
+          },
+          "result": {
+            "status": 200,
+            "warnings": [
+              "The Hue bridge is not paired yet, so the light names were not checked."
+            ]
+          },
+          "switches": [
+            {
+              "name": "Spaced",
+              "deviceId": "1000abcdef",
+              "deviceKey": "k1",
+              "lights": [
+                "Desk"
+              ],
+              "groups": []
+            },
+            {
+              "name": "Final sigma",
+              "deviceId": "abcς",
+              "deviceKey": null,
+              "lights": [
+                "Ceiling"
+              ],
+              "groups": []
+            },
+            {
+              "name": "Kelvin",
+              "deviceId": "1000K99",
+              "deviceKey": null,
+              "lights": [
+                "Ceiling"
+              ],
+              "groups": []
+            }
+          ]
+        },
+        {
+          "op": "update",
+          "deviceId": "abcΣ",
+          "input": {
+            "name": null,
+            "deviceId": "1000abcdef",
+            "deviceKey": null,
+            "lights": [
+              "Desk"
+            ],
+            "groups": null
+          },
+          "result": {
+            "status": 404,
+            "detail": "No switch with device id abcσ is configured."
+          },
+          "switches": [
+            {
+              "name": "Spaced",
+              "deviceId": "1000abcdef",
+              "deviceKey": "k1",
+              "lights": [
+                "Desk"
+              ],
+              "groups": []
+            },
+            {
+              "name": "Final sigma",
+              "deviceId": "abcς",
+              "deviceKey": null,
+              "lights": [
+                "Ceiling"
+              ],
+              "groups": []
+            },
+            {
+              "name": "Kelvin",
+              "deviceId": "1000K99",
+              "deviceKey": null,
+              "lights": [
+                "Ceiling"
+              ],
+              "groups": []
+            }
+          ]
+        },
+        {
+          "op": "update",
+          "deviceId": "abcς",
+          "input": {
+            "name": null,
+            "deviceId": "1000cccccc",
+            "deviceKey": null,
+            "lights": [
+              "Desk"
+            ],
+            "groups": null
+          },
+          "result": {
+            "status": 200,
+            "warnings": [
+              "The Hue bridge is not paired yet, so the light names were not checked."
+            ]
+          },
+          "switches": [
+            {
+              "name": "Spaced",
+              "deviceId": "1000abcdef",
+              "deviceKey": "k1",
+              "lights": [
+                "Desk"
+              ],
+              "groups": []
+            },
+            {
+              "name": null,
+              "deviceId": "1000cccccc",
+              "deviceKey": null,
+              "lights": [
+                "Desk"
+              ],
+              "groups": []
+            },
+            {
+              "name": "Kelvin",
+              "deviceId": "1000K99",
+              "deviceKey": null,
+              "lights": [
+                "Ceiling"
+              ],
+              "groups": []
+            }
+          ]
+        },
+        {
+          "op": "update",
+          "deviceId": "1000K99",
+          "input": {
+            "name": null,
+            "deviceId": "1000k99",
+            "deviceKey": null,
+            "lights": [
+              "Desk"
+            ],
+            "groups": null
+          },
+          "result": {
+            "status": 200,
+            "warnings": [
+              "The Hue bridge is not paired yet, so the light names were not checked."
+            ]
+          },
+          "switches": [
+            {
+              "name": "Spaced",
+              "deviceId": "1000abcdef",
+              "deviceKey": "k1",
+              "lights": [
+                "Desk"
+              ],
+              "groups": []
+            },
+            {
+              "name": null,
+              "deviceId": "1000cccccc",
+              "deviceKey": null,
+              "lights": [
+                "Desk"
+              ],
+              "groups": []
+            },
+            {
+              "name": null,
+              "deviceId": "1000k99",
+              "deviceKey": null,
+              "lights": [
+                "Desk"
+              ],
+              "groups": []
+            }
+          ]
+        },
+        {
+          "op": "create",
+          "input": {
+            "name": null,
+            "deviceId": "1000K99",
+            "deviceKey": null,
+            "lights": [
+              "Desk"
+            ],
+            "groups": null
+          },
+          "result": {
+            "status": 409,
+            "detail": "Device 1000k99 is already configured. Edit that switch instead."
+          },
+          "switches": [
+            {
+              "name": "Spaced",
+              "deviceId": "1000abcdef",
+              "deviceKey": "k1",
+              "lights": [
+                "Desk"
+              ],
+              "groups": []
+            },
+            {
+              "name": null,
+              "deviceId": "1000cccccc",
+              "deviceKey": null,
+              "lights": [
+                "Desk"
+              ],
+              "groups": []
+            },
+            {
+              "name": null,
+              "deviceId": "1000k99",
+              "deviceKey": null,
+              "lights": [
+                "Desk"
+              ],
+              "groups": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "unusableAddress",
+      "hue": {
+        "bridgeIp": "bad host",
+        "appKey": "test-app-key"
+      },
+      "switches": [
+        {
+          "name": null,
+          "deviceId": "1000abcdef",
+          "deviceKey": null,
+          "lights": [
+            "Ceiling"
+          ],
+          "groups": []
+        }
+      ],
+      "steps": [
+        {
+          "op": "update",
+          "deviceId": "1000abcdef",
+          "input": {
+            "name": null,
+            "deviceId": "1000abcdef",
+            "deviceKey": null,
+            "lights": [
+              "Ceiling"
+            ],
+            "groups": null
+          },
+          "result": {
+            "status": 200,
+            "warnings": [
+              "The Hue settings in the config can't be used, so the light names were not checked ('bad host' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443.)."
+            ]
+          },
+          "switches": [
+            {
+              "name": null,
+              "deviceId": "1000abcdef",
+              "deviceKey": null,
+              "lights": [
+                "Ceiling"
+              ],
+              "groups": []
+            }
+          ]
+        },
+        {
+          "op": "create",
+          "input": {
+            "name": null,
+            "deviceId": "1000999999",
+            "deviceKey": null,
+            "lights": null,
+            "groups": [
+              "room:Hallway"
+            ]
+          },
+          "result": {
+            "status": 201,
+            "warnings": [
+              "The Hue settings in the config can't be used, so the light names were not checked ('bad host' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for example 192.168.1.20 or bridge.local:8443.)."
+            ]
+          },
+          "switches": [
+            {
+              "name": null,
+              "deviceId": "1000abcdef",
+              "deviceKey": null,
+              "lights": [
+                "Ceiling"
+              ],
+              "groups": []
+            },
+            {
+              "name": null,
+              "deviceId": "1000999999",
+              "deviceKey": null,
+              "lights": [],
+              "groups": [
+                "room:Hallway"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "create",
+          "input": {
+            "name": null,
+            "deviceId": "1000cccccc",
+            "deviceKey": null,
+            "lights": [],
+            "groups": null
+          },
+          "result": {
+            "status": 400,
+            "errors": {
+              "targets": [
+                "Choose at least one light, room or zone."
+              ]
+            }
+          },
+          "switches": [
+            {
+              "name": null,
+              "deviceId": "1000abcdef",
+              "deviceKey": null,
+              "lights": [
+                "Ceiling"
+              ],
+              "groups": []
+            },
+            {
+              "name": null,
+              "deviceId": "1000999999",
+              "deviceKey": null,
+              "lights": [],
+              "groups": [
+                "room:Hallway"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "unusableAppKey",
+      "hue": {
+        "bridgeIp": "192.0.2.10",
+        "appKey": "test\napp-key"
+      },
+      "switches": [],
+      "steps": [
+        {
+          "op": "create",
+          "input": {
+            "name": null,
+            "deviceId": "1000abcdef",
+            "deviceKey": null,
+            "lights": [
+              "Ceiling"
+            ],
+            "groups": null
+          },
+          "result": {
+            "status": 201,
+            "warnings": [
+              "The Hue settings in the config can't be used, so the light names were not checked (The Hue application key contains characters that can't be sent to the bridge; run 'sonoff2hue hue-pair' again.)."
+            ]
+          },
+          "switches": [
+            {
+              "name": null,
+              "deviceId": "1000abcdef",
+              "deviceKey": null,
+              "lights": [
+                "Ceiling"
+              ],
+              "groups": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
   "reasonPhrases": {
     "100": "Continue",
     "101": "Switching Protocols",

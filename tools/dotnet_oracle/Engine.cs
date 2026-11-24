@@ -40,6 +40,8 @@ internal static class Engine
             ["targets"] = Map(cases["targets"]!, TargetsCase),
             ["toggle"] = Map(cases["toggle"]!, ToggleCase),
             ["compareIgnoreCase"] = Map(cases["compareIgnoreCase"]!, CompareIgnoreCase),
+            ["switchValidation"] = Map(cases["switchValidation"]!, Switches.Validation),
+            ["switchWrites"] = Map(cases["switchWrites"]!, Switches.Writes),
             ["reasonPhrases"] = ReasonPhrases(),
         };
         var options = new JsonSerializerOptions { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };

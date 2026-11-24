@@ -14,6 +14,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from custom_components.sonoff2hue.engine import ewelink
 from custom_components.sonoff2hue.engine.dns import DnsRecordType
 from tests.engine.packets import DnsPacketBuilder, a, announcement, name, probe, srv, txt
+from tools.dotnet_oracle import switch_cases
 
 KEY = "a1b2c3d4-e5f6-4711-8899-aabbccddeeff"
 IV = bytes(range(16))
@@ -1302,6 +1303,8 @@ def main() -> None:
         "targets": resolver_cases(),
         "toggle": toggle_cases(),
         "compareIgnoreCase": [{"left": utf16_units(a), "right": utf16_units(b)} for a, b in COMPARISONS],
+        "switchValidation": switch_cases.validation_cases(),
+        "switchWrites": switch_cases.write_cases(),
     }
     out = Path(sys.argv[1])
     out.write_text(json.dumps(cases, ensure_ascii=False, indent=1), encoding="utf-8")

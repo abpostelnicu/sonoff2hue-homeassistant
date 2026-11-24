@@ -11,6 +11,11 @@ fixtures are committed, and `tests/engine` compares the port against them.
   their requests and log lines, `StringComparer.OrdinalIgnoreCase` comparisons), evaluated by the app's own classes
   (`Engine.cs`). `tests/engine/test_dotnet_parity.py` replays them through the port, and lists the few known
   differences with their reasons.
+- In the same fixture, the switch API's cases that `switch_cases.py` builds: `SwitchValidation.Validate`, and the
+  endpoints that add and change a switch, run one step after the other on a config file in a temporary folder.
+  `Switches.cs` reaches the app's internal types through reflection, and `tests/engine/test_switch_rules.py` replays
+  the cases. The app's message about a malformed device id gives an example id, which `Switches.cs` replaces with the
+  made-up `1000abcdef`, because the app's example could be a real device's and the fixture is public.
 
 Regenerate both after a change to the app's engine (the parity rule in `.github/copilot-instructions.md`), with the
 .NET 10 SDK and a checkout of the private repository `abpostelnicu/sonoff2hue`. Use a checkout of the commit to compare

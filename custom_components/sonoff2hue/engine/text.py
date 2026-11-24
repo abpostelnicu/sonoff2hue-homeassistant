@@ -26,6 +26,12 @@ def is_white_space(char: str) -> bool:
     return char in _WHITE_SPACE
 
 
+def is_control(char: str) -> bool:
+    """``char.IsControl``: the category Cc, U+0000-U+001F and U+007F-U+009F. .NET tests UTF-16 code units, and the
+    surrogates of a character outside the Basic Multilingual Plane aren't control characters."""
+    return char <= "\x1f" or "\x7f" <= char <= "\x9f"
+
+
 def trim(value: str) -> str:
     """``string.Trim()``."""
     start, end = 0, len(value)
