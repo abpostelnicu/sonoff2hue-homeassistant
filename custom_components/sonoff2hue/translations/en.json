@@ -2,7 +2,103 @@
   "config": {
     "step": {
       "user": {
-        "description": "This development version of sonoff2hue can't pair a Hue bridge or map switches yet. Submitting adds the integration, which then does nothing until a later version."
+        "title": "Pair a Hue bridge",
+        "description": "Search your network for Hue bridges, or enter the address of the bridge.",
+        "menu_options": {
+          "discover": "Find bridges",
+          "address": "Enter the bridge address"
+        }
+      },
+      "reconfigure": {
+        "title": "Pair again or pair another bridge",
+        "description": "Search your network for Hue bridges, or enter the address of the bridge. Your switch mappings are kept.",
+        "menu_options": {
+          "discover": "Find bridges",
+          "address": "Enter the bridge address"
+        }
+      },
+      "discover": {
+        "title": "Find bridges"
+      },
+      "pick": {
+        "title": "Choose a bridge",
+        "description": "Choose the Hue bridge to pair, or another address. Each bridge shows its address, its bridge id and how it was found.",
+        "data": {
+          "bridge": "Bridge"
+        }
+      },
+      "no_bridges": {
+        "title": "No bridges found",
+        "description": "Make sure the bridge is powered on and connected to the same network as Home Assistant. Search again, or enter its address.",
+        "menu_options": {
+          "discover": "Search again",
+          "address": "Enter the bridge address"
+        }
+      },
+      "discovery_failed": {
+        "title": "The search failed",
+        "description": "{error}",
+        "menu_options": {
+          "discover": "Search again",
+          "address": "Enter the bridge address"
+        }
+      },
+      "address": {
+        "title": "Enter the bridge address",
+        "data": {
+          "address": "Bridge address"
+        },
+        "data_description": {
+          "address": "IP address or host name, optionally with :port."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Pair the Hue bridge again",
+        "description": "The Hue bridge at {address} rejected the application key of sonoff2hue, which can't switch the lights until it is paired again. Select Submit, then press the round link button on top of the bridge within 60 seconds."
+      },
+      "link": {
+        "title": "Press the link button"
+      },
+      "link_timeout": {
+        "title": "The link button was not pressed in time",
+        "description": "{error}",
+        "menu_options": {
+          "retry": "Retry",
+          "user": "Choose another bridge",
+          "reconfigure": "Choose another bridge"
+        }
+      },
+      "link_failed": {
+        "title": "Pairing failed",
+        "description": "{error}",
+        "menu_options": {
+          "retry": "Retry",
+          "user": "Choose another bridge",
+          "reconfigure": "Choose another bridge"
+        }
+      }
+    },
+    "progress": {
+      "discover": "Searching the network… this takes about 5 seconds.",
+      "link": "Found {name} (model {model}, bridge id {bridge_id}, firmware {firmware}) at {address}.\nCertificate SHA-256 (pinned from now on): {certificate}\n\nPress the round link button on top of the bridge now. Waiting up to 60 seconds...",
+      "link_retrying": "Found {name} (model {model}, bridge id {bridge_id}, firmware {firmware}) at {address}.\nCertificate SHA-256 (pinned from now on): {certificate}\n\nPress the round link button on top of the bridge now. Waiting up to 60 seconds...\n\nThe bridge did not answer ({error}); still trying."
+    },
+    "error": {
+      "invalid_address": "{error}",
+      "cannot_connect": "{error}",
+      "unexpected": "Pairing didn't start: {error}"
+    },
+    "abort": {
+      "wrong_bridge": "The Hue bridge at {address} is not the paired bridge: its bridge id is {bridge_id}, not {expected}. To pair another bridge, reconfigure the sonoff2hue integration."
+    },
+    "create_entry": {
+      "paired": "Paired with {name} as {device_type}. Next, add your MINIR4M wall switches to the sonoff2hue integration."
+    }
+  },
+  "selector": {
+    "bridge": {
+      "options": {
+        "other": "Another address"
       }
     }
   }

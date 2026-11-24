@@ -38,7 +38,7 @@ scripts/develop lights     # the fake bridge's lights, rooms and zones, and ever
   packages it would otherwise install at its first start (`requirements_dev.txt`), most of all its 117 MB frontend.
   After that, Home Assistant starts in a few seconds and installs nothing. Ctrl+C stops it, and the fake bridge with it.
 - Open http://127.0.0.1:8123 and create a throwaway user. The integration is under Settings › Devices & services ›
-  Add integration › sonoff2hue; until its setup flow can pair a bridge, adding it only creates its entry.
+  Add integration › sonoff2hue: choose *Enter the bridge address* and enter the fake bridge's, `127.0.0.1:18443`.
 - Home Assistant listens on 127.0.0.1 only. `SONOFF2HUE_DEV_PORT=8124 scripts/develop` moves it to another port, also
   later.
 - It loads `custom_components/sonoff2hue` from this checkout, with nothing copied or linked: it runs from the
