@@ -39,7 +39,7 @@ from custom_components.sonoff2hue.const import (
     ENTRY_TITLE,
     SUBENTRY_SWITCH,
 )
-from custom_components.sonoff2hue.engine import hue_setup
+from custom_components.sonoff2hue.engine import hue_setup, supervisor, yaml_import
 from custom_components.sonoff2hue.engine.config import ConfigError
 from custom_components.sonoff2hue.engine.errors import UnexpectedError
 from custom_components.sonoff2hue.engine.hue_client import AiohttpTransport, HueApiError, HueBridgeInfo
@@ -322,12 +322,12 @@ def transports(monkeypatch: pytest.MonkeyPatch) -> list[AiohttpTransport]:
 # The start.
 
 
-async def test_the_setup_offers_to_find_the_bridge_or_enter_its_address(hass: HomeAssistant) -> None:
+async def test_the_setup_offers_to_find_the_bridge_enter_its_address_or_import_a_file(hass: HomeAssistant) -> None:
     result = await start(hass)
 
     assert result["type"] is FlowResultType.MENU
     assert result["step_id"] == "user"
-    assert result["menu_options"] == ["discover", "address"]
+    assert result["menu_options"] == ["discover", "address", "import_yaml"]
 
 
 async def test_a_second_entry_is_refused(hass: HomeAssistant) -> None:
@@ -359,7 +359,11 @@ async def test_the_frontend_gets_each_step_over_http(
     response = await client.post("/api/config/config_entries/flow", json={"handler": DOMAIN})
     step = await response.json()
     flow_id = step["flow_id"]
-    assert (step["type"], step["step_id"], step["menu_options"]) == ("menu", "user", ["discover", "address"])
+    assert (step["type"], step["step_id"], step["menu_options"]) == (
+        "menu",
+        "user",
+        ["discover", "address", "import_yaml"],
+    )
 
     step = await send({"next_step_id": "discover"})
     assert (step["type"], step["step_id"], step["progress_action"]) == ("progress", "discover", "discover")
@@ -1033,3 +1037,453 @@ async def test_reauth_offers_only_to_retry(hass: HomeAssistant, fake_hue: FakeHu
 
     assert result["reason"] == "reauth_successful"
     assert entry.data[CONF_APP_KEY] == "new-app-key"
+
+
+# Importing a sonoff2hue.yaml.
+
+SWITCHES = """switches:
+  - name: Hallway switch
+    deviceId: 1000ABCDEF
+    deviceKey: made-up-device-key
+    lights:
+      - Hallway
+    groups: []
+  - deviceId: "1000999999"
+    groups:
+      - room:Living room
+"""
+"""Two switches as the .NET app's file has them: one named with a device key, one without either."""
+IMPORTED_SWITCHES = [
+    (
+        "1000abcdef",
+        "Hallway switch",
+        {
+            CONF_DEVICE_ID: "1000ABCDEF",
+            CONF_NAME: "Hallway switch",
+            CONF_DEVICE_KEY: "made-up-device-key",
+            CONF_LIGHTS: ["Hallway"],
+            CONF_GROUPS: [],
+        },
+    ),
+    (
+        "1000999999",
+        "1000999999",
+        {
+            CONF_DEVICE_ID: "1000999999",
+            CONF_NAME: None,
+            CONF_DEVICE_KEY: None,
+            CONF_LIGHTS: [],
+            CONF_GROUPS: ["room:Living room"],
+        },
+    ),
+]
+"""The subentries of SWITCHES: unique id, title and data."""
+
+
+def config_file(**hue: str | None) -> str:
+    """A sonoff2hue.yaml with this hue section (camelCase keys; None leaves a key out) and SWITCHES."""
+    lines = [f"  {key}: {value}" for key, value in hue.items() if value is not None]
+    return ("hue:\n" + "".join(line + "\n" for line in lines) if lines else "") + SWITCHES
+
+
+def switches_of(entry: Any) -> list[tuple[str | None, str, dict[str, Any]]]:
+    """The entry's subentries as (unique id, title, data), checking that each is a switch."""
+    assert {subentry.subentry_type for subentry in entry.subentries.values()} == {SUBENTRY_SWITCH}
+    return [(subentry.unique_id, subentry.title, dict(subentry.data)) for subentry in entry.subentries.values()]
+
+
+async def import_file(hass: HomeAssistant, text: str) -> ConfigFlowResult:
+    """A setup flow that imports ``text``: what it shows after reading and checking it."""
+    result = await choose(hass, await start(hass), "import_yaml")
+    assert (result["type"], result["step_id"], result["errors"]) == (FlowResultType.FORM, "import_yaml", {})
+    assert suggested(result, "config") is None
+    return await go(hass, result, {"config": text})
+
+
+async def test_importing_a_file_with_its_bridge_adds_the_entry_and_the_switches(
+    hass: HomeAssistant, fake_hue: FakeHueHost
+) -> None:
+    app_key = await fake_hue.pair()
+
+    result = await import_file(
+        hass,
+        config_file(
+            bridgeIp=fake_hue.address,
+            bridgeId=BRIDGE_ID,
+            appKey=app_key,
+            certificateSha256=fake_hue.fingerprint,
+        ),
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    entry = result["result"]
+    assert (entry.title, entry.unique_id) == ("sonoff2hue", BRIDGE_ID)
+    assert entry.data == {
+        CONF_BRIDGE_IP: fake_hue.address,
+        CONF_BRIDGE_ID: BRIDGE_ID,
+        CONF_APP_KEY: app_key,
+        CONF_CERTIFICATE_SHA256: fake_hue.fingerprint,
+    }
+    assert switches_of(entry) == IMPORTED_SWITCHES
+    assert (result["description"], result["description_placeholders"]) == (
+        "imported",
+        {"address": fake_hue.address, "switches": "Hallway switch, 1000999999"},
+    )
+    assert "subentries" not in result  # their device keys stay out of the answer to the browser
+    requests = fake_hue.bridge.describe_requests()
+    assert "GET /clip/v2/resource/bridge 200" in requests
+    assert "GET /api/0/config 200" in requests  # the bridge's own id, even when the file has one
+
+
+@pytest.mark.parametrize("file_id", [None, '""'], ids=["left out", "blank"])
+async def test_a_missing_bridge_id_comes_from_the_bridge(
+    hass: HomeAssistant, fake_hue: FakeHueHost, file_id: str | None
+) -> None:
+    app_key = await fake_hue.pair()
+
+    result = await import_file(
+        hass,
+        config_file(
+            bridgeIp=fake_hue.address, bridgeId=file_id, appKey=app_key, certificateSha256=fake_hue.fingerprint
+        ),
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert (result["result"].unique_id, result["result"].data[CONF_BRIDGE_ID]) == (BRIDGE_ID, BRIDGE_ID)
+    assert (result["description"], result["description_placeholders"]) == (
+        "imported",
+        {"address": fake_hue.address, "switches": "Hallway switch, 1000999999"},
+    )
+
+
+@pytest.mark.parametrize(
+    ("pin", "file_id", "description", "placeholders"),
+    [
+        (True, BRIDGE_ID.lower(), "imported", {}),
+        (True, OTHER_ID, "imported_other_id", {"file_bridge_id": OTHER_ID, "bridge_id": BRIDGE_ID}),
+        (
+            False,
+            OTHER_ID,
+            "imported_other_id_unpinned",
+            {"file_bridge_id": OTHER_ID, "bridge_id": BRIDGE_ID, "warning": supervisor.NOT_PINNED},
+        ),
+    ],
+    ids=["the same id in other letter case", "another id", "another id and no pin"],
+)
+async def test_the_bridge_id_is_the_bridges_own(
+    hass: HomeAssistant,
+    fake_hue: FakeHueHost,
+    pin: bool,
+    file_id: str,
+    description: str,
+    placeholders: dict[str, str],
+) -> None:
+    """The bridge id is the unique id, which reauth and reconfigure compare with the bridge's: it comes from the bridge,
+    and the new entry's text says when the file named another."""
+    app_key = await fake_hue.pair()
+
+    result = await import_file(
+        hass,
+        config_file(
+            bridgeIp=fake_hue.address,
+            bridgeId=file_id,
+            appKey=app_key,
+            certificateSha256=fake_hue.fingerprint if pin else None,
+        ),
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert (result["result"].unique_id, result["result"].data[CONF_BRIDGE_ID]) == (BRIDGE_ID, BRIDGE_ID)
+    assert (result["description"], result["description_placeholders"]) == (
+        description,
+        {"address": fake_hue.address, "switches": "Hallway switch, 1000999999"} | placeholders,
+    )
+
+
+@pytest.mark.parametrize("pin", [None, "' '"], ids=["left out", "blank"])
+async def test_a_file_without_a_pin_is_imported_with_the_runs_warning(
+    hass: HomeAssistant, fake_hue: FakeHueHost, pin: str | None
+) -> None:
+    app_key = await fake_hue.pair()
+
+    result = await import_file(
+        hass, config_file(bridgeIp=fake_hue.address, bridgeId=BRIDGE_ID, appKey=app_key, certificateSha256=pin)
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["result"].data[CONF_CERTIFICATE_SHA256] == (None if pin is None else " ")
+    assert (result["description"], result["description_placeholders"]["warning"]) == (
+        "imported_unpinned",
+        "hue.certificateSha256 is not set, so the bridge certificate is not verified. Reconfigure the sonoff2hue "
+        "integration to pair the bridge again and pin it.",
+    )
+
+
+@pytest.mark.parametrize(
+    ("hue", "message"),
+    [
+        (
+            {"certificateSha256": "00" * 32},
+            "The Hue bridge TLS certificate does not match the pinned certificateSha256. If the bridge was replaced or "
+            "reset, pair the bridge again.",
+        ),
+        (
+            {"appKey": "made-up-app-key"},
+            "The Hue bridge rejected the application key (unauthorized user); pair the bridge again.",
+        ),
+        (
+            {"appKey": '"made-up\\tapp-key"'},
+            "The Hue application key contains characters that can't be sent to the bridge; pair the bridge again.",
+        ),
+        (
+            {"bridgeIp": "not a host"},
+            "'not a host' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for "
+            "example 192.168.1.20 or bridge.local:8443.",
+        ),
+    ],
+    ids=["another pin", "a key the bridge refuses", "a key that can't be sent", "a malformed address"],
+)
+async def test_a_bridge_that_refuses_the_files_settings(
+    hass: HomeAssistant, fake_hue: FakeHueHost, hue: dict[str, str], message: str
+) -> None:
+    app_key = await fake_hue.pair()
+    settings = {"bridgeIp": fake_hue.address, "appKey": app_key, "certificateSha256": fake_hue.fingerprint} | hue
+
+    result = await import_file(hass, config_file(**settings))
+
+    assert (result["type"], result["step_id"], result["menu_options"]) == (
+        FlowResultType.MENU,
+        "import_failed",
+        ["import_check", "import_pair", "import_yaml"],
+    )
+    assert result["description_placeholders"] == {"error": message}
+    assert hass.config_entries.async_entries(DOMAIN) == []
+
+
+@pytest.mark.usefixtures("socket_enabled")
+async def test_a_file_whose_bridge_does_not_answer(hass: HomeAssistant) -> None:
+    port = closed_port()
+
+    result = await import_file(hass, config_file(bridgeIp=f"127.0.0.1:{port}", appKey="made-up-app-key"))
+
+    assert (result["step_id"], result["description_placeholders"]) == (
+        "import_failed",
+        {"error": f"Hue bridge not reachable: Connection refused (127.0.0.1:{port})"},
+    )
+
+
+async def test_a_bridge_that_gives_no_bridge_id(hass: HomeAssistant, fake_hue: FakeHueHost) -> None:
+    app_key = await fake_hue.pair()
+    fake_hue.fail(Fault("/api/0/config", status=200, body="{}"))
+
+    result = await import_file(hass, config_file(bridgeIp=fake_hue.address, appKey=app_key))
+
+    assert (result["step_id"], result["description_placeholders"]) == (
+        "import_failed",
+        {"error": f"The device at {fake_hue.address} does not look like a Hue bridge."},
+    )
+
+
+async def test_a_bridge_answer_that_dotnet_fails_on(
+    hass: HomeAssistant, fake_hue: FakeHueHost, caplog: pytest.LogCaptureFixture
+) -> None:
+    app_key = await fake_hue.pair()
+    fake_hue.fail(Fault("/clip/v2/resource/bridge", status=200, body='{"errors":[null]}'))
+
+    result = await import_file(hass, config_file(bridgeIp=fake_hue.address, appKey=app_key))
+
+    assert (result["step_id"], result["description_placeholders"]) == (
+        "import_failed",
+        {"error": "Object reference not set to an instance of an object."},
+    )
+    assert flow_log(caplog) == [(logging.ERROR, f"Connecting to the Hue bridge at {fake_hue.address} failed.")]
+    assert flow_records(caplog)[-1].exc_info is not None
+
+
+async def test_trying_the_files_bridge_again(hass: HomeAssistant, fake_hue: FakeHueHost) -> None:
+    app_key = await fake_hue.pair()
+    fake_hue.fail(Fault("/clip/v2/resource/bridge", status=503))
+
+    result = await import_file(
+        hass,
+        config_file(
+            bridgeIp=fake_hue.address, bridgeId=BRIDGE_ID, appKey=app_key, certificateSha256=fake_hue.fingerprint
+        ),
+    )
+
+    assert result["description_placeholders"] == {
+        "error": "Hue bridge returned 503 Service Unavailable for GET /clip/v2/resource/bridge"
+    }
+
+    result = await choose(hass, result, "import_check")
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert switches_of(result["result"]) == IMPORTED_SWITCHES
+
+
+async def test_pairing_the_bridge_instead_keeps_the_files_switches(
+    hass: HomeAssistant, fake_hue_pressed: FakeHueHost
+) -> None:
+    result = await import_file(hass, config_file(bridgeIp=fake_hue_pressed.address, appKey="made-up-app-key"))
+    result = await choose(hass, result, "import_pair")
+
+    assert (result["type"], result["step_id"], result["menu_options"]) == (
+        FlowResultType.MENU,
+        "import_pair",
+        ["discover", "address"],
+    )
+    assert result["description_placeholders"] == {"switches": "Hallway switch, 1000999999"}
+
+    result = await choose(hass, result, "address")
+
+    assert suggested(result, "address") == fake_hue_pressed.address
+
+    result = await done(hass, await go(hass, result, {"address": fake_hue_pressed.address}))
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    entry = result["result"]
+    assert entry.data[CONF_APP_KEY] != "made-up-app-key"
+    assert fake_hue_pressed.bridge.is_authorized(entry.data[CONF_APP_KEY])
+    assert entry.data[CONF_CERTIFICATE_SHA256] == fake_hue_pressed.fingerprint
+    assert switches_of(entry) == IMPORTED_SWITCHES
+    assert (result["description"], result["description_placeholders"]) == (
+        "paired_imported",
+        {"name": NAME, "device_type": hue_setup.build_device_type(), "switches": "Hallway switch, 1000999999"},
+    )
+    assert "subentries" not in result
+
+
+async def test_pasting_the_file_again_after_its_bridge_failed(hass: HomeAssistant, fake_hue: FakeHueHost) -> None:
+    result = await import_file(hass, config_file(bridgeIp=fake_hue.address, appKey="made-up-app-key"))
+
+    result = await choose(hass, result, "import_yaml")
+
+    assert (result["type"], result["step_id"], result["errors"]) == (FlowResultType.FORM, "import_yaml", {})
+    assert suggested(result, "config") is None
+
+
+@pytest.mark.parametrize(
+    ("hue", "address"),
+    [({}, ""), ({"bridgeIp": "192.0.2.10"}, "192.0.2.10"), ({"appKey": "made-up-app-key"}, "")],
+    ids=["no hue section", "an address without a key", "a key without an address"],
+)
+async def test_a_file_without_the_bridge_pairs_it_first(
+    hass: HomeAssistant, fake_hue_pressed: FakeHueHost, hue: dict[str, str], address: str
+) -> None:
+    result = await import_file(hass, config_file(**hue))
+
+    assert (result["type"], result["step_id"]) == (FlowResultType.MENU, "import_pair")
+
+    result = await choose(hass, result, "address")
+
+    assert suggested(result, "address") == address
+
+    result = await done(hass, await go(hass, result, {"address": fake_hue_pressed.address}))
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["result"].data[CONF_BRIDGE_IP] == fake_hue_pressed.address
+    assert switches_of(result["result"]) == IMPORTED_SWITCHES
+
+
+async def test_choosing_another_bridge_while_importing_goes_back_to_pairing_for_the_switches(
+    hass: HomeAssistant, fake_hue: FakeHueHost
+) -> None:
+    with pairing_ends(PairingTimeoutError(hue_setup.PAIRING_WINDOW, None)):
+        result = await choose(hass, await import_file(hass, SWITCHES), "address")
+        result = await done(hass, await go(hass, result, {"address": fake_hue.address}))
+
+    assert (result["step_id"], result["menu_options"]) == ("link_timeout", ["retry", "import_pair"])
+
+    result = await choose(hass, result, "import_pair")
+
+    assert (result["type"], result["step_id"]) == (FlowResultType.MENU, "import_pair")
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "hue:\n  bridgeIP: 192.0.2.10\n",
+        "switches:\n  - deviceId: 1000abcdef\n    lights: [Hallway]\n  -\n",
+        "hue:\n  appKey: a\n  appKey: b\n" + SWITCHES,
+    ],
+    ids=["an unknown key", "an empty switch", "a duplicate key"],
+)
+async def test_a_file_that_dotnet_cannot_read(hass: HomeAssistant, text: str) -> None:
+    with pytest.raises(ConfigError) as dotnet:
+        yaml_import.parse(text)
+
+    result = await import_file(hass, text)
+
+    assert (result["step_id"], result["errors"]) == ("import_yaml", {"config": "invalid_config"})
+    assert result["description_placeholders"] == {"error": str(dotnet.value)}
+    assert suggested(result, "config") is None  # the keys in it are never shown back
+
+
+async def test_the_reading_errors_name_the_line_and_column(hass: HomeAssistant) -> None:
+    result = await import_file(hass, "hue:\n  bridgeIP: 192.0.2.10\n")
+
+    assert result["description_placeholders"] == {
+        "error": "Config, line 2, column 3: unknown key 'bridgeIP' under 'hue'. Valid keys are bridgeIp, bridgeId, "
+        "appKey, certificateSha256 (case-sensitive)."
+    }
+
+
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        (
+            "hue:\n  bridgeIp: 192.0.2.10\n  appKey: made-up-app-key\nswitches:\n  - deviceId: 1000abcdef\n"
+            "    name: Hallway switch\n",
+            "Invalid configuration:\n  - switches[0] ('Hallway switch'): add at least one entry to 'lights' or 'groups'.",
+        ),
+        (
+            "# no switches yet\n",
+            "Invalid configuration:\n  - No switches configured. Add at least one entry to 'switches'.",
+        ),
+        (
+            SWITCHES + "  - deviceId: 1000abcdef\n    lights: [Ceiling]\n",
+            "Invalid configuration:\n  - switches[2]: deviceId '1000abcdef' is configured more than once; put all its "
+            "lights in one entry.",
+        ),
+    ],
+    ids=["a switch without lights", "no switches", "a device twice"],
+)
+async def test_a_file_that_the_run_would_refuse(hass: HomeAssistant, text: str, message: str) -> None:
+    """The run's own checks; a file without the bridge's address and key gets only the switches', since pairing gives
+    those."""
+    result = await import_file(hass, text)
+
+    assert (result["step_id"], result["errors"]) == ("import_yaml", {"config": "invalid_config"})
+    assert result["description_placeholders"] == {"error": message}
+
+
+async def test_a_file_whose_reading_ends_dotnet(hass: HomeAssistant, caplog: pytest.LogCaptureFixture) -> None:
+    result = await import_file(hass, "a\n")
+
+    assert (result["step_id"], result["errors"]) == ("import_yaml", {"config": "unreadable_config"})
+    assert result["description_placeholders"] == {"error": "Stack overflow."}
+    assert flow_log(caplog) == [(logging.ERROR, "Reading the pasted sonoff2hue.yaml failed.")]
+
+
+async def test_an_imported_entry_is_answered_over_http_without_its_keys(
+    hass: HomeAssistant, hass_client: ClientSessionGenerator, fake_hue: FakeHueHost
+) -> None:
+    """The frontend gets a new entry's result without its data but, from Home Assistant, with its subentries: the flow
+    leaves those out, as their device keys are secrets too."""
+    assert await async_setup_component(hass, "config", {})
+    client = await hass_client()
+    app_key = await fake_hue.pair()
+    text = config_file(bridgeIp=fake_hue.address, appKey=app_key, certificateSha256=fake_hue.fingerprint)
+
+    response = await client.post("/api/config/config_entries/flow", json={"handler": DOMAIN})
+    flow_id = (await response.json())["flow_id"]
+    path = f"/api/config/config_entries/flow/{flow_id}"
+    form = await (await client.post(path, json={"next_step_id": "import_yaml"})).json()
+    response = await client.post(path, json={"config": text})
+    created = await response.text()
+
+    assert form["step_id"] == "import_yaml"
+    assert json.loads(created)["type"] == "create_entry"
+    for secret in (app_key, "made-up-device-key"):
+        assert secret not in created
+    assert switches_of(hass.config_entries.async_entries(DOMAIN)[0]) == IMPORTED_SWITCHES

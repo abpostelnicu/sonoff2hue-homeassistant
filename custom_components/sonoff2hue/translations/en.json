@@ -6,7 +6,8 @@
         "description": "Search your network for Hue bridges, or enter the address of the bridge.",
         "menu_options": {
           "discover": "Find bridges",
-          "address": "Enter the bridge address"
+          "address": "Enter the bridge address",
+          "import_yaml": "Import sonoff2hue.yaml"
         }
       },
       "reconfigure": {
@@ -65,7 +66,8 @@
         "menu_options": {
           "retry": "Retry",
           "user": "Choose another bridge",
-          "reconfigure": "Choose another bridge"
+          "reconfigure": "Choose another bridge",
+          "import_pair": "Choose another bridge"
         }
       },
       "link_failed": {
@@ -74,7 +76,35 @@
         "menu_options": {
           "retry": "Retry",
           "user": "Choose another bridge",
-          "reconfigure": "Choose another bridge"
+          "reconfigure": "Choose another bridge",
+          "import_pair": "Choose another bridge"
+        }
+      },
+      "import_yaml": {
+        "title": "Import sonoff2hue.yaml",
+        "description": "Paste the whole sonoff2hue.yaml of the sonoff2hue app; it is read as the app reads it. Stop the app first: with both running, every press would toggle the lights twice.\n\nWith the bridge's bridgeIp and appKey, sonoff2hue connects to the bridge with them; without them, you pair the bridge next. Each switch in the file becomes a switch of the integration.",
+        "data": {
+          "config": "sonoff2hue.yaml"
+        },
+        "data_description": {
+          "config": "Its application key and device keys are kept by Home Assistant and not shown again, so after an error, paste the file again."
+        }
+      },
+      "import_pair": {
+        "title": "Pair the Hue bridge",
+        "description": "Pair the Hue bridge for the switches from the file: {switches}. Search your network for Hue bridges, or enter the address of the bridge.",
+        "menu_options": {
+          "discover": "Find bridges",
+          "address": "Enter the bridge address"
+        }
+      },
+      "import_failed": {
+        "title": "The bridge in the file can't be used",
+        "description": "{error}",
+        "menu_options": {
+          "import_check": "Try again",
+          "import_pair": "Pair the bridge again and keep the switches",
+          "import_yaml": "Paste the file again"
         }
       }
     },
@@ -86,13 +116,20 @@
     "error": {
       "invalid_address": "{error}",
       "cannot_connect": "{error}",
-      "unexpected": "Pairing didn't start: {error}"
+      "unexpected": "Pairing didn't start: {error}",
+      "invalid_config": "{error}",
+      "unreadable_config": "The file can't be read: {error}"
     },
     "abort": {
       "wrong_bridge": "The Hue bridge at {address} is not the paired bridge: its bridge id is {bridge_id}, not {expected}. To pair another bridge, reconfigure the sonoff2hue integration."
     },
     "create_entry": {
-      "paired": "Paired with {name} as {device_type}. Next, add your MINIR4M wall switches to the sonoff2hue integration."
+      "paired": "Paired with {name} as {device_type}. Next, add your MINIR4M wall switches to the sonoff2hue integration.",
+      "imported": "Added the Hue bridge at {address} and the switches from the file: {switches}.",
+      "imported_unpinned": "Added the Hue bridge at {address} and the switches from the file: {switches}.\n\n{warning}",
+      "imported_other_id": "Added the Hue bridge at {address} and the switches from the file: {switches}.\n\nThe file gives the bridge id {file_bridge_id}, but the bridge at {address} has the id {bridge_id}, which sonoff2hue uses.",
+      "imported_other_id_unpinned": "Added the Hue bridge at {address} and the switches from the file: {switches}.\n\nThe file gives the bridge id {file_bridge_id}, but the bridge at {address} has the id {bridge_id}, which sonoff2hue uses.\n\n{warning}",
+      "paired_imported": "Paired with {name} as {device_type}, and added the switches from the file: {switches}."
     }
   },
   "selector": {

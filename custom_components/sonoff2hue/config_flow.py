@@ -7,6 +7,11 @@ the bridges found (``pick``), or to the address (``address``). The bridge's iden
 from there, then ``link``, a progress step, waits up to 60 seconds for the link button. On success ``paired`` saves the
 bridge; otherwise ``link_timeout`` or ``link_failed`` offers to retry. Reauth goes from ``reauth_confirm`` to ``link``
 with the stored bridge.
+
+The menu's third way, ``import_yaml``, reads a pasted ``sonoff2hue.yaml`` as the .NET app read its file and runs the
+checks of its ``run``. With the bridge's address and key, it connects as ``run`` did at startup and adds the entry with
+the file's switches as subentries; ``import_failed`` offers to try again, to pair the bridge instead, or to paste the
+file again. Without them, ``import_pair`` leads to the search or the address and to ``link`` first.
 """
 
 import asyncio
@@ -15,7 +20,13 @@ from dataclasses import dataclass
 import logging
 from typing import Any, Final
 
-from homeassistant.config_entries import SOURCE_REAUTH, SOURCE_RECONFIGURE, ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import (
+    SOURCE_REAUTH,
+    SOURCE_RECONFIGURE,
+    ConfigFlow,
+    ConfigFlowResult,
+    ConfigSubentryData,
+)
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import UnknownFlow
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -25,15 +36,29 @@ from homeassistant.helpers.selector import (
     SelectSelectorConfig,
     SelectSelectorMode,
     TextSelector,
+    TextSelectorConfig,
 )
 import probatio
 
-from .const import CONF_APP_KEY, CONF_BRIDGE_ID, CONF_BRIDGE_IP, CONF_CERTIFICATE_SHA256, DOMAIN, ENTRY_TITLE
-from .engine import text
-from .engine.config import ConfigError
+from .const import (
+    CONF_APP_KEY,
+    CONF_BRIDGE_ID,
+    CONF_BRIDGE_IP,
+    CONF_CERTIFICATE_SHA256,
+    CONF_DEVICE_ID,
+    CONF_DEVICE_KEY,
+    CONF_GROUPS,
+    CONF_LIGHTS,
+    CONF_NAME,
+    DOMAIN,
+    ENTRY_TITLE,
+    SUBENTRY_SWITCH,
+)
+from .engine import text, yaml_import
+from .engine.config import ConfigError, EngineConfig, HueSettings, SwitchSettings
 from .engine.errors import UnexpectedError
 from .engine.hue_address import try_create_base_url
-from .engine.hue_client import HueApiError, HueBridgeInfo
+from .engine.hue_client import PAIR_AGAIN, HueApiError, HueBridgeInfo
 from .engine.hue_setup import (
     DISCOVERY_TIMEOUT,
     PAIRING_WINDOW,
@@ -46,20 +71,32 @@ from .engine.hue_setup import (
     get_bridge_info,
     pair,
 )
+from .engine.supervisor import NOT_PINNED, create_hue_client
+from .engine.switch_rules import is_paired
 
 _LOGGER = logging.getLogger(__name__)
 
 PAIR_MENU: Final = ["discover", "address"]
 """The ways to the bridge: search the network for it, or enter its address."""
-SETUP_MENU: Final = [*PAIR_MENU]
-"""The ways to set up; the import of a ``sonoff2hue.yaml`` will join them."""
+SETUP_MENU: Final = [*PAIR_MENU, "import_yaml"]
+"""The ways to set up: the two to the bridge, or importing a ``sonoff2hue.yaml``."""
+IMPORT_FAILED_MENU: Final = ["import_check", "import_pair", "import_yaml"]
+"""After the file's bridge failed: try again, pair the bridge instead and keep the switches, or paste the file again."""
 
 ADDRESS: Final = "address"
 BRIDGE: Final = "bridge"
 OTHER: Final = "other"
 """The choice of another address than the bridges found."""
 
+CONFIG: Final = "config"
+"""The pasted ``sonoff2hue.yaml``."""
+
 ADDRESS_SCHEMA: Final = probatio.Schema({probatio.Required(ADDRESS): TextSelector()})
+IMPORT_SCHEMA: Final = probatio.Schema({probatio.Required(CONFIG): TextSelector(TextSelectorConfig(multiline=True))})
+
+PAIR_INSTEAD: Final = "pair the bridge again"
+"""What the engine's ``PAIR_AGAIN`` says while importing, where there is no integration to reconfigure yet and
+``import_failed`` offers to pair the bridge."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,6 +131,43 @@ def _label(bridge: DiscoveredBridge) -> str:
     return " — ".join(part for part in (bridge.ip, bridge.bridge_id, bridge.source) if part)
 
 
+def _check_for_run(config: EngineConfig) -> None:
+    """The checks of the .NET app's ``run`` (``ValidateForRun``). Without the bridge's address and key, which pairing
+    gives, only the switches' are left: stand-ins take the bridge's place."""
+    if is_paired(config.hue):
+        config.validate_for_run()
+    else:
+        EngineConfig(HueSettings(bridge_ip="paired", app_key="paired"), config.switches).validate_for_run()
+
+
+def _switch_title(switch: SwitchSettings) -> str:
+    """A switch subentry's title: its name, or its device id without one."""
+    if switch.name is None or text.is_null_or_white_space(switch.name):
+        return switch.normalized_device_id
+    return text.trim(switch.name)
+
+
+def _switch_titles(config: EngineConfig) -> str:
+    """The file's switches, by their titles, for the dialogs: names and device ids, never the keys."""
+    return ", ".join(_switch_title(switch) for switch in config.switches)
+
+
+def _switch_subentry(switch: SwitchSettings) -> ConfigSubentryData:
+    """A switch of the file as a ``switch`` subentry, with the values as written."""
+    return ConfigSubentryData(
+        data={
+            CONF_DEVICE_ID: switch.device_id,
+            CONF_NAME: switch.name,
+            CONF_DEVICE_KEY: switch.device_key,
+            CONF_LIGHTS: list(switch.lights),
+            CONF_GROUPS: list(switch.groups),
+        },
+        subentry_type=SUBENTRY_SWITCH,
+        title=_switch_title(switch),
+        unique_id=switch.normalized_device_id,
+    )
+
+
 class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
     """Pairs the one Hue bridge (``single_config_entry``). Its unique id is the bridge id."""
 
@@ -111,11 +185,13 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
         self._attempt_error: str | None = None
         """Why the last pairing attempt failed, while the bridge doesn't answer; ``None`` once it does."""
         self._removed = False
+        self._import: EngineConfig | None = None
+        """The imported file, once it passed the run's checks."""
 
     # The ways in.
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """Find the bridge, or enter its address."""
+        """Find the bridge, enter its address, or import a ``sonoff2hue.yaml``."""
         return self.async_show_menu(step_id="user", menu_options=SETUP_MENU)
 
     async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
@@ -230,6 +306,8 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
                     placeholders["error"] = str(failure)
         elif self.source == SOURCE_RECONFIGURE:
             address = self._get_reconfigure_entry().data.get(CONF_BRIDGE_IP, "")
+        elif self._import is not None:
+            address = self._import.hue.bridge_ip or ""
         return self.async_show_form(
             step_id="address",
             data_schema=self.add_suggested_values_to_schema(ADDRESS_SCHEMA, {ADDRESS: address}),
@@ -348,10 +426,13 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
         return {"error": self._failure.message}
 
     def _retry_menu(self) -> list[str]:
-        """Retry, or choose another bridge, as the web UI offered; reauth is bound to the stored bridge."""
+        """Retry, or choose another bridge, as the web UI offered; reauth is bound to the stored bridge, and an import
+        goes back to pairing the bridge for its switches."""
         if self.source == SOURCE_REAUTH:
             return ["retry"]
-        return ["retry", "reconfigure" if self.source == SOURCE_RECONFIGURE else "user"]
+        if self.source == SOURCE_RECONFIGURE:
+            return ["retry", "reconfigure"]
+        return ["retry", "user" if self._import is None else "import_pair"]
 
     async def async_step_retry(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Pairs again at the same address, reading the bridge again, as the web UI's Retry did."""
@@ -380,14 +461,127 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_update_reload_and_abort(
                 self._get_reconfigure_entry(), unique_id=info.bridge_id, data_updates=data
             )
+        placeholders = {
+            "name": info.name if info.name is not None else "the Hue bridge",
+            "device_type": self._paired.device_type,
+        }
+        if self._import is not None:
+            return self.async_create_entry(
+                title=ENTRY_TITLE,
+                data=data,
+                subentries=[_switch_subentry(switch) for switch in self._import.switches],
+                description="paired_imported",
+                description_placeholders={**placeholders, "switches": _switch_titles(self._import)},
+            )
+        return self.async_create_entry(
+            title=ENTRY_TITLE, data=data, description="paired", description_placeholders=placeholders
+        )
+
+    async def async_on_create_entry(self, result: ConfigFlowResult) -> ConfigFlowResult:
+        """Keeps the switches' data, with their device keys, out of the answer to the browser, which gets a new entry's
+        result without its data but with its subentries. The entry holds them already."""
+        result.pop("subentries", None)
+        return result
+
+    # Importing a sonoff2hue.yaml.
+
+    async def async_step_import_yaml(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Takes a pasted ``sonoff2hue.yaml``, read as ``AppConfig.Parse`` reads the file and checked as the .NET app's
+        ``run`` checks it. The text holds the keys, so it is never shown back, not even after an error."""
+        errors: dict[str, str] = {}
+        placeholders: dict[str, str] = {}
+        if user_input is not None:
+            try:
+                config = yaml_import.parse(user_input[CONFIG])
+                _check_for_run(config)
+            except ConfigError as err:
+                errors[CONFIG] = "invalid_config"
+                placeholders["error"] = str(err)
+            except UnexpectedError as err:
+                _LOGGER.exception("Reading the pasted sonoff2hue.yaml failed.")
+                errors[CONFIG] = "unreadable_config"
+                placeholders["error"] = str(err)
+            else:
+                self._import = config
+                if is_paired(config.hue):
+                    return await self.async_step_import_check()
+                return await self.async_step_import_pair()
+        return self.async_show_form(
+            step_id="import_yaml", data_schema=IMPORT_SCHEMA, errors=errors, description_placeholders=placeholders
+        )
+
+    async def async_step_import_check(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """With the file's bridge address and key: connects with the key and the pin, as the .NET app's ``run`` did at
+        startup, then adds the entry with the file's switches."""
+        config = self._imported()
+        hue = config.hue
+        connected = await self._async_connect(hue)
+        if isinstance(connected, _Failed):
+            self._failure = connected
+            return await self.async_step_import_failed()
+        await self.async_set_unique_id(connected)
+        placeholders = {"address": hue.bridge_ip or "", "switches": _switch_titles(config)}
+        description = "imported"
+        file_id = hue.bridge_id or ""
+        if not text.is_null_or_white_space(file_id) and not text.equals_ignore_case(file_id, connected):
+            # Another bridge answers at the file's address; the same id in other letter case needs no word.
+            description += "_other_id"
+            placeholders |= {"file_bridge_id": file_id, "bridge_id": connected}
+        if text.is_null_or_white_space(hue.certificate_sha256):
+            description += "_unpinned"
+            placeholders["warning"] = NOT_PINNED
         return self.async_create_entry(
             title=ENTRY_TITLE,
-            data=data,
-            description="paired",
-            description_placeholders={
-                "name": info.name if info.name is not None else "the Hue bridge",
-                "device_type": self._paired.device_type,
+            data={
+                CONF_BRIDGE_IP: hue.bridge_ip,
+                CONF_BRIDGE_ID: connected,
+                CONF_APP_KEY: hue.app_key,
+                CONF_CERTIFICATE_SHA256: hue.certificate_sha256,
             },
+            subentries=[_switch_subentry(switch) for switch in config.switches],
+            description=description,
+            description_placeholders=placeholders,
+        )
+
+    async def _async_connect(self, hue: HueSettings) -> str | _Failed:
+        """The bridge's own id, once the bridge accepted the file's key over a connection checked against the file's pin
+        (the supervisor's first keep-alive). The id is the unique id, which reauth and reconfigure compare with the
+        bridge's, so it isn't taken from the file. ``import_failed`` shows a failure, with "pair the bridge again" where
+        the engine says to reconfigure the integration, which doesn't exist yet."""
+        try:
+            client = create_hue_client(hue)
+        except ConfigError as err:
+            return _Failed("import_failed", str(err).replace(PAIR_AGAIN, PAIR_INSTEAD))
+        try:
+            await client.ping()
+            info = await get_bridge_info(hue.bridge_ip or "")
+        except HueApiError as err:
+            return _Failed("import_failed", str(err).replace(PAIR_AGAIN, PAIR_INSTEAD))
+        except UnexpectedError as err:
+            _LOGGER.exception("Connecting to the Hue bridge at %s failed.", hue.bridge_ip)
+            return _Failed("import_failed", str(err))
+        finally:
+            await client.close()
+        return info.bridge_id or ""
+
+    async def async_step_import_failed(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """The file's bridge can't be used: try again, pair the bridge instead and keep the switches, or paste the file
+        again."""
+        return self.async_show_menu(
+            step_id="import_failed", menu_options=IMPORT_FAILED_MENU, description_placeholders=self._failure_text()
+        )
+
+    def _imported(self) -> EngineConfig:
+        """The imported file, which only the import's own steps read, once it is there."""
+        assert self._import is not None  # noqa: S101 - set before the import's steps
+        return self._import
+
+    async def async_step_import_pair(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Pairs the bridge for the file's switches: find it, or enter its address."""
+        return self.async_show_menu(
+            step_id="import_pair",
+            menu_options=PAIR_MENU,
+            description_placeholders={"switches": _switch_titles(self._imported())},
         )
 
     @callback
