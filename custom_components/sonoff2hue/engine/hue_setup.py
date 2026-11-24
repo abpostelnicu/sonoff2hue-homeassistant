@@ -129,7 +129,14 @@ async def _discover_mdns(
                 ),
                 None,
             )
-            ip = str(address) if address is not None else packet.remote[0]
+            if address is not None:
+                ip = str(address)
+            elif packet.from_this_host:
+                # A relay's copy, such as the one that Home Assistant OS's multicast plugin repeats from its `hassio`
+                # bridge, doesn't say where the bridge is (decision 19).
+                continue
+            else:
+                ip = packet.remote[0]
             bridge_id = record.txt.get("bridgeid") if record.txt is not None else None
             found.setdefault(ip, DiscoveredBridge(ip, bridge_id, "mDNS"))
 

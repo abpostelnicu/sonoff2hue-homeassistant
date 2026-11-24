@@ -347,6 +347,23 @@ async def test_discovery_finds_bridges_by_mdns_and_in_the_cloud(cloud: list[web.
     assert [(q.name, q.type) for q in sent[0].questions] == [("_hue._tcp.local", DnsRecordType.PTR)]
 
 
+async def test_discovery_takes_no_address_from_a_copy_that_this_host_relays(cloud: list[web.Response]) -> None:
+    # Home Assistant OS's multicast plugin repeats each answer from its `hassio` bridge, one of this host's own
+    # addresses, as the fake network's 192.0.2.1 and 198.51.100.1 are (decision 19). Without an A record, such a copy
+    # doesn't say where the bridge is.
+    cloud.append(web.json_response([]))
+    packets = [
+        (hue_announcement("Hue Bridge - 2", "001788fffe000002"), "192.0.2.20"),
+        (hue_announcement("Hue Bridge - 2", "001788fffe000002"), "192.0.2.1"),
+        (hue_announcement("Hue Bridge - 7", "001788fffe000007", host="192.0.2.70"), "198.51.100.1"),
+    ]
+
+    assert await discover(FakeNetwork(), packets) == [
+        DiscoveredBridge("192.0.2.20", "001788fffe000002", "mDNS"),
+        DiscoveredBridge("192.0.2.70", "001788fffe000007", "mDNS"),
+    ]
+
+
 async def test_discovery_asks_for_bridges_as_the_socket_opens(cloud: list[web.Response]) -> None:
     cloud.append(web.json_response([]))
     network = FakeNetwork()
