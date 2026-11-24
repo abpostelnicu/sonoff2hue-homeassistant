@@ -1,7 +1,7 @@
 """Tests of the mDNS listener; the parts that the .NET app tested only on real networks are tested here with fakes."""
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 import errno
 import logging
 import socket
@@ -108,6 +108,39 @@ async def test_started_callbacks_run_for_every_socket_and_stop_with_it(network: 
 
     assert cancelled == ["before", "while open"]
     assert runs == ["before", "while open", "before", "while open"]
+    await _stop(task)
+
+
+async def test_removing_a_started_callback_stops_it_while_the_listener_goes_on(network: FakeNetwork) -> None:
+    listener = MdnsListener(network.open, network.watch)
+    runs: list[str] = []
+    cancelled: list[str] = []
+
+    def started(label: str) -> Callable[[MdnsListener], Awaitable[None]]:
+        async def callback(_: MdnsListener) -> None:
+            runs.append(label)
+            try:
+                await asyncio.sleep(3600)
+            except asyncio.CancelledError:
+                cancelled.append(label)
+                raise
+
+        return callback
+
+    listener.add_started(started("kept"))
+    remove = listener.add_started(started("removed"))
+    task = asyncio.create_task(listener.run())
+    await network.next_open()
+    await asyncio.sleep(0)
+
+    await remove()
+    assert cancelled == ["removed"]
+
+    network.network_changed()
+    await network.next_open()
+    await asyncio.sleep(0)
+    assert runs == ["kept", "removed", "kept"]
+    assert cancelled == ["removed", "kept"]
     await _stop(task)
 
 

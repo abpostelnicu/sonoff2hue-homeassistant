@@ -61,3 +61,10 @@ class FakeNetwork:
         await asyncio.wait_for(self.opened.wait(), 5)
         self.opened.clear()
         return self.transports[-1]
+
+
+async def until(condition: Callable[[], bool], within: float = 5) -> None:
+    """Waits until ``condition`` holds, checking every 10 ms, and fails after ``within`` seconds."""
+    async with asyncio.timeout(within):
+        while not condition():  # noqa: ASYNC110 - the state under test has no event to wait for
+            await asyncio.sleep(0.01)
