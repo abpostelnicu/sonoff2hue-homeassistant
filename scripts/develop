@@ -19,6 +19,7 @@
 # Settings, from the environment:
 #   SONOFF2HUE_DEV_PORT    Home Assistant's port on 127.0.0.1: 8123 when .dev/config is made, and when set, applied
 #                          again
+#   SONOFF2HUE_DEV_CONFIG  Home Assistant's configuration folder (default .dev/config); scripts/e2e gives one of its own
 #   SONOFF2HUE_DEV_DEVICE  the device id of the simulated MINIR4M (default 1000abcdef)
 #   FAKE_HUE_BIND, FAKE_HUE_PORT, FAKE_HUE_LINK_BUTTON
 #                          the fake bridge's settings (python -m tools.fake_hue help): 127.0.0.1 and 18443 by default,
@@ -28,11 +29,13 @@ self=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
 cd "$(dirname "$0")/.."
 
 dev=.dev
+config=${SONOFF2HUE_DEV_CONFIG:-$dev/config}
 ha_python=$dev/venv/bin/python
 tools_python=.venv/bin/python
 device=${SONOFF2HUE_DEV_DEVICE:-1000abcdef}
 export FAKE_HUE_LINK_BUTTON=${FAKE_HUE_LINK_BUTTON:-pressed}
-# assist_pipeline's requirements have no wheels for Python 3.14 and need a C++ compiler (requirements_dev.txt).
+# assist_pipeline's requirements have no wheels for Python 3.14 and need a C++ compiler (requirements_dev.txt). The
+# end-to-end test (tools/e2e) runs Home Assistant as hass() below does, with the same list.
 skip_packages=pymicro-vad,pyspeex-noise
 restart_exit_code=100 # Home Assistant's exit code when it is restarted (from its UI, a service call or SIGHUP)
 fake_hue_pid=
@@ -56,14 +59,14 @@ setup() {
   constraints=$("$ha_python" -c \
     'import homeassistant, pathlib; print(pathlib.Path(homeassistant.__file__).with_name("package_constraints.txt"))')
   uv pip install --python "$ha_python" -r requirements_dev.txt --constraint "$constraints"
-  "$ha_python" -m tools.develop "$dev/config"
+  "$ha_python" -m tools.develop "$config"
 }
 
 hass() {
   local status
   while true; do
     status=0
-    "$ha_python" -m homeassistant --config "$dev/config" --skip-pip-packages "$skip_packages" || status=$?
+    "$ha_python" -m homeassistant --config "$config" --skip-pip-packages "$skip_packages" || status=$?
     if [ "$status" -ne "$restart_exit_code" ]; then
       return "$status"
     fi

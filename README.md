@@ -69,7 +69,8 @@ scripts/develop lights     # the fake bridge's lights, rooms and zones, and ever
   macOS refuses the multicast of the simulated switch and of the integration's mDNS listener with "No route to host".
   WSL 2's default NAT network doesn't pass on the LAN's multicast, so real switches aren't seen there.
 - **Start over:** delete `.dev/config` to start again from onboarding, or `.dev` for everything, Home Assistant's
-  environment included.
+  environment included. `SONOFF2HUE_DEV_CONFIG` chooses another configuration folder than `.dev/config`, made the same
+  way.
 
 ### Debugging in VS Code
 
