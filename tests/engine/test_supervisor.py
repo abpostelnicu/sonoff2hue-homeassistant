@@ -1,11 +1,12 @@
-"""Tests of the bridge supervisor: the .NET app's ``BridgeSupervisor_FollowsTheConfiguration``, and every state,
-message and retry of ``BridgeSupervisor``, on virtual time with an in-memory bridge and a fake network."""
+"""Tests of the bridge supervisor: how it follows the configuration, and every state, message and retry of
+``BridgeSupervisor``, on virtual time with an in-memory bridge and a fake network."""
 
 import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
 import contextlib
 from datetime import timedelta
 import inspect
+import itertools
 import json
 import logging
 from typing import Any
@@ -14,7 +15,6 @@ import pytest
 
 from custom_components.sonoff2hue.engine import supervisor
 from custom_components.sonoff2hue.engine.config import EngineConfig, HueSettings, SwitchSettings
-from custom_components.sonoff2hue.engine.errors import UnexpectedError
 from custom_components.sonoff2hue.engine.hue_client import HueClient
 from custom_components.sonoff2hue.engine.mdns import MdnsListener
 from custom_components.sonoff2hue.engine.registry import DeviceRegistry
@@ -72,7 +72,7 @@ class Bridge(InMemoryBridge):
         return [seconds for seconds, request in self.times if request == f"GET {path}"]
 
     def clients(self) -> HueClientFactory:
-        """The .NET test's ``FakeFactory``: clients for the configured address and key, which reach this bridge."""
+        """A client factory: clients for the configured address and key, which reach this bridge."""
 
         def create(hue: HueSettings) -> HueClient:
             self.created += 1
@@ -205,12 +205,12 @@ def supervisor_log(caplog: pytest.LogCaptureFixture) -> list[tuple[int, str]]:
     return [(record.levelno, record.getMessage()) for record in caplog.records if record.name == supervisor.__name__]
 
 
-# The .NET app's BridgeSupervisor test.
+# Following the configuration.
 
 
 async def test_follows_the_configuration(time: VirtualTime, caplog: pytest.LogCaptureFixture) -> None:
-    """Every change of the configuration reloads the config entry: the supervisor is cancelled, and a new one runs the
-    new configuration. The tracker is kept here, as in the .NET test."""
+    """For every change of the configuration, the supervisor is cancelled and a new one runs the new configuration,
+    with the same tracker, as the runtime does it (decision 23)."""
     caplog.set_level(logging.INFO, logger=supervisor.__name__)
     bridge = Bridge(time)
     network = FakeNetwork()
@@ -396,7 +396,7 @@ async def test_resolving_waits_while_the_bridge_is_not_usable_yet(
     await harness.start()
     await asyncio.sleep(30)
 
-    # The supervisor's logger is the one that says so, as .NET passes its own logger.
+    # The supervisor's logger is the one that says so: the supervisor passes its own to resolve_bindings.
     not_usable = (
         "Hue bridge at bridge.test not usable yet (Hue bridge returned 503 Service Unavailable for GET "
         "/clip/v2/resource/light); retrying in 10s."
@@ -481,7 +481,7 @@ async def test_a_key_rejected_while_running_calls_the_hook_after_each_refusal(ti
     await asyncio.sleep(1)
 
     assert rejected == pytest.approx([45, 90, 141])
-    # The bridge goes on running, as in .NET: no restart, no other state, the same reports.
+    # The bridge goes on running: no restart, no other state, the same reports.
     assert harness.status.history == [(0, State.CONNECTING, CONNECTING), (0, State.RUNNING, RUNNING)]
     # The supervisor's ping and the runner's first keep-alive at 0 s, then every 45 s.
     assert harness.bridge.requested("/clip/v2/resource/bridge") == pytest.approx([0, 0, 45, 90, 135])
@@ -619,12 +619,26 @@ async def test_presses_toggle_the_lights_and_reach_the_tracker(start: Callable[.
 # Failures.
 
 
+@pytest.fixture
+def crash_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The first resolving of the names fails as a bug would, with an exception that nobody expects."""
+    resolve = supervisor.resolve_bindings
+    calls = itertools.count()
+
+    async def crash_first(*args: Any) -> list[SwitchBinding]:
+        if next(calls) == 0:
+            raise RuntimeError("resolving broke")
+        return await resolve(*args)
+
+    monkeypatch.setattr(supervisor, "resolve_bindings", crash_first)
+
+
+@pytest.mark.usefixtures("crash_once")
 async def test_an_unexpected_stop_starts_the_bridge_again_30_seconds_later(
     time: VirtualTime, caplog: pytest.LogCaptureFixture
 ) -> None:
     caplog.set_level(logging.INFO, logger=supervisor.__name__)
     harness = Harness(time, EngineConfig(PAIRED, [hall()]))
-    harness.bridge.fail("/clip/v2/resource/bridge", 200, '{"errors":[null],"data":[]}', count=1)
     await harness.start()
     await asyncio.sleep(29)
     stopped = (harness.bridge.created, harness.bridge.closed)
@@ -632,7 +646,7 @@ async def test_an_unexpected_stop_starts_the_bridge_again_30_seconds_later(
 
     assert harness.status.history == [
         (0, State.CONNECTING, CONNECTING),
-        (0, State.ERROR, "The bridge stopped unexpectedly: Object reference not set to an instance of an object."),
+        (0, State.ERROR, "The bridge stopped unexpectedly: resolving broke"),
         (30, State.CONNECTING, CONNECTING),
         (30, State.RUNNING, RUNNING),
     ]
@@ -642,7 +656,7 @@ async def test_an_unexpected_stop_starts_the_bridge_again_30_seconds_later(
         "The bridge stopped unexpectedly; restarting it in 30 s.",
     )
     assert record.exc_info is not None
-    assert isinstance(record.exc_info[1], UnexpectedError)
+    assert isinstance(record.exc_info[1], RuntimeError)
     assert stopped == (1, 1)
     assert (harness.bridge.created, harness.bridge.closed) == (2, 1)
     assert harness.bridge.requested("/clip/v2/resource/bridge") == pytest.approx([0, 30, 30])
@@ -664,7 +678,7 @@ async def test_a_runner_that_returns_is_started_again_30_seconds_later(
     harness = await start(EngineConfig(PAIRED, [hall()]))
     await asyncio.sleep(45)
 
-    # As in .NET, without a word: the runner only returns when cancelled.
+    # Without a word: the runner only returns when cancelled.
     assert harness.status.history == [
         (0, State.CONNECTING, CONNECTING),
         (0, State.RUNNING, RUNNING),
@@ -735,19 +749,19 @@ async def test_stopping_while_running_stops_the_runner_and_leaves_the_listener_r
 # The log line of a restart for a new configuration.
 
 
-async def test_config_changed_logs_the_restart_as_dotnet_did(
+@pytest.mark.usefixtures("crash_once")
+async def test_config_changed_logs_the_restart_only_while_the_bridge_runs(
     time: VirtualTime, caplog: pytest.LogCaptureFixture
 ) -> None:
     caplog.set_level(logging.INFO, logger=supervisor.__name__)
     restart = (logging.INFO, "Configuration changed; restarting the bridge.")
     harness = Harness(time, EngineConfig(PAIRED, [hall()]))
-    harness.bridge.fail("/clip/v2/resource/bridge", 200, '{"errors":[null],"data":[]}', count=1)
 
     # Not before it runs.
     harness.supervisor.config_changed()
     assert supervisor_log(caplog) == []
 
-    # Not while it waits to start again after an unexpected stop, as .NET swallowed that cancellation.
+    # Not while it waits to start again after an unexpected stop.
     await harness.start()
     await asyncio.sleep(10)
     caplog.clear()

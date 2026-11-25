@@ -1,5 +1,4 @@
-"""Tests of the status tracker: the .NET app's ``StatusTracker_ReportsRunnerOutcomesPerSwitch``, and how the parts of
-the state combine, as the web interface's dashboard showed them."""
+"""Tests of the status tracker: the runner's reports per switch, and how the parts of the state combine."""
 
 import asyncio
 from collections.abc import AsyncIterator
@@ -10,7 +9,6 @@ import pytest
 
 from custom_components.sonoff2hue.engine import ewelink
 from custom_components.sonoff2hue.engine.config import EngineConfig, HueSettings, SwitchSettings
-from custom_components.sonoff2hue.engine.errors import UnexpectedError
 from custom_components.sonoff2hue.engine.hue_client import HueTarget, HueTargetKind
 from custom_components.sonoff2hue.engine.press import SwitchTracker
 from custom_components.sonoff2hue.engine.registry import DeviceRegistry
@@ -88,7 +86,7 @@ def hall_switch(device_id: str = DEVICE) -> SwitchSettings:
     return SwitchSettings(device_id, "Hall", None, ["Ceiling"])
 
 
-# The .NET app's StatusTracker test.
+# The runner's reports.
 
 
 async def test_reports_runner_outcomes_per_switch(time: VirtualTime) -> None:
@@ -190,7 +188,7 @@ async def test_running_again_with_the_same_message_changes_the_targets_but_not_s
     status.tracker.set_running([binding(hall, CEILING)])
     await asyncio.sleep(1)
 
-    # As in .NET: the service didn't change, so neither does "since", and nothing is published.
+    # The service didn't change, so neither does "since", and nothing is published.
     status.tracker.set_running([binding(hall, DESK)])
     await asyncio.sleep(1)
 
@@ -201,15 +199,13 @@ async def test_running_again_with_the_same_message_changes_the_targets_but_not_s
     status.tracker.close()
 
 
-async def test_a_device_id_mapped_twice_is_refused_as_dotnet_refuses_it(time: VirtualTime) -> None:
+async def test_a_device_id_mapped_twice_is_refused_and_changes_nothing(time: VirtualTime) -> None:
     status = Status(time, EngineConfig(PAIRED, [hall_switch()]))
     status.tracker.set_running([binding(hall_switch(), CEILING)])
 
-    with pytest.raises(UnexpectedError) as err:
+    with pytest.raises(ValueError, match=r"^More than one switch has the device id 1000abcdef\.$"):
         status.tracker.set_running([binding(hall_switch(), DESK), binding(hall_switch(DEVICE.upper()), CEILING)])
 
-    assert err.value.dotnet_type == "ArgumentException"
-    assert str(err.value) == "An item with the same key has already been added. Key: 1000abcdef"
     assert status.tracker.snapshot().switches[0].targets == ("light 'Ceiling'",)
     status.tracker.close()
 
@@ -247,10 +243,11 @@ async def test_reachability_keeps_its_message_only_while_unreachable_and_shows_o
         (HueSettings("192.0.2.20", app_key="app-key"), True, False),
         (HueSettings("192.0.2.20", app_key="app-key", certificate_sha256=" \u3000"), True, False),
         (HueSettings("192.0.2.20", app_key="\u2028", certificate_sha256="AB"), False, True),
+        (HueSettings("192.0.2.20", app_key="\x1f"), False, False),
         (HueSettings(" ", app_key="app-key"), False, False),
     ],
 )
-async def test_paired_and_pinned_follow_dotnets_white_space(
+async def test_paired_and_pinned_take_white_space_for_missing(
     time: VirtualTime, hue: HueSettings, paired: bool, pinned: bool
 ) -> None:
     status = Status(time, EngineConfig(hue))
@@ -404,17 +401,19 @@ async def test_a_new_configuration_keeps_the_reachability_of_the_same_bridge(tim
     tracker.config_changed(EngineConfig(PAIRED, [SwitchSettings(DEVICE, "Hallway", None, ["Desk"])]))
     assert tracker.snapshot().switches[0].last_action == ToggleAction(START, True, 1, 0, 0, 5)
 
-    # The bridge is the address, the key and the pin, written as .NET joins them: null is empty.
+    # The bridge is its address, key and pin, where a missing pin is an empty one; its id doesn't count.
     unpinned = HueSettings(PAIRED.bridge_ip, PAIRED.bridge_id, PAIRED.app_key, None)
     tracker.config_changed(EngineConfig(unpinned))
     assert tracker.snapshot().hue.reachable is None
     tracker.set_bridge_reachability(False, "Hue bridge request timed out.")
     tracker.config_changed(EngineConfig(HueSettings(PAIRED.bridge_ip, "001788fffe000002", PAIRED.app_key, "")))
     assert tracker.snapshot().hue.reachable is False
+    # Each of the three counts on its own.
     tracker.config_changed(EngineConfig(HueSettings("192.0.2.20|app", app_key="key", certificate_sha256="")))
     tracker.set_bridge_reachability(True, None)
     tracker.config_changed(EngineConfig(HueSettings("192.0.2.20", app_key="app|key")))
-    assert tracker.snapshot().hue.reachable is True
+    assert tracker.snapshot().hue.reachable is None
+    tracker.set_bridge_reachability(True, None)
     tracker.config_changed(EngineConfig(HueSettings("192.0.2.21", app_key="app|key")))
     assert tracker.snapshot().hue == HueStatus(True, "192.0.2.21", None, False, None, None, None)
 

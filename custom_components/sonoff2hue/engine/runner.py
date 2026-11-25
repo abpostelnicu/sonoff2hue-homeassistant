@@ -1,23 +1,27 @@
-"""Wall switch presses in, Hue toggles out: a port of the .NET app's ``Bridge/Sonoff2HueRunner.cs`` and
-``IRunnerObserver.cs``.
+"""Wall switch presses in, Hue toggles out.
 
-The runner attaches to an :class:`MdnsListener` that the integration runs for the LAN monitor too (decision 8 of this
-repository): it adds a packet handler and a started callback, as the .NET runner's own listener had them, and removes
-them when it stops.
+The :class:`Runner` attaches to the config entry's :class:`MdnsListener`, which the LAN monitor runs too (decision 8):
+it adds a packet handler and a started callback, and removes them when it stops, while the listener goes on. Each time
+the socket (re)starts, the callback resets the switch tracker and asks the switches for their state, their baseline.
+The tracker then tells which broadcast is a press, and each press toggles the switch's Hue lights, rooms and zones.
+
+Concurrency (decision 14): each toggle is a task, and the toggles of one switch take turns on its :class:`asyncio.Lock`
+in the order of the presses. The keep-alive is a task too. Tasks start eagerly (``eager_start=True``) and a delay of 0
+isn't awaited, so a task runs until it first waits before the code that started it goes on: a stale press is dropped,
+or a toggle that needs no I/O ends, before the next event of its packet is handled. Stopping tells everything to stop
+before it awaits anything, then waits for all of it to end.
 """
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 import logging
 from operator import methodcaller
 import time
 
-from . import text
 from .config import ConfigError, EngineConfig, SwitchSettings
 from .dns import DnsRecordType
-from .errors import UnexpectedError
 from .ewelink import SERVICE_TYPE
 from .hue_client import HueApiError, HueClient, HueTarget
 from .mdns import TRACE, MdnsListener, MdnsPacket
@@ -30,10 +34,13 @@ _LOGGER = logging.getLogger(__name__)
 MAX_PRESS_AGE = timedelta(seconds=5)
 """A press that waited longer for the bridge is dropped rather than toggling the lights late."""
 KEEP_WARM_INTERVAL = 45.0
+"""Seconds between the keep-alive requests, which keep the connection to the bridge warm for a quick toggle."""
 DISCOVERY_QUERY_DELAYS = (0.0, 1.0, 2.0)
 """Seconds before each of the first queries after the socket (re)starts, so queries at 0, 1 and 3 s."""
 MISSING_SWITCH_QUERY_INTERVAL = 30.0
+"""Seconds between the queries while a switch hasn't been seen on the LAN."""
 RESOLVE_RETRY_DELAY = 10.0
+"""Seconds before the names are resolved again while the bridge isn't usable."""
 
 
 @dataclass(eq=False)
@@ -73,7 +80,19 @@ class RunnerObserver:
     def on_key_rejected(self) -> None:
         """The bridge rejected the application key (401 or 403): it ended a keep-alive request or a toggle. It comes
         after each such failure, right after the reachability report, so that Home Assistant can offer to pair the
-        bridge again; the .NET app's observer has no such call, and nothing else changes."""
+        bridge again (decision 21)."""
+
+
+def bindings_by_device_id(bindings: Iterable[SwitchBinding]) -> dict[str, SwitchBinding]:
+    """The bindings by their switches' device ids, casefolded. Raises :class:`ValueError` when two switches have the
+    same device id, which :meth:`EngineConfig.validate_for_run` refuses before anything runs."""
+    by_device_id: dict[str, SwitchBinding] = {}
+    for binding in bindings:
+        device_id = binding.settings.normalized_device_id
+        if (key := device_id.casefold()) in by_device_id:
+            raise ValueError(f"More than one switch has the device id {device_id}.")
+        by_device_id[key] = binding
+    return by_device_id
 
 
 async def resolve_bindings(
@@ -114,15 +133,9 @@ class Runner:
         observer: RunnerObserver | None = None,
         clock: Callable[[], datetime] = _now,
     ) -> None:
-        self._bindings: dict[str, SwitchBinding] = {}
-        for binding in bindings:
-            key = text.fold(binding.settings.normalized_device_id)
-            if key in self._bindings:
-                raise UnexpectedError(
-                    "ArgumentException",
-                    f"An item with the same key has already been added. Key: {binding.settings.normalized_device_id}",
-                )
-            self._bindings[key] = binding
+        """Raises :class:`ValueError` when two of ``bindings`` have the same device id. ``clock`` tells the age of a
+        press, and has to agree with the listener's, which stamps each packet with the time it was received."""
+        self._bindings = bindings_by_device_id(bindings)
         self._hue = hue
         self._toggler = HueToggler(hue, _LOGGER)
         self._tracker = SwitchTracker(config)
@@ -138,17 +151,18 @@ class Runner:
         and started callback are gone, and the keep-alive and every toggle started so far have been stopped and have
         ended, so the client can be closed."""
         for binding in self._bindings.values():
-            _LOGGER.info("%s -> %s", binding.settings.display_name, ", ".join(str(t) for t in binding.targets))
-            if text.is_null_or_white_space(binding.settings.device_key):
+            settings = binding.settings
+            _LOGGER.info("%s -> %s", settings.display_name, ", ".join(map(str, binding.targets)))
+            if not settings.device_key or settings.device_key.isspace():
                 _LOGGER.info(
                     "%s: no deviceKey configured, so every new state broadcast counts as a press (relay/setting "
                     "changes cannot be filtered).",
-                    binding.settings.display_name,
+                    settings.display_name,
                 )
 
         loop = asyncio.get_running_loop()
-        # As RunAsync calls KeepBridgeWarmAsync: the first ping goes out before anything is awaited. The switches are
-        # asked for their state after the next line, as the .NET runner's own listener opened its socket after it.
+        # Eager: the first keep-alive request goes out before anything is awaited, and before the switches are asked
+        # for their state, which the started callback does as soon as it is added to an open socket.
         keep_warm = loop.create_task(self._keep_bridge_warm(), eager_start=True)
         _LOGGER.info("Listening for wall switch presses.")
         remove_started = listener.add_started(self._discover_switches)
@@ -156,7 +170,8 @@ class Runner:
         try:
             await loop.create_future()
         finally:
-            # As cancelling the .NET runner's token does: everything is told to stop before anything is awaited.
+            # Everything is told to stop before anything is awaited: no packet starts a toggle, and no request goes out,
+            # while the started callback is removed.
             remove_handler()
             keep_warm.cancel()
             toggles = self._cancel_toggles()
@@ -167,7 +182,7 @@ class Runner:
         self._tracker.reset_all()
 
         # A few quick queries make every switch answer with its current state (the baseline). A delay of 0 isn't
-        # awaited, as .NET's Task.Delay(0) doesn't wait: the first query goes out at once.
+        # awaited, so the first query goes out as the socket opens, before the callback first waits.
         for delay in DISCOVERY_QUERY_DELAYS:
             if delay > 0:
                 await asyncio.sleep(delay)
@@ -185,16 +200,19 @@ class Runner:
             listener.query(SERVICE_TYPE, DnsRecordType.PTR)
 
     def handle_packet(self, packet: MdnsPacket) -> None:
+        """Handles a packet from the listener: logs what each broadcast of a configured switch means, and starts a
+        toggle for each press."""
         update = self._tracker.process(packet)
         for device_id in update.rejoined:
-            if (rejoined := self._bindings.get(text.fold(device_id))) is not None:
+            if (rejoined := self._bindings.get(device_id.casefold())) is not None:
                 _LOGGER.info("%s (re)joined the network.", rejoined.settings.display_name)
 
         for tracked in update.events:
             announcement = tracked.announcement
-            binding = self._bindings.get(text.fold(announcement.device_id))
+            key = announcement.device_id.casefold()
+            binding = self._bindings.get(key)
             if binding is None:
-                if (key := text.fold(announcement.device_id)) not in self._reported_unknown:
+                if key not in self._reported_unknown:
                     self._reported_unknown.add(key)
                     _LOGGER.debug(
                         "Ignoring unconfigured eWeLink device %s at %s.",
@@ -253,8 +271,7 @@ class Runner:
             await asyncio.wait(list(self._toggles))
 
     async def stop_toggles(self) -> None:
-        """Stops the running and queued toggles, as cancelling the .NET runner's token does, and waits for them; a
-        stopped toggle reports nothing."""
+        """Cancels the running and queued toggles and waits for them; a cancelled toggle reports nothing."""
         if toggles := self._cancel_toggles():
             await asyncio.wait(toggles)
 
@@ -276,7 +293,7 @@ class Runner:
             self._report_bridge_reachability(True, None)
 
     def _start_toggle(self, binding: SwitchBinding, pressed_at: datetime) -> None:
-        # Eager, as calling ToggleLightsAsync runs it until it first waits: a stale press is dropped, and a toggle that
+        # Eager: the task runs until it first waits before this returns, so a stale press is dropped, and a toggle that
         # needs no I/O ends, before the next event of the packet is handled.
         toggle = asyncio.get_running_loop().create_task(self._toggle_lights(binding, pressed_at), eager_start=True)
         if not toggle.done():
@@ -320,15 +337,14 @@ class Runner:
                 self._report_bridge_reachability(False, str(err))
                 if err.is_authentication_error:
                     self._notify(methodcaller("on_key_rejected"))
-                _LOGGER.error("%s: could not toggle the lights: %s", name, err)  # noqa: TRY400 - .NET logs no trace
+                _LOGGER.error("%s: could not toggle the lights: %s", name, err)  # noqa: TRY400 - no traceback needed
                 self._notify(methodcaller("on_toggle_failed", binding, str(err)))
             except Exception as err:
                 _LOGGER.exception("%s: unexpected error while toggling the lights.", name)
                 self._notify(methodcaller("on_toggle_failed", binding, str(err)))
 
     async def _keep_bridge_warm(self) -> None:
-        # The first request goes out right away, so the bridge's state is known from the start; .NET's first
-        # Task.Delay(TimeSpan.Zero) doesn't wait.
+        # The first request goes out at once, so that the bridge's state is known from the start.
         while True:
             await self.ping_bridge()
             await asyncio.sleep(KEEP_WARM_INTERVAL)
@@ -358,5 +374,5 @@ class Runner:
 
 
 def _null(value: object) -> object:
-    """A value as .NET's logging writes it: null is "(null)"."""
+    """A value for a log line, where a missing one reads "(null)"."""
     return "(null)" if value is None else value

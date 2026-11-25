@@ -1,5 +1,5 @@
-"""Wall switch presses in, Hue toggles out: the .NET app's ``RunnerTests`` and the runner cases of
-``QaRegressionTests``, and the runner on a listener (``run``), which the .NET tests left to the real network."""
+"""Tests of the runner: presses in, Hue toggles out, with what it reports and logs, how it resolves the names, and the
+runner on a listener (``run``) on a fake network."""
 
 import asyncio
 import base64
@@ -14,7 +14,6 @@ import pytest
 from custom_components.sonoff2hue.engine import ewelink, mdns, runner, toggler
 from custom_components.sonoff2hue.engine.config import ConfigError, EngineConfig, HueSettings, SwitchSettings
 from custom_components.sonoff2hue.engine.dns import DnsRecordType, build_query
-from custom_components.sonoff2hue.engine.errors import UnexpectedError
 from custom_components.sonoff2hue.engine.hue_client import HueApiError, HueClient, HueTarget, HueTargetKind
 from custom_components.sonoff2hue.engine.mdns import MdnsListener, MdnsPacket
 from custom_components.sonoff2hue.engine.runner import Runner, RunnerObserver, SwitchBinding, resolve_bindings
@@ -39,8 +38,7 @@ CEILING = HueTarget(HueTargetKind.LIGHT, "l1", "Ceiling")
 
 
 class LightBridge(InMemoryBridge):
-    """A bridge with one light, l1, that answers every request with ``status`` when it isn't 200 (the .NET tests'
-    ``FakeBridge``)."""
+    """A bridge with one light, l1, that answers every request with ``status`` when it isn't 200."""
 
     def __init__(self) -> None:
         super().__init__(self._answer)
@@ -89,6 +87,13 @@ class RecordingObserver(RunnerObserver):
 
     def on_bridge_reachability(self, reachable: bool, message: str | None) -> None:
         self.events.append("bridge up" if reachable else f"bridge down: {message}")
+
+
+class KeyObserver(RecordingObserver):
+    """Records each rejected key too."""
+
+    def on_key_rejected(self) -> None:
+        self.events.append("key rejected")
 
 
 class ThrowingObserver(RunnerObserver):
@@ -191,7 +196,7 @@ def no_retry_delays(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(runner, "RESOLVE_RETRY_DELAY", 0)
 
 
-# The .NET app's RunnerTests.
+# Presses, toggles and what the observer hears of them.
 
 
 async def test_a_press_toggles_the_targets_and_reports_each_step() -> None:
@@ -256,7 +261,7 @@ async def test_a_stale_press_is_dropped_before_handle_packet_returns(caplog: pyt
 
     switch.handle_packet(plain(101))
 
-    # Nothing awaited: the toggle ran as far as calling ToggleLightsAsync runs it in .NET.
+    # Nothing awaited: the toggle's task started eagerly and ended before handle_packet returned.
     assert observer.events == ["press Hall seq=101", "dropped Hall"]
     assert runner_log(caplog)[-2:] == [
         (logging.INFO, "Hall (1000abcdef): wall switch operated (seq 101)."),
@@ -275,7 +280,7 @@ async def test_a_toggle_that_needs_no_io_ends_before_the_next_event_of_its_packe
 
     switch.handle_packet(with_other_device(101, 5))
 
-    # The bridge answers at once, so the toggle ends inside handle_packet, as in .NET with a handler that does.
+    # The bridge answers at once, so the toggle ends inside handle_packet, before the other device's broadcast.
     assert observer.events == ["press Hall seq=101", "bridge up", "toggled Hall on changed=1 unchanged=0 failed=0"]
     assert runner_log(caplog)[1:] == [
         (logging.INFO, "Hall (1000abcdef): wall switch operated (seq 101)."),
@@ -383,7 +388,7 @@ async def test_an_observer_without_overrides_uses_the_empty_defaults() -> None:
     assert bridge.lights["l1"] is True
 
 
-# The runner cases of the .NET app's QaRegressionTests.
+# Encrypted broadcasts, queued presses and the age of a press.
 
 
 @pytest.mark.parametrize("ceiling_on", [False, True])
@@ -557,46 +562,55 @@ async def test_a_queued_press_just_beyond_five_seconds_is_dropped_and_releases_t
 
 
 async def test_an_unexpected_error_while_toggling_is_logged_with_its_trace_and_reported(
-    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    observer = RecordingObserver()
-    switch = create_runner(InMemoryBridge(lambda request: (200, '{"data":[null]}')).client(), observer)
+    class BrokenToggler:
+        def __init__(self, hue: HueClient, logger: logging.Logger) -> None:
+            pass
+
+        async def toggle(self, targets: list[HueTarget]) -> ToggleResult:
+            raise RuntimeError("the toggle broke")
+
+    monkeypatch.setattr(runner, "HueToggler", BrokenToggler)
+    observer = KeyObserver()
+    switch = create_runner(LightBridge().client(), observer)
 
     switch.handle_packet(plain(100))
     switch.handle_packet(plain(101))
     await switch.when_toggles_complete()
 
-    assert observer.events == [
-        "press Hall seq=101",
-        "toggle failed Hall: Object reference not set to an instance of an object.",
-    ]
+    # An unexpected error says nothing about the bridge: no reachability report and no rejected key.
+    assert observer.events == ["press Hall seq=101", "toggle failed Hall: the toggle broke"]
     [record] = [
         r for r in caplog.records if r.getMessage() == "Hall (1000abcdef): unexpected error while toggling the lights."
     ]
     assert record.levelno == logging.ERROR
     assert record.exc_info is not None
-    assert record.exc_info[0] is UnexpectedError
+    assert record.exc_info[0] is RuntimeError
 
 
-async def test_a_keep_alive_that_fails_unexpectedly_reports_the_bridge_as_down() -> None:
-    observer = RecordingObserver()
-    switch = create_runner(InMemoryBridge(lambda request: (200, '{"errors":[null],"data":[]}')).client(), observer)
+async def test_a_keep_alive_that_fails_unexpectedly_reports_the_bridge_as_down(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def broken_ping() -> None:
+        raise RuntimeError("the keep-alive broke")
 
-    await switch.ping_bridge()
+    hue = LightBridge().client()
+    monkeypatch.setattr(hue, "ping", broken_ping)
+    observer = KeyObserver()
 
-    assert observer.events == ["bridge down: Object reference not set to an instance of an object."]
+    await create_runner(hue, observer).ping_bridge()
+
+    assert observer.events == ["bridge down: the keep-alive broke"]
 
 
-def test_a_device_id_mapped_twice_is_refused_as_dotnet_refuses_it() -> None:
+def test_a_device_id_mapped_twice_is_refused() -> None:
     first = SwitchBinding(SwitchSettings(DEVICE_ID, "Hall"), [CEILING])
     second = SwitchBinding(SwitchSettings(" 1000ABCDEF ", "Hall again"), [CEILING])
     config = EngineConfig(switches=[first.settings, second.settings])
 
-    with pytest.raises(UnexpectedError) as err:
+    with pytest.raises(ValueError, match=r"^More than one switch has the device id 1000abcdef\.$"):
         Runner(config, [first, second], LightBridge().client())
-
-    assert err.value.dotnet_type == "ArgumentException"
-    assert str(err.value) == "An item with the same key has already been added. Key: 1000abcdef"
 
 
 # What the runner logs.
@@ -942,7 +956,7 @@ async def test_run_sends_its_first_ping_and_query_before_it_first_waits(
 
     running = asyncio.get_running_loop().create_task(switch.run(listener), eager_start=True)
 
-    # Nothing awaited: run() went as far as RunAsync goes before it first waits, the first of three queries included.
+    # Nothing awaited: run() went on until it first waited, the first ping and the first of three queries included.
     assert [r.getMessage() for r in caplog.records if r.name in (runner.__name__, LoggingBridge.log.name)] == [
         "Hall (1000abcdef) -> light 'Ceiling'",
         "Hall (1000abcdef): no deviceKey configured, so every new state broadcast counts as a press (relay/setting "
@@ -971,19 +985,14 @@ async def test_a_broadcast_right_after_a_restart_of_the_socket_is_a_new_baseline
     await network.next_open()
     _broadcast(network, 101)
 
-    # The new socket's started callback reset the baselines before its first packet, as .NET's Started does.
+    # The new socket's started callback, which starts eagerly, reset the baselines before its first packet.
     assert observer.events == ["bridge up"]
     assert bridge.paths == ["GET /clip/v2/resource/bridge"]
     await _stop(running)
     await _stop(listening)
 
 
-# A rejected key, reported for Home Assistant's reauthentication; the .NET app's observer has no such call (decision 21).
-
-
-class KeyObserver(RecordingObserver):
-    def on_key_rejected(self) -> None:
-        self.events.append("key rejected")
+# A rejected key, reported for Home Assistant's reauthentication (decision 21).
 
 
 REJECTED = f"The Hue bridge rejected the application key; {PAIR_AGAIN}."

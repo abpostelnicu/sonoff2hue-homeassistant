@@ -1,20 +1,16 @@
 """The integration's state for its entities and diagnostics: what the bridge supervisor and the runner report, combined
-with the configuration and the LAN devices.
+with the configuration and the LAN devices (decision 21).
 
-A port of the .NET app's ``Web/Monitoring/StatusTracker.cs``, which fed the web interface's dashboard. Changes reach
-the listeners as one snapshot at most every 500 ms, as .NET published its ``status`` event; Home Assistant's entities
-are those listeners now. The tracker is a :class:`RunnerObserver`, which the supervisor gives the runner, and it
-follows the :class:`DeviceRegistry` for the switches' devices.
-
-Not ported: the ``EventHub`` (the listeners replace it), the config file's and the password file's paths, which belonged
-to the web interface, and the version, which is the manifest's. The tracker is used on the event loop only, so .NET's
-lock has no counterpart. An injected clock that returns an aware UTC datetime replaces ``TimeProvider``.
+Changes reach the listeners as one snapshot, 500 ms after the first of them, so that the reports of one event, such as
+the bridge's reachability and then the service's state, arrive together and the entities write their states at most
+twice a second. The tracker is a :class:`RunnerObserver`, which the supervisor gives the runner, and it follows the
+:class:`DeviceRegistry` for the switches' devices. It is used on the event loop only. Its clock returns an aware UTC
+datetime, so that tests can set the time.
 
 Use, for the Home Assistant runtime: make one for a configuration and its registry, add a listener with
 :meth:`StatusTracker.add_listener`, pass the tracker to the bridge supervisor, read :meth:`StatusTracker.snapshot`
 whenever needed, and :meth:`StatusTracker.close` it when the config entry unloads. The runtime keeps the tracker and its
-registry while the configuration changes, as .NET kept them, and calls :meth:`StatusTracker.config_changed` for each
-change (decision 23).
+registry while the configuration changes, and calls :meth:`StatusTracker.config_changed` for each change (decision 23).
 """
 
 import asyncio
@@ -23,11 +19,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 
-from . import text
 from .config import EngineConfig, HueSettings
-from .errors import UnexpectedError
 from .registry import DeviceRegistry, LanDevice
-from .runner import RunnerObserver, SwitchBinding
+from .runner import RunnerObserver, SwitchBinding, bindings_by_device_id
 from .toggler import ToggleResult
 
 PUBLISH_DELAY = 0.5
@@ -37,7 +31,7 @@ PRESS_DROPPED = "A press was dropped because it waited more than 5 seconds for t
 
 
 class ServiceState(StrEnum):
-    """The state of the bridge, in the order of .NET's ``ServiceState``."""
+    """The state of the bridge; the values are the Status sensor's options."""
 
     NOT_CONFIGURED = "not_configured"
     """The Hue bridge is not paired or no switch is mapped yet."""
@@ -94,7 +88,7 @@ class ToggleAction:
 
 @dataclass(frozen=True, slots=True)
 class SwitchError:
-    """The last thing that went wrong for a switch (``SwitchErrorDto``); not an exception."""
+    """The last thing that went wrong for a switch; not an exception."""
 
     at: datetime
     message: str
@@ -147,7 +141,7 @@ class StatusTracker(RunnerObserver):
         self._started_at = clock()
         self._service = ServiceStatus(ServiceState.CONNECTING, "Starting.", (), self._started_at)
         self._bridge = _bridge_identity(config.hue)
-        # By text.fold(device id), as .NET's OrdinalIgnoreCase dictionaries.
+        # By the switches' device ids, casefolded.
         self._targets: dict[str, tuple[str, ...]] = {}
         self._last_actions: dict[str, ToggleAction] = {}
         self._last_errors: dict[str, SwitchError] = {}
@@ -170,7 +164,7 @@ class StatusTracker(RunnerObserver):
         """Calls ``listener`` with a snapshot 500 ms after a change, with every change made until then; returns a
         function that removes it. Listeners run in order on the event loop, and one that raises stops the rest and goes
         to the loop's exception handler. A device that isn't a configured switch, which only changes ``devices_seen``,
-        is published only with the next other change, as in .NET: follow the registry for every device."""
+        is published only with the next other change: follow the registry for every device."""
         self._listeners.append(listener)
         return lambda: self._listeners.remove(listener)
 
@@ -188,17 +182,11 @@ class StatusTracker(RunnerObserver):
         self._schedule_publish()
 
     def set_running(self, bindings: Sequence[SwitchBinding]) -> None:
-        """The runner started with these resolved switches."""
-        targets: dict[str, tuple[str, ...]] = {}
-        for binding in bindings:
-            key = text.fold(binding.settings.normalized_device_id)
-            if key in targets:
-                raise UnexpectedError(
-                    "ArgumentException",
-                    f"An item with the same key has already been added. Key: {binding.settings.normalized_device_id}",
-                )
-            targets[key] = tuple(str(target) for target in binding.targets)
-        self._targets = targets
+        """The runner started with these resolved switches. Raises :class:`ValueError` when two of them have the same
+        device id, and changes nothing then."""
+        self._targets = {
+            key: tuple(map(str, binding.targets)) for key, binding in bindings_by_device_id(bindings).items()
+        }
 
         count = sum(len(binding.targets) for binding in bindings)
         self.set_service(
@@ -216,7 +204,7 @@ class StatusTracker(RunnerObserver):
 
     def on_toggled(self, binding: SwitchBinding, result: ToggleResult, elapsed: timedelta) -> None:
         now = self._clock()
-        key = text.fold(binding.settings.normalized_device_id)
+        key = binding.settings.normalized_device_id.casefold()
         self._last_actions[key] = ToggleAction(
             now, result.turned_on, result.changed, result.unchanged, result.failed, elapsed // timedelta(milliseconds=1)
         )
@@ -239,12 +227,12 @@ class StatusTracker(RunnerObserver):
         config = self._config
         devices = self._registry.snapshot()
         hue = config.hue
-        paired = not text.is_null_or_white_space(hue.bridge_ip) and not text.is_null_or_white_space(hue.app_key)
+        paired = not _is_blank(hue.bridge_ip) and not _is_blank(hue.app_key)
         switches: list[SwitchStatus] = []
         for switch in config.switches:
             device_id = switch.normalized_device_id
-            key = text.fold(device_id)
-            device = next((d for d in devices if text.equals_ignore_case(d.device_id, device_id)), None)
+            key = device_id.casefold()
+            device = next((d for d in devices if d.device_id.casefold() == key), None)
             switches.append(
                 SwitchStatus(
                     switch.name,
@@ -268,7 +256,7 @@ class StatusTracker(RunnerObserver):
                 paired,
                 hue.bridge_ip,
                 hue.bridge_id,
-                not text.is_null_or_white_space(hue.certificate_sha256),
+                not _is_blank(hue.certificate_sha256),
                 self._reachable if paired else None,
                 self._reachability_message if paired else None,
                 self._checked_at if paired else None,
@@ -278,9 +266,9 @@ class StatusTracker(RunnerObserver):
         )
 
     def config_changed(self, config: EngineConfig) -> None:
-        """``OnConfigChanged``, for each change of the configuration, which the runtime applies without reloading the
-        config entry: snapshots show the new configuration. Reachability belongs to one bridge: editing switches keeps
-        it, pairing again or another bridge resets it."""
+        """For each change of the configuration, which the runtime applies without reloading the config entry:
+        snapshots show the new configuration. Reachability belongs to one bridge: editing switches keeps it, pairing
+        again or another bridge resets it."""
         self._config = config
         bridge = _bridge_identity(config.hue)
         if bridge != self._bridge:
@@ -303,7 +291,7 @@ class StatusTracker(RunnerObserver):
             self._publish = None
 
     def _record_error(self, binding: SwitchBinding, message: str) -> None:
-        self._last_errors[text.fold(binding.settings.normalized_device_id)] = SwitchError(self._clock(), message)
+        self._last_errors[binding.settings.normalized_device_id.casefold()] = SwitchError(self._clock(), message)
         self._schedule_publish()
 
     def _on_device_changed(self, device: LanDevice) -> None:
@@ -322,6 +310,11 @@ class StatusTracker(RunnerObserver):
             listener(snapshot)
 
 
-def _bridge_identity(hue: HueSettings) -> str:
-    """The bridge as .NET compares it: ``$"{BridgeIp}|{AppKey}|{CertificateSha256}"``, where null is empty."""
-    return "|".join("" if value is None else value for value in (hue.bridge_ip, hue.app_key, hue.certificate_sha256))
+def _bridge_identity(hue: HueSettings) -> tuple[str, str, str]:
+    """The bridge, as far as its reachability goes: its address, application key and pin, where a missing one is
+    empty."""
+    return hue.bridge_ip or "", hue.app_key or "", hue.certificate_sha256 or ""
+
+
+def _is_blank(value: str | None) -> bool:
+    return not value or value.isspace()

@@ -1,25 +1,18 @@
 """Runs the bridge whenever the configuration is complete, and reports why it can't run otherwise.
 
-A port of the .NET app's ``Web/Management/BridgeSupervisor.cs``. It checks the configuration in .NET's order, waits
-for the Hue bridge, resolves the switches' lights, rooms and zones, and then runs the :class:`Runner` on the config
-entry's mDNS listener, which the LAN monitor runs and keeps running. Every step is reported to the
-:class:`StatusTracker`, which is also the runner's observer.
+A :class:`BridgeSupervisor` runs one :class:`EngineConfig` (decision 21). It checks, in this order, that the bridge is
+paired, that a switch is configured, that :meth:`EngineConfig.validate_for_run` passes and that a Hue client can be made
+for the bridge's settings. Then it waits for the bridge, resolves the switches' lights, rooms and zones, and runs the
+:class:`Runner` on the config entry's mDNS listener, which the LAN monitor runs and keeps running. Each step is reported
+to the :class:`StatusTracker`, which is also the runner's observer. A check that fails holds its state until the
+configuration changes; an unexpected failure starts the bridge again 30 s later.
 
-What Home Assistant replaces:
-
-- .NET's ``ConfigStore`` restarted the supervisor's run with the new configuration after every change. The runtime
-  restarts the supervisor for every change instead (decision 23): a supervisor runs one :class:`EngineConfig` until it
-  is cancelled, and the runtime starts one for the new configuration. :meth:`BridgeSupervisor.config_changed` logs, as
-  .NET did then, that the bridge restarts.
-- .NET's "The config file can't be read." state has no counterpart: there is no config file.
-- ``HueClientFactory`` is the ``hue_clients`` parameter, so that tests can pass an in-memory bridge.
-
-Use, for the Home Assistant runtime: run :meth:`BridgeSupervisor.run` as the config entry's background task. Call
-:meth:`BridgeSupervisor.config_changed` from the entry's update listener, before cancelling the task. Cancelling it
-stops the runner and closes the Hue client, and leaves the listener running. ``on_key_rejected`` is called whenever the
-bridge rejects the application key, while the supervisor connects to it and while the runner runs, which is when the
-runtime starts Home Assistant's reauthentication. ``observer`` gets the runner's reports after the status tracker, for
-the runtime's bus events.
+Use, for the Home Assistant runtime (decision 23): run :meth:`BridgeSupervisor.run` as a background task. For each
+change of the configuration, call :meth:`BridgeSupervisor.config_changed`, cancel the task, and start a supervisor for
+the new configuration once it has ended. Cancelling it stops the runner and closes the Hue client, and leaves the
+listener running. ``on_key_rejected`` is called whenever the bridge rejects the application key, while the supervisor
+connects to it and while the runner runs, which is when the runtime starts Home Assistant's reauthentication.
+``observer`` gets the runner's reports after the status tracker, for the runtime's bus events.
 """
 
 import asyncio
@@ -28,7 +21,6 @@ from datetime import UTC, datetime, timedelta
 import logging
 from typing import NoReturn
 
-from . import text
 from .config import ConfigError, EngineConfig, HueSettings
 from .hue_client import PAIR_AGAIN, HueApiError, HueClient
 from .mdns import MdnsListener
@@ -45,22 +37,22 @@ FAILURE_RETRY_DELAY = 30.0
 
 _PAIR_AGAIN_SENTENCE = PAIR_AGAIN[:1].upper() + PAIR_AGAIN[1:]
 NOT_PAIRED = "Pair the Hue bridge to get started: reconfigure the sonoff2hue integration."
-""".NET's "Pair the Hue bridge to get started.", with how to pair in Home Assistant."""
+"""The message while the bridge isn't paired; reconfiguring the integration pairs it (decision 22)."""
 NO_SWITCHES = "Add a switch: pick a MINIR4M and the Hue lights it should toggle."
 KEY_REJECTED = f"The Hue bridge no longer accepts sonoff2hue's application key. {_PAIR_AGAIN_SENTENCE}."
-""".NET's message, where "Pair the bridge again." says how to do it in Home Assistant."""
+"""The message after the bridge rejected the application key, which says how to pair the bridge again."""
 NOT_PINNED = (
     f"hue.certificateSha256 is not set, so the bridge certificate is not verified. {_PAIR_AGAIN_SENTENCE} and pin it."
 )
-""".NET's warning, where "Pair the bridge again to pin it." says how to do it in Home Assistant."""
+"""The warning before the bridge runs without a pinned certificate, which says how to pin it."""
 
 type HueClientFactory = Callable[[HueSettings], HueClient]
 
 
 def create_hue_client(hue: HueSettings) -> HueClient:
-    """``HueClientFactory.Create``: a client for the configured bridge, which checks the bridge's certificate against the
-    pin, if there is one. Raises :class:`ConfigError` when the settings can't be used, such as a malformed bridge address
-    or application key."""
+    """The default :data:`HueClientFactory`: a client for the configured bridge, which checks the bridge's certificate
+    against the pin, if there is one. Raises :class:`ConfigError` when the settings can't be used, such as a malformed
+    bridge address or application key."""
     return HueClient(hue.bridge_ip or "", hue.app_key or "", hue.certificate_sha256)
 
 
@@ -85,8 +77,8 @@ class BridgeSupervisor:
         """``listener`` is the config entry's mDNS listener, which the runner shares and which keeps running when the
         supervisor stops. ``on_key_rejected`` runs on the event loop soon after the bridge rejected the application key:
         while the supervisor connects to it, which leaves it in the error state until the next change, and after each
-        keep-alive request or toggle that the bridge refuses so while the runner runs, which goes on as in .NET. One
-        that raises goes to the loop's exception handler. ``observer`` gets each of the runner's reports right after the
+        keep-alive request or toggle that the bridge refuses so while the runner runs, which goes on running. One that
+        raises goes to the loop's exception handler. ``observer`` gets each of the runner's reports right after the
         status tracker. ``clock`` is the runner's, for the age of a press, and has to agree with the listener's."""
         self._config = config
         self._listener = listener
@@ -99,9 +91,9 @@ class BridgeSupervisor:
         self._waiting_after_failure = False
 
     def config_changed(self) -> None:
-        """Logs that the bridge restarts with a new configuration, as .NET's supervisor did when its configuration
-        changed: while it runs, unless it is waiting to start again after an unexpected stop. The runtime then cancels
-        this supervisor and starts one for the new configuration."""
+        """Logs that the bridge restarts for a new configuration, while the supervisor runs, unless it is waiting to
+        start again after an unexpected stop. The runtime then cancels this supervisor and starts one for the new
+        configuration."""
         if self._running and not self._waiting_after_failure:
             _LOGGER.info("Configuration changed; restarting the bridge.")
 
@@ -129,7 +121,7 @@ class BridgeSupervisor:
 
     async def _run(self) -> None:
         settings = self._config
-        if text.is_null_or_white_space(settings.hue.bridge_ip) or text.is_null_or_white_space(settings.hue.app_key):
+        if _is_blank(settings.hue.bridge_ip) or _is_blank(settings.hue.app_key):
             self._status.set_service(ServiceState.NOT_CONFIGURED, NOT_PAIRED)
             await _wait_for_change()
 
@@ -169,7 +161,7 @@ class BridgeSupervisor:
                     self._report_key_rejected()
                 await _wait_for_change()
 
-            if text.is_null_or_white_space(settings.hue.certificate_sha256):
+            if _is_blank(settings.hue.certificate_sha256):
                 _LOGGER.warning(NOT_PINNED)
 
             self._status.set_running(bindings)
@@ -179,7 +171,8 @@ class BridgeSupervisor:
             await hue.close()
 
     def _report_key_rejected(self) -> None:
-        """Runs the hook on the event loop's next turn, so that one that raises can't stop the supervisor or the runner."""
+        """Runs the hook on the event loop's next turn, so that one that raises can't stop the supervisor or the
+        runner."""
         if self._on_key_rejected is not None:
             asyncio.get_running_loop().call_soon(self._on_key_rejected)
 
@@ -207,8 +200,8 @@ class BridgeSupervisor:
 
 
 class _Observer(RunnerObserver):
-    """The runner's observer: every report goes to the status tracker, as in .NET, then to the supervisor's ``observer``
-    if it has one, and a rejected key to the supervisor's hook as well."""
+    """The runner's observer: every report goes to the status tracker, then to the supervisor's ``observer`` if it has
+    one, and a rejected key to the supervisor's hook as well."""
 
     def __init__(
         self, status: StatusTracker, key_rejected: Callable[[], None], observer: RunnerObserver | None = None
@@ -243,14 +236,17 @@ class _Observer(RunnerObserver):
 
 
 async def _wait_for_change() -> NoReturn:
-    """``Task.Delay(Timeout.Infinite, cancellationToken)``: waits until the supervisor is cancelled, which the runtime
-    does for every change of the configuration."""
+    """Waits until the supervisor is cancelled, which the runtime does for every change of the configuration."""
     while True:
         await asyncio.get_running_loop().create_future()
 
 
+def _is_blank(value: str | None) -> bool:
+    return not value or value.isspace()
+
+
 def _problems_of(err: ConfigError) -> list[str]:
-    """:class:`ConfigError` messages list one problem per "  - " line."""
-    lines = (text.trim(line) for line in str(err).split("\n"))
-    problems = [line[2:] for line in lines if line.startswith("- ")]
+    """:class:`ConfigError` messages list one problem per "  - " line; a message without such lines is one problem."""
+    lines = (line.strip() for line in str(err).split("\n"))
+    problems = [line.removeprefix("- ") for line in lines if line.startswith("- ")]
     return problems or [str(err)]
