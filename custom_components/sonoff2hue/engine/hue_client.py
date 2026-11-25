@@ -1,13 +1,9 @@
 """The Hue bridge's local CLIP API v2 over HTTPS, with the bridge's certificate pinned.
 
-A port of the .NET app's ``Hue/HueClient.cs``, ``Hue/HueTls.cs`` and ``Hue/HueModels.cs``. The bridge serves a
-certificate that is self-signed or signed by Signify's private CA, issued to the bridge id rather than its address, so
-normal validation can never succeed. The certificate is pinned when pairing (trust on first use) and checked by its
-SHA-256 afterwards. The client keeps its TLS connection open for 5 minutes, so that a press doesn't wait for a handshake.
-
-The answers are read as .NET reads them: ``HttpContent.ReadAsStringAsync`` decodes the body, and ``JsonSerializer`` with
-``JsonSerializerDefaults.Web`` the CLIP v2 envelope. Where the app's code throws something other than
-``HueApiException`` for a malformed answer, the port raises :class:`UnexpectedError` with .NET's exception and message.
+The bridge serves a certificate that is self-signed or signed by Signify's private CA, issued to the bridge id rather
+than its address, so normal validation can never succeed. The certificate is pinned when pairing (trust on first use)
+and checked by its SHA-256 afterwards. The client keeps its TLS connection open for 5 minutes, so that a press doesn't
+wait for a handshake.
 """
 
 import asyncio
@@ -15,23 +11,22 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 import hashlib
+from http import HTTPStatus
 import json
 import os
+import re
 import socket
-from typing import Any, Protocol
+from typing import Any, Protocol, Self
 from urllib.parse import quote
 
 import aiohttp
 from yarl import URL
 
-from . import errors, text
 from .config import ConfigError
-from .errors import UnexpectedError
 from .hue_address import BridgeUrl, create_base_url
-from .jsonnode import MAX_DEPTH, nesting_depth, reject_constant
 
 PAIR_AGAIN = "reconfigure the sonoff2hue integration to pair the bridge again"
-"""What the .NET app's messages said with "run 'sonoff2hue hue-pair' again"."""
+"""What to do when the bridge no longer accepts the application key or presents another certificate."""
 CERTIFICATE_MISMATCH = (
     "The Hue bridge TLS certificate does not match the pinned certificateSha256. If the bridge was replaced or reset, "
     f"{PAIR_AGAIN}."
@@ -41,6 +36,17 @@ CERTIFICATE_MISMATCH = (
 REQUEST_TIMEOUT = 5.0
 CONNECT_TIMEOUT = 4.0
 IDLE_TIMEOUT = 300.0
+"""Seconds that an idle connection to the bridge stays open, much longer than the keep-alive's interval."""
+
+_TRANSIENT = frozenset(
+    {
+        HTTPStatus.TOO_MANY_REQUESTS,
+        HTTPStatus.INTERNAL_SERVER_ERROR,
+        HTTPStatus.BAD_GATEWAY,
+        HTTPStatus.SERVICE_UNAVAILABLE,
+        HTTPStatus.GATEWAY_TIMEOUT,
+    }
+)
 
 
 class HueTargetKind(Enum):
@@ -50,8 +56,7 @@ class HueTargetKind(Enum):
 
 @dataclass(frozen=True, slots=True)
 class HueTarget:
-    """Something that can be switched on and off: a light, or the grouped_light of a room or zone. The id is ``None``
-    only for a light that a malformed answer gave a null id, as in .NET."""
+    """Something that can be switched on and off: a light, or the grouped_light of a room or zone."""
 
     kind: HueTargetKind
     id: str | None
@@ -64,7 +69,7 @@ class HueTarget:
 
 @dataclass(frozen=True, slots=True)
 class HueLight:
-    """A light. Its id and name are ``None`` only where a malformed answer has a null id, as in .NET."""
+    """A light; its name is its id when the bridge gives it none."""
 
     id: str | None
     name: str | None
@@ -92,7 +97,7 @@ class HueBridgeInfo:
 
 
 class HueApiError(Exception):
-    """A request to the bridge failed (``HueApiException``)."""
+    """A request to the bridge failed. ``status`` is the HTTP status of the bridge's answer, ``None`` without one."""
 
     def __init__(self, message: str, status: int | None = None) -> None:
         super().__init__(message)
@@ -100,11 +105,12 @@ class HueApiError(Exception):
 
     @property
     def is_authentication_error(self) -> bool:
-        return self.status in (401, 403)
+        return self.status in (HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN)
 
     @property
     def is_transient(self) -> bool:
-        return self.status is None or self.status in (429, 503, 502, 504, 500)
+        """Whether trying again later may help: the bridge didn't answer, or answered that it is busy or failing."""
+        return self.status is None or self.status in _TRANSIENT
 
 
 class HueApi(Protocol):
@@ -117,49 +123,15 @@ class HueApi(Protocol):
     async def set_on(self, target: HueTarget, on: bool) -> None: ...
 
 
-# HTTP answers, read as .NET reads them.
+# HTTP.
 
-# HttpResponseMessage.ReasonPhrase when the status line has none (HttpStatusDescription), measured on .NET 10.
-# fmt: off
-_REASON_PHRASES = {
-    100: "Continue", 101: "Switching Protocols", 102: "Processing", 103: "Early Hints", 200: "OK", 201: "Created",
-    202: "Accepted", 203: "Non-Authoritative Information", 204: "No Content", 205: "Reset Content",
-    206: "Partial Content", 207: "Multi-Status", 208: "Already Reported", 226: "IM Used", 300: "Multiple Choices",
-    301: "Moved Permanently", 302: "Found", 303: "See Other", 304: "Not Modified", 305: "Use Proxy",
-    307: "Temporary Redirect", 308: "Permanent Redirect", 400: "Bad Request", 401: "Unauthorized",
-    402: "Payment Required", 403: "Forbidden", 404: "Not Found", 405: "Method Not Allowed", 406: "Not Acceptable",
-    407: "Proxy Authentication Required", 408: "Request Timeout", 409: "Conflict", 410: "Gone",
-    411: "Length Required", 412: "Precondition Failed", 413: "Request Entity Too Large", 414: "Request-Uri Too Long",
-    415: "Unsupported Media Type", 416: "Requested Range Not Satisfiable", 417: "Expectation Failed",
-    421: "Misdirected Request", 422: "Unprocessable Entity", 423: "Locked", 424: "Failed Dependency",
-    426: "Upgrade Required", 428: "Precondition Required", 429: "Too Many Requests",
-    431: "Request Header Fields Too Large", 451: "Unavailable For Legal Reasons", 500: "Internal Server Error",
-    501: "Not Implemented", 502: "Bad Gateway", 503: "Service Unavailable", 504: "Gateway Timeout",
-    505: "Http Version Not Supported", 506: "Variant Also Negotiates", 507: "Insufficient Storage",
-    508: "Loop Detected", 510: "Not Extended", 511: "Network Authentication Required",
-}
 
-# Encoding.GetEncoding's names without a code pages provider, lowercase, by code page; measured on .NET 10.
-_UTF7 = 65000
-_ENCODING_NAMES = {
-    65001: ("utf-8", "unicode-1-1-utf-8", "unicode-2-0-utf-8", "x-unicode-1-1-utf-8", "x-unicode-2-0-utf-8"),
-    28591: ("latin1", "l1", "iso-8859-1", "iso_8859-1:1987", "cp819", "ibm819", "csisolatin1", "iso-ir-100",
-            "iso8859-1", "iso_8859-1"),
-    20127: ("us-ascii", "ascii", "us", "cp367", "ibm367", "csascii", "iso-ir-6", "iso646-us", "iso_646.irv:1991",
-            "ansi_x3.4-1968", "ansi_x3.4-1986"),
-    1200: ("utf-16", "utf-16le", "unicode", "ucs-2", "iso-10646-ucs-2"),
-    1201: ("utf-16be", "unicodefffe"),
-    12000: ("utf-32", "utf-32le"),
-    12001: ("utf-32be",),
-    _UTF7: ("utf-7", "csunicode11utf7", "unicode-1-1-utf-7", "unicode-2-0-utf-7", "x-unicode-1-1-utf-7",
-            "x-unicode-2-0-utf-7"),
-}
-# fmt: on
-_CODE_PAGES = {name: code_page for code_page, names in _ENCODING_NAMES.items() for name in names}
-_PREAMBLES = {65001: b"\xef\xbb\xbf", 1200: b"\xff\xfe", 1201: b"\xfe\xff", 12000: b"\xff\xfe\x00\x00"}
-_CODECS = {65001: "utf-8", 1200: "utf-16-le", 1201: "utf-16-be", 12000: "utf-32-le", 12001: "utf-32-be"}
-_DETECTED = (65001, 12000, 1200, 1201)
-"""The byte order marks that ``ReadAsStringAsync`` looks for without a charset, in its order."""
+def load_json(text: str) -> Any:
+    """``json.loads``; raises ``ValueError`` for anything that isn't JSON, also for JSON nested too deeply to read."""
+    try:
+        return json.loads(text)
+    except RecursionError as err:
+        raise ValueError("The JSON is nested too deeply.") from err
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,78 +146,46 @@ class HttpAnswer:
 
     @property
     def reason_phrase(self) -> str | None:
-        """``HttpResponseMessage.ReasonPhrase``: the status line's, else .NET's default for the status."""
-        return self.reason if self.reason is not None else _REASON_PHRASES.get(self.status)
+        """The status line's reason phrase, else the standard one of the status, if it has one."""
+        if self.reason:
+            return self.reason
+        try:
+            return HTTPStatus(self.status).phrase
+        except ValueError:
+            return None
 
     @property
     def is_success(self) -> bool:
         return 200 <= self.status <= 299
 
+    def text(self) -> str:
+        """The body, decoded by its charset, or as UTF-8 without one or for a charset that Python has no text codec
+        for; bytes that don't decode become U+FFFD, and a byte order mark is dropped."""
+        try:
+            text = self.content.decode(self.charset.strip('"') if self.charset else "utf-8", "replace")
+        except LookupError:
+            text = self.content.decode("utf-8", "replace")
+        return text.removeprefix("\ufeff")
+
+    def json(self) -> Any:
+        """The body as JSON; raises ``ValueError`` when it isn't."""
+        return load_json(self.text())
+
     def read_as_string(self) -> str:
-        """``HttpContent.ReadAsStringAsync``: the charset's encoding, or one detected from a byte order mark, else
-        UTF-8; a byte order mark is dropped."""
-        if self.charset is not None:
-            code_page = _code_page(self.charset)
-            if code_page is None:
-                raise UnexpectedError(
-                    "InvalidOperationException",
-                    "The character set provided in ContentType is invalid. Cannot read content as string using an "
-                    "invalid character set.",
-                )
-            preamble = _PREAMBLES.get(code_page, b"")
-            start = len(preamble) if preamble and self.content.startswith(preamble) else 0
-        else:
-            code_page, start = 65001, 0
-            for detected in _DETECTED:
-                if self.content.startswith(_PREAMBLES[detected]):
-                    code_page, start = detected, len(_PREAMBLES[detected])
-                    break
-        return _decode(self.content[start:], code_page)
+        """The body as text, as :meth:`text` gives it."""
+        return self.text()
 
     def read_json_text(self) -> str:
-        """The text that ``HttpContent.ReadFromJsonAsync`` parses: transcoded from the charset's encoding, else UTF-8,
-        without a byte order mark."""
-        code_page = 65001
-        if self.charset is not None:
-            found = _code_page(self.charset)
-            if found is None:
-                raise UnexpectedError(
-                    "InvalidOperationException", "The character set provided in ContentType is invalid."
-                )
-            code_page = found
-        decoded = _decode(self.content, code_page)
-        return decoded.removeprefix("\ufeff")
-
-
-def _code_page(charset: str) -> int | None:
-    """``Encoding.GetEncoding`` for a charset, at most one pair of quotes removed; ``None`` for a name .NET doesn't
-    know, and an :class:`UnexpectedError` for UTF-7, which .NET no longer supports."""
-    if len(charset) > 2 and charset[0] == '"' and charset[-1] == '"':
-        charset = charset[1:-1]
-    code_page = _CODE_PAGES.get(text.lower_invariant(charset))
-    if code_page == _UTF7:
-        raise UnexpectedError(
-            "NotSupportedException",
-            "Support for UTF-7 is disabled. See https://aka.ms/dotnet-warnings/SYSLIB0001 for more information.",
-        )
-    return code_page
-
-
-def _decode(content: bytes, code_page: int) -> str:
-    if code_page == 20127:
-        return "".join(chr(byte) if byte < 0x80 else "?" for byte in content)
-    if code_page == 28591:
-        return content.decode("latin-1")
-    return content.decode(_CODECS[code_page], "replace")
+        """The body as text, as :meth:`text` gives it, for a JSON parser."""
+        return self.text()
 
 
 # Transport.
 
 
 class TransportError(Exception):
-    """A request that got no answer. ``kind`` is "certificate" (the TLS handshake failed, or the pin didn't match),
-    "timeout" or "network"; ``detail`` is .NET's message for a network failure, such as
-    "Connection refused (192.0.2.1:443)"."""
+    """A request that got no answer. ``kind`` is "certificate" (the TLS handshake failed, or the certificate isn't the
+    pinned one), "timeout" or "network"; ``detail`` says what happened, such as "Connection refused (192.0.2.1:443)"."""
 
     def __init__(self, kind: str, detail: str) -> None:
         super().__init__(detail)
@@ -266,21 +206,23 @@ class HueTransport(Protocol):
 type TransportFactory = Callable[[BridgeUrl, str | None, Callable[[str], None] | None], HueTransport]
 """Makes a transport for a bridge URL, a pinned SHA-256 (or none) and a callback for each certificate it sees."""
 
-JSON_CONTENT_TYPE = "application/json; charset=utf-8"
-"""The Content-Type of a request with a body, as .NET's ``JsonContent`` writes it."""
-_SSL_FAILED = "The SSL connection could not be established, see inner exception."
-_SEND_FAILED = "An error occurred while sending the request."
+JSON_CONTENT_TYPE = "application/json"
+"""The Content-Type of a request with a body."""
+
+_SHA256 = re.compile(r"[0-9A-F]{64}")
+_NO_CERTIFICATE = bytes(32)
+"""The pin of a malformed fingerprint, which no certificate has."""
 
 
 def normalize_fingerprint(fingerprint: str) -> str:
-    """``HueTls.Normalize``: without colons and spaces, trimmed, upper case."""
-    return text.fold(text.trim(fingerprint.replace(":", "").replace(" ", "")))
+    """A SHA-256 fingerprint as upper-case hex, without the colons and white space it may be written with."""
+    return re.sub(r"[\s:]", "", fingerprint).upper()
 
 
 class AiohttpTransport:
-    """HTTPS to the bridge with its own connection pool, whose idle connections stay 5 minutes. When
-    ``certificate_sha256`` is set, a connection is only used if the bridge's certificate has that SHA-256; otherwise any
-    certificate is accepted, as in .NET."""
+    """HTTPS to the bridge with its own connection pool, whose idle connections stay open for 5 minutes. When
+    ``certificate_sha256`` is set, a connection is used only if the bridge's certificate has that SHA-256; otherwise
+    any certificate is accepted."""
 
     def __init__(
         self,
@@ -289,25 +231,23 @@ class AiohttpTransport:
         on_certificate: Callable[[str], None] | None = None,
     ) -> None:
         self._url = url
-        pinned = (
-            None if text.is_null_or_white_space(certificate_sha256) else normalize_fingerprint(certificate_sha256 or "")
-        )
-        if pinned is not None and (len(pinned) != 64 or not all(c in "0123456789ABCDEF" for c in pinned)):
-            pinned = "0" * 64  # a pin that no certificate has, as a malformed one never matches in .NET
+        self._where = f"{url.host}:{url.port}"
+        pinned: bytes | None = None
+        if certificate_sha256 and not certificate_sha256.isspace():
+            fingerprint = normalize_fingerprint(certificate_sha256)
+            pinned = bytes.fromhex(fingerprint) if _SHA256.fullmatch(fingerprint) else _NO_CERTIFICATE
         self._check = _CertificateCheck(pinned, on_certificate)
         self._session: aiohttp.ClientSession | None = None
 
     def _client(self) -> aiohttp.ClientSession:
         if self._session is None:
-            connector = aiohttp.TCPConnector(ssl=self._check, keepalive_timeout=IDLE_TIMEOUT)
-            timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT, connect=CONNECT_TIMEOUT)
-            # .NET's HttpClient sends none of these headers and doesn't decompress.
-            self._session = aiohttp.ClientSession(
-                connector=connector,
-                timeout=timeout,
-                auto_decompress=False,
-                skip_auto_headers=("Accept", "Accept-Encoding", "User-Agent"),
+            # The system's resolver, which also answers .local names where the system can: with aiodns installed,
+            # aiohttp's default resolver would be c-ares.
+            connector = aiohttp.TCPConnector(
+                ssl=self._check, keepalive_timeout=IDLE_TIMEOUT, resolver=aiohttp.ThreadedResolver()
             )
+            timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT, connect=CONNECT_TIMEOUT)
+            self._session = aiohttp.ClientSession(connector=connector, timeout=timeout)
         return self._session
 
     async def send(
@@ -317,18 +257,21 @@ class AiohttpTransport:
         if body is not None:
             request_headers["Content-Type"] = JSON_CONTENT_TYPE
         try:
-            url = request_url(self._url, path)
-            async with self._client().request(method, url, data=body, headers=request_headers) as response:
+            async with self._client().request(
+                method, request_url(self._url, path), data=body, headers=request_headers
+            ) as response:
                 content = await response.read()
                 return HttpAnswer(response.status, response.reason or None, content, response.charset)
-        except (aiohttp.ServerFingerprintMismatch, aiohttp.ClientSSLError) as err:
-            raise TransportError("certificate", _SSL_FAILED) from err
+        except aiohttp.ServerFingerprintMismatch as err:
+            raise TransportError("certificate", f"The certificate isn't the pinned one ({self._where})") from err
+        except aiohttp.ClientSSLError as err:
+            raise TransportError("certificate", f"The TLS handshake failed ({self._where})") from err
         except TimeoutError as err:  # aiohttp's connect and read timeouts are TimeoutErrors too
             raise TransportError("timeout", "The request timed out.") from err
         except aiohttp.ClientConnectorError as err:
-            raise TransportError("network", _connect_failure(err.os_error, self._url)) from err
-        except (aiohttp.ClientError, ValueError) as err:
-            raise TransportError("network", _SEND_FAILED) from err
+            raise TransportError("network", f"{_reason(err.os_error)} ({self._where})") from err
+        except aiohttp.ClientError as err:
+            raise TransportError("network", f"{str(err) or 'The request failed'} ({self._where})") from err
 
     async def close(self) -> None:
         if self._session is not None:
@@ -337,12 +280,11 @@ class AiohttpTransport:
 
 
 class _CertificateCheck(aiohttp.Fingerprint):
-    """What ``HueTls.CreateHandler``'s validation callback does for every new TLS connection: report the SHA-256 of the
-    bridge's certificate, then accept it only if it is the pinned one, when there is a pin. aiohttp calls ``check``
-    right after each handshake."""
+    """Reports the SHA-256 of the bridge's certificate for every new TLS connection, then accepts the connection only if
+    the certificate is the pinned one, when there is a pin. aiohttp calls ``check`` right after each handshake."""
 
-    def __init__(self, pinned: str | None, on_certificate: Callable[[str], None] | None) -> None:
-        super().__init__(bytes.fromhex(pinned) if pinned is not None else bytes(32))
+    def __init__(self, pinned: bytes | None, on_certificate: Callable[[str], None] | None) -> None:
+        super().__init__(_NO_CERTIFICATE if pinned is None else pinned)
         self._pinned = pinned is not None
         self._on_certificate = on_certificate
 
@@ -367,18 +309,13 @@ def request_url(url: BridgeUrl, path: str) -> URL:
     return url.url.with_path(f"/{path}", encoded=True)
 
 
-def _connect_failure(error: OSError, url: BridgeUrl) -> str:
-    """.NET's message for a connection that failed, such as "Connection refused (192.0.2.1:443)"."""
-    if isinstance(error, ConnectionResetError):
-        # aiohttp connects and shakes hands in one step; .NET reports a connection closed during the handshake so.
-        return _SSL_FAILED
-    if isinstance(error, socket.gaierror) and error.strerror:
-        reason = error.strerror
-    elif error.errno is not None and error.errno > 0:
-        reason = os.strerror(error.errno)
-    else:
-        reason = str(error) or _SEND_FAILED
-    return f"{reason} ({url.host}:{url.port})"
+def _reason(error: OSError) -> str:
+    """Why a connection failed, in the system's words where it has them, such as "Connection refused"."""
+    if error.errno is not None and not isinstance(error, socket.gaierror):
+        return os.strerror(error.errno)
+    if reason := error.strerror or str(error):
+        return reason
+    return "The connection was closed" if isinstance(error, ConnectionError) else "The connection failed"
 
 
 # The client.
@@ -401,18 +338,15 @@ class HueClient:
         self._transport = transport_factory(url, certificate_sha256, None)
 
     async def get_lights(self) -> list[HueLight]:
-        lights = await self._resources("light")
         return [
             HueLight(light.id, light.name if light.name is not None else light.id, bool(light.on))
-            for light in _items(lights)
+            for light in await self._resources("light")
         ]
 
     async def get_groups(self) -> list[HueGroup]:
         rooms = await self._resources("room")
         zones = await self._resources("zone")
-        return [_group(resource, "room") for resource in _items(rooms)] + [
-            _group(resource, "zone") for resource in _items(zones)
-        ]
+        return [_group(room, "room") for room in rooms] + [_group(zone, "zone") for zone in zones]
 
     async def get_light_states(self) -> dict[str, bool]:
         return _states(await self._resources("light"))
@@ -421,9 +355,11 @@ class HueClient:
         return _states(await self._resources("grouped_light"))
 
     async def set_on(self, target: HueTarget, on: bool) -> None:
+        if not target.id:
+            raise ValueError(f"The Hue {target} has no id.")
         resource_type = "light" if target.kind == HueTargetKind.LIGHT else "grouped_light"
         body = json.dumps({"on": {"on": on}}, separators=(",", ":")).encode()
-        await self._send("PUT", f"clip/v2/resource/{resource_type}/{_escape(target.id)}", body)
+        await self._send("PUT", f"clip/v2/resource/{resource_type}/{_escape(target.id)}", resource_type, body)
 
     async def ping(self) -> None:
         """A cheap authenticated request; it keeps the TLS connection warm and tells whether the bridge is usable."""
@@ -432,261 +368,164 @@ class HueClient:
     async def close(self) -> None:
         await self._transport.close()
 
-    async def _resources(self, resource_type: str) -> list[_Resource | None]:
-        body = await self._send("GET", f"clip/v2/resource/{resource_type}", None)
+    async def _resources(self, resource_type: str) -> list[_Resource]:
+        data = await self._send("GET", f"clip/v2/resource/{resource_type}", resource_type)
         try:
-            envelope = _envelope(body)
+            return [_Resource.parse(item) for item in data]
         except ValueError as err:
-            raise HueApiError(f"Unexpected response from the Hue bridge for '{resource_type}'.") from err
-        return [] if envelope is None or envelope.data is None else envelope.data
+            raise _unexpected(resource_type) from err
 
-    async def _send(self, method: str, path: str, body: bytes | None) -> str:
+    async def _send(self, method: str, path: str, resource_type: str, body: bytes | None = None) -> list[Any]:
+        """Sends a request and returns the data of the bridge's answer. Raises :class:`HueApiError` when there is no
+        answer, when the answer is a failure or reports errors, and when it isn't a CLIP v2 answer."""
         try:
             answer = await self._transport.send(method, path, body, self._headers)
         except TransportError as err:
-            if err.kind == "certificate":
-                raise HueApiError(CERTIFICATE_MISMATCH) from err
-            if err.kind == "timeout":
-                raise HueApiError("Hue bridge request timed out.") from err
-            raise HueApiError(f"Hue bridge not reachable: {err.detail}") from err
+            match err.kind:
+                case "certificate":
+                    raise HueApiError(CERTIFICATE_MISMATCH) from err
+                case "timeout":
+                    raise HueApiError("Hue bridge request timed out.") from err
+                case _:
+                    raise HueApiError(f"Hue bridge not reachable: {err.detail}") from err
 
-        content = answer.read_as_string()
+        content = answer.text()
         if answer.is_success:
+            try:
+                envelope = _Envelope.parse(content)
+            except ValueError as err:
+                raise _unexpected(resource_type) from err
             # CLIP v2 can answer 2xx and still report errors, e.g. 207 for an unreachable light: "device (light) has
             # communication issues, command (.on.on) may not have effect". Those requests did not succeed.
-            errors_found = _try_read_errors(content)
-            if errors_found is not None:
-                raise HueApiError(f"The Hue bridge reported errors for {method} /{path}: {errors_found}", answer.status)
-            return content
+            if envelope.errors:
+                raise HueApiError(
+                    f"The Hue bridge reported errors for {method} /{path}: {'; '.join(envelope.errors)}", answer.status
+                )
+            return envelope.data
 
-        description = _try_read_errors(content)
-        if answer.status in (401, 403):
-            detail = "" if description is None else f" ({description})"
+        try:
+            description = "; ".join(_Envelope.parse(content).errors)
+        except ValueError:
+            description = ""
+        if answer.status in (HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN):
+            detail = f" ({description})" if description else ""
             message = f"The Hue bridge rejected the application key{detail}; {PAIR_AGAIN}."
         else:
-            detail = "" if description is None else f": {description}"
-            message = f"Hue bridge returned {answer.status} {answer.reason_phrase or ''} for {method} /{path}{detail}"
+            phrase = answer.reason_phrase
+            status = f"{answer.status} {phrase}" if phrase else str(answer.status)
+            detail = f": {description}" if description else ""
+            message = f"Hue bridge returned {status} for {method} /{path}{detail}"
         raise HueApiError(message, answer.status)
 
 
 def _check_app_key(app_key: str) -> str:
     # The key goes into an HTTP header; a newline or other control character would break the request. Real keys are
     # plain ASCII.
-    if any(not char.isascii() or ord(char) < 0x20 or ord(char) == 0x7F for char in app_key):
+    if not (app_key.isascii() and app_key.isprintable()):
         raise ConfigError(
             f"The Hue application key contains characters that can't be sent to the bridge; {PAIR_AGAIN}."
         )
     return app_key
 
 
-def _escape(resource_id: str | None) -> str:
+def _escape(resource_id: str) -> str:
     """A resource id as one segment of a path: percent-encoded, dots too, so that ids such as ``..`` stay in it."""
-    if resource_id is None:
-        raise errors.argument_null("stringToEscape")
     return quote(resource_id, safe="", errors="replace").replace(".", "%2E")
 
 
-# The CLIP v2 envelope, read as .NET's JsonSerializer reads HueEnvelope with JsonSerializerDefaults.Web: property names
-# match without regard to case, the last of duplicate properties wins, unknown properties are skipped, and a value of
-# the wrong JSON type, or a string with a lone surrogate, is an error. A null in a list stays, as in .NET, where reading
-# it throws a NullReferenceException.
+def _unexpected(resource_type: str) -> HueApiError:
+    return HueApiError(f"Unexpected response from the Hue bridge for '{resource_type}'.")
 
 
-@dataclass(frozen=True, slots=True)
-class _Service:
-    rid: str | None
-    rtype: str | None
+# CLIP v2 answers. An answer is a JSON object with the lists "errors" and "data", both lists of objects. A key whose
+# value is null counts as missing; any other value has to be of its kind. A null in a list of objects makes the answer
+# malformed, as does a value of another kind or a missing key that is needed, such as a resource's id.
 
 
-@dataclass(frozen=True, slots=True)
-class _Resource:
-    id: str | None
-    name: str | None
-    on: bool | None
-    services: list[_Service | None] | None
+class _MalformedError(ValueError):
+    """An answer that isn't a CLIP v2 answer."""
 
 
-class _NullItem:
-    """A null in the list of errors, unlike an error without a description: .NET throws when it reads it."""
+def _field[T](obj: dict[str, Any], key: str, kind: type[T]) -> T | None:
+    """``obj[key]``, or ``None`` when it is missing or null; raises :class:`_MalformedError` when it isn't a
+    ``kind``."""
+    value = obj.get(key)
+    if value is not None and not isinstance(value, kind):
+        raise _MalformedError(f"'{key}' is not a {kind.__name__}: {value!r}")
+    return value
 
 
-_NULL_ITEM = _NullItem()
+def _objects(obj: dict[str, Any], key: str) -> list[dict[str, Any]]:
+    """The list of objects ``obj[key]``, empty when it is missing or null; raises :class:`_MalformedError` for anything
+    else."""
+    items = _field(obj, key, list) or []
+    if not all(isinstance(item, dict) for item in items):
+        raise _MalformedError(f"'{key}' is not a list of objects")
+    return items
+
+
+def _text(obj: dict[str, Any], key: str) -> str:
+    """The text ``obj[key]``, such as an id, which has to be there and not be empty."""
+    value = _field(obj, key, str)
+    if not value:
+        raise _MalformedError(f"'{key}' is missing")
+    return value
 
 
 @dataclass(frozen=True, slots=True)
 class _Envelope:
-    errors: list[str | _NullItem | None] | None
-    data: list[_Resource | None] | None
+    """A CLIP v2 answer: the description of each error it reports, or "no description", and its data."""
+
+    errors: list[str]
+    data: list[dict[str, Any]]
+
+    @classmethod
+    def parse(cls, content: str) -> Self:
+        answer = load_json(content)
+        if not isinstance(answer, dict):
+            raise _MalformedError("The answer is not a JSON object.")
+        descriptions = [_field(error, "description", str) for error in _objects(answer, "errors")]
+        return cls(
+            [text if text and not text.isspace() else "no description" for text in descriptions],
+            _objects(answer, "data"),
+        )
 
 
-class _MismatchError(ValueError):
-    """The JSON doesn't fit the type .NET deserializes it into (a ``JsonException`` there)."""
+@dataclass(frozen=True, slots=True)
+class _Service:
+    rid: str
+    rtype: str
+
+    @classmethod
+    def parse(cls, service: dict[str, Any]) -> Self:
+        return cls(_text(service, "rid"), _text(service, "rtype"))
 
 
-class _Pairs(list[tuple[str, Any]]):
-    """A JSON object as its properties, in order."""
+@dataclass(frozen=True, slots=True)
+class _Resource:
+    id: str
+    name: str | None
+    on: bool | None
+    services: list[_Service]
 
-    def get(self, name: str) -> Any:
-        found: Any = _MISSING
-        for key, value in self:
-            if text.equals_ignore_case(key, name):
-                found = value
-        return found
-
-
-_MISSING = object()
-
-
-def _parse(body: str) -> Any:
-    if nesting_depth(body) > MAX_DEPTH:
-        raise _MismatchError("The maximum configured depth of 64 has been exceeded.")
-    return json.loads(body, object_pairs_hook=_Pairs, parse_constant=reject_constant)
-
-
-def _envelope(body: str) -> _Envelope | None:
-    """``JsonSerializer.Deserialize<HueEnvelope>``; raises ``ValueError`` where .NET throws ``JsonException``."""
-    root = _parse(body)
-    if root is None:
-        return None
-    root = _require_object(root)
-    return _Envelope(_list(root.get("errors"), _error, _NULL_ITEM), _list(root.get("data"), _resource))
+    @classmethod
+    def parse(cls, resource: dict[str, Any]) -> Self:
+        on = _field(resource, "on", dict)
+        if on is not None and not isinstance(on.get("on"), bool):
+            raise _MalformedError("'on' has no boolean 'on'")
+        return cls(
+            _text(resource, "id"),
+            _field(_field(resource, "metadata", dict) or {}, "name", str),
+            None if on is None else on["on"],
+            [_Service.parse(service) for service in _objects(resource, "services")],
+        )
 
 
-def _list(value: Any, item: Callable[[Any], Any], null: Any = None) -> list[Any] | None:
-    if value is _MISSING or value is None:
-        return None
-    if not isinstance(value, list) or isinstance(value, _Pairs):
-        raise _MismatchError("The JSON value could not be converted to a list.")
-    return [null if element is None else item(element) for element in value]
-
-
-def _object(value: Any) -> _Pairs | None:
-    if value is _MISSING or value is None:
-        return None
-    return _require_object(value)
-
-
-def _require_object(value: Any) -> _Pairs:
-    if not isinstance(value, _Pairs):
-        raise _MismatchError("The JSON value could not be converted to an object.")
-    # The serializer reads every property name of a type it fills; a lone surrogate in one is an error.
-    if any(_has_lone_surrogate(key) for key, _ in value):
-        raise _MismatchError("Cannot read invalid UTF-16 JSON text as string.")
-    return value
-
-
-def _string(value: Any) -> str | None:
-    if value is _MISSING or value is None:
-        return None
-    if not isinstance(value, str):
-        raise _MismatchError("The JSON value could not be converted to System.String.")
-    if _has_lone_surrogate(value):
-        raise _MismatchError("Cannot read invalid UTF-16 JSON text as string.")
-    return value
-
-
-def _has_lone_surrogate(value: str) -> bool:
-    return any("\ud800" <= char <= "\udfff" for char in value)
-
-
-def _error(value: Any) -> str | None:
-    error = _require_object(value)
-    return _string(error.get("description"))
-
-
-def _resource(value: Any) -> _Resource:
-    resource = _require_object(value)
-    metadata = _object(resource.get("metadata"))
-    on = _object(resource.get("on"))
-    on_value = None
-    if on is not None:
-        flag = on.get("on")
-        if flag is _MISSING:
-            on_value = False
-        elif not isinstance(flag, bool):
-            raise _MismatchError("The JSON value could not be converted to System.Boolean.")
-        else:
-            on_value = flag
-    resource_id = resource.get("id")
-    return _Resource(
-        id="" if resource_id is _MISSING else _string(resource_id),
-        name=None if metadata is None else _string(metadata.get("name")),
-        on=on_value,
-        services=_list(resource.get("services"), _service),
-    )
-
-
-def _service(value: Any) -> _Service:
-    service = _require_object(value)
-    rid, rtype = service.get("rid"), service.get("rtype")
-    return _Service("" if rid is _MISSING else _string(rid), "" if rtype is _MISSING else _string(rtype))
-
-
-def _try_read_errors(body: str) -> str | None:
-    """The descriptions in a CLIP v2 ``errors`` array, or ``None`` if there are none or the body can't be read."""
-    try:
-        envelope = _envelope(body)
-    except ValueError:
-        return None
-    if envelope is None or not envelope.errors:
-        return None
-    descriptions: list[str] = []
-    for error in envelope.errors:
-        if isinstance(error, _NullItem):
-            raise errors.null_reference()
-        descriptions.append("no description" if text.is_null_or_white_space(error) else (error or ""))
-    return "; ".join(descriptions)
-
-
-def _items(resources: list[_Resource | None]) -> list[_Resource]:
-    """The resources, failing on a null among them as .NET's ``Select`` does."""
-    if any(resource is None for resource in resources):
-        raise errors.null_reference()
-    return [resource for resource in resources if resource is not None]
-
-
-def _states(resources: list[_Resource | None]) -> dict[str, bool]:
-    """``Where(r => r.On is not null).ToDictionary(r => r.Id, r => r.On!.On, OrdinalIgnoreCase)``."""
-    states: dict[str, bool] = {}
-    folded: set[str] = set()
-    for resource in resources:
-        if resource is None:
-            raise errors.null_reference()
-        if resource.on is None:
-            continue
-        if resource.id is None:
-            raise errors.argument_null("key")
-        key = text.fold(resource.id)
-        if key in folded:
-            raise UnexpectedError(
-                "ArgumentException", f"An item with the same key has already been added. Key: {resource.id}"
-            )
-        folded.add(key)
-        states[resource.id] = resource.on
-    return _CaseInsensitive(states)
-
-
-class _CaseInsensitive(dict[str, bool]):
-    """The states, keyed by resource id without regard to case, as the .NET dictionary is."""
-
-    def __init__(self, states: dict[str, bool]) -> None:
-        super().__init__(states)
-        self._folded = {text.fold(key): value for key, value in states.items()}
-
-    def get(self, key: str, default: Any = None) -> Any:
-        return self._folded.get(text.fold(key), default)
-
-    def __contains__(self, key: object) -> bool:
-        return isinstance(key, str) and text.fold(key) in self._folded
+def _states(resources: list[_Resource]) -> dict[str, bool]:
+    """Whether each resource that can be switched is on, by its id."""
+    return {resource.id: resource.on for resource in resources if resource.on is not None}
 
 
 def _group(resource: _Resource, kind: str) -> HueGroup:
-    """``Services?.FirstOrDefault(s => s.Rtype == "grouped_light")?.Rid``, failing on a null service before a match."""
-    grouped: str | None = None
-    for service in resource.services or []:
-        if service is None:
-            raise errors.null_reference()
-        if service.rtype == "grouped_light":
-            grouped = service.rid
-            break
-    return HueGroup(resource.id, resource.name if resource.name is not None else resource.id, kind, grouped)
+    grouped_light = next((service.rid for service in resource.services if service.rtype == "grouped_light"), None)
+    return HueGroup(resource.id, resource.name if resource.name is not None else resource.id, kind, grouped_light)
