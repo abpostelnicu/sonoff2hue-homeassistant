@@ -647,6 +647,21 @@ async def test_the_runner_logs_what_each_broadcast_means(caplog: pytest.LogCaptu
     ]
 
 
+def test_a_missing_seq_or_address_is_logged_as_none(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.DEBUG, logger=runner.__name__)
+    switch = create_runner(LightBridge().client())
+
+    # Without SRV and A records, a copy from this host gives no address.
+    for device_id in (DEVICE_ID, OTHER_DEVICE_ID):
+        copy = announcement(device_id, None, "payload", "iv", ip=None)
+        switch.handle_packet(to_packet(copy, ADDRESS, NOW, from_this_host=True))
+
+    assert runner_log(caplog) == [
+        (logging.INFO, "Hall (1000abcdef): online at None (seq None; payload not decoded)."),
+        (logging.DEBUG, "Ignoring unconfigured eWeLink device 1000999999 at None."),
+    ]
+
+
 async def test_payload_problems_and_a_switch_that_is_not_detached_are_warned_about_when_they_change(
     caplog: pytest.LogCaptureFixture,
 ) -> None:

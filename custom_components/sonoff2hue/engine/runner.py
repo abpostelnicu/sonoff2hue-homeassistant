@@ -112,7 +112,7 @@ async def resolve_bindings(
         except HueApiError as err:
             if not err.is_transient:
                 raise
-            logger.warning("Hue bridge at %s not usable yet (%s); retrying in 10s.", _null(config.hue.bridge_ip), err)
+            logger.warning("Hue bridge at %s not usable yet (%s); retrying in 10s.", config.hue.bridge_ip, err)
             await asyncio.sleep(RESOLVE_RETRY_DELAY)
         else:
             return bindings
@@ -217,7 +217,7 @@ class Runner:
                     _LOGGER.debug(
                         "Ignoring unconfigured eWeLink device %s at %s.",
                         announcement.device_id,
-                        _null(announcement.address),
+                        announcement.address,
                     )
                 continue
 
@@ -226,25 +226,25 @@ class Runner:
             seq = tracked.event.seq
             match tracked.event.kind:
                 case SwitchEventKind.PRESS:
-                    _LOGGER.info("%s: wall switch operated (seq %s).", name, _null(seq))
+                    _LOGGER.info("%s: wall switch operated (seq %s).", name, seq)
                     self._notify(methodcaller("on_press", binding, seq))
                     self._start_toggle(binding, announcement.received_at)
                 case SwitchEventKind.BASELINE:
                     _LOGGER.info(
                         "%s: online at %s (seq %s; %s).",
                         name,
-                        _null(announcement.address),
-                        _null(seq),
+                        announcement.address,
+                        seq,
                         summarize(tracked.params),
                     )
                 case SwitchEventKind.RELAY_CHANGED:
-                    _LOGGER.info("%s: ignored, relay changed (%s).", name, _null(tracked.event.detail))
+                    _LOGGER.info("%s: ignored, relay changed (%s).", name, tracked.event.detail)
                 case SwitchEventKind.SETTINGS_CHANGED:
-                    _LOGGER.info("%s: ignored, settings changed (%s).", name, _null(tracked.event.detail))
+                    _LOGGER.info("%s: ignored, settings changed (%s).", name, tracked.event.detail)
                 case SwitchEventKind.SEQUENCE_RESET:
-                    _LOGGER.info("%s: ignored, device restarted (%s).", name, _null(tracked.event.detail))
+                    _LOGGER.info("%s: ignored, device restarted (%s).", name, tracked.event.detail)
                 case SwitchEventKind.DUPLICATE:
-                    _LOGGER.log(TRACE, "%s: duplicate broadcast (seq %s).", name, _null(seq))
+                    _LOGGER.log(TRACE, "%s: duplicate broadcast (seq %s).", name, seq)
 
     def _report_diagnostics(self, binding: SwitchBinding, tracked: TrackedEvent) -> None:
         if tracked.decode_error != binding.last_decode_error:
@@ -361,7 +361,7 @@ class Runner:
         if reachable and previous is False:
             _LOGGER.info("Hue bridge reachable again.")
         elif not reachable and previous is not False:
-            _LOGGER.warning("Hue bridge unavailable: %s", _null(error))
+            _LOGGER.warning("Hue bridge unavailable: %s", error)
         self._notify(methodcaller("on_bridge_reachability", reachable, error))
 
     def _notify(self, callback: Callable[[RunnerObserver], None]) -> None:
@@ -371,8 +371,3 @@ class Runner:
             callback(self._observer)
         except Exception:
             _LOGGER.warning("Runner observer %s failed.", type(self._observer).__name__, exc_info=True)
-
-
-def _null(value: object) -> object:
-    """A value for a log line, where a missing one reads "(null)"."""
-    return "(null)" if value is None else value
