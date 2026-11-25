@@ -44,25 +44,17 @@ class BridgeUrl:
         return self.uri
 
 
-def try_create_base_url(address: str | None) -> tuple[BridgeUrl, None] | tuple[None, str]:
-    """The bridge's base URL, or ``None`` and the reason the address can't be used."""
-    value = (address or "").strip()
+def create_base_url(address: str) -> BridgeUrl:
+    """The bridge's base URL; raises :class:`ConfigError` with the reason when the address can't be used."""
+    value = address.strip()
     if not value:
-        return None, "The Hue bridge address is empty."
+        raise ConfigError("The Hue bridge address is empty.")
     url = _parse(value)
     if url is None:
-        return None, (
+        raise ConfigError(
             f"'{value}' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, "
             "for example 192.168.1.20 or bridge.local:8443."
         )
-    return url, None
-
-
-def create_base_url(address: str | None) -> BridgeUrl:
-    """Like :func:`try_create_base_url`, but raises :class:`ConfigError` for an address that can't be used."""
-    url, error = try_create_base_url(address)
-    if url is None:
-        raise ConfigError(error)
     return url
 
 

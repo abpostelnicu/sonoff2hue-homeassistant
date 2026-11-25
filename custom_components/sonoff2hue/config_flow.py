@@ -56,7 +56,7 @@ from .const import (
 )
 from .engine import yaml_import
 from .engine.config import ConfigError, EngineConfig, HueSettings, SwitchSettings
-from .engine.hue_address import try_create_base_url
+from .engine.hue_address import create_base_url
 from .engine.hue_client import PAIR_AGAIN, HueApiError, HueBridgeInfo
 from .engine.hue_setup import (
     DISCOVERY_TIMEOUT,
@@ -297,10 +297,11 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
         address = ""
         if user_input is not None:
             address = user_input[ADDRESS].strip()
-            _, error = try_create_base_url(address)
-            if error is not None:
+            try:
+                create_base_url(address)
+            except ConfigError as err:
                 errors[ADDRESS] = "invalid_address"
-                placeholders["error"] = error
+                placeholders["error"] = str(err)
             else:
                 try:
                     return await self._async_start_pairing(address)

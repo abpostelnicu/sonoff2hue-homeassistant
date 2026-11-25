@@ -3,7 +3,7 @@
 import pytest
 
 from custom_components.sonoff2hue.engine.config import ConfigError
-from custom_components.sonoff2hue.engine.hue_address import create_base_url, try_create_base_url
+from custom_components.sonoff2hue.engine.hue_address import create_base_url
 
 
 def invalid(address: str) -> str:
@@ -11,6 +11,13 @@ def invalid(address: str) -> str:
         f"'{address}' is not a valid Hue bridge address. Use a host name or IP address, optionally with a port, for "
         "example 192.168.1.20 or bridge.local:8443."
     )
+
+
+def refusal(address: str) -> str:
+    """Why :func:`create_base_url` refuses the address."""
+    with pytest.raises(ConfigError) as failure:
+        create_base_url(address)
+    return str(failure.value)
 
 
 @pytest.mark.parametrize(
@@ -45,10 +52,8 @@ def invalid(address: str) -> str:
     ],
 )
 def test_an_accepted_address(address: str, url: str, host: str, port: int) -> None:
-    base, error = try_create_base_url(address)
+    base = create_base_url(address)
 
-    assert error is None
-    assert base is not None
     assert (str(base.url), base.host, base.port) == (url, host, port)
 
 
@@ -101,19 +106,12 @@ def test_an_accepted_address(address: str, url: str, host: str, port: int) -> No
     ],
 )
 def test_a_refused_address(address: str) -> None:
-    assert try_create_base_url(address) == (None, invalid(address))
+    assert refusal(address) == invalid(address)
 
 
-@pytest.mark.parametrize("address", [None, "", " \t\n"])
-def test_an_empty_address(address: str | None) -> None:
-    assert try_create_base_url(address) == (None, "The Hue bridge address is empty.")
-
-
-def test_create_base_url_raises_the_reason() -> None:
-    with pytest.raises(ConfigError) as failure:
-        create_base_url("hue bridge")
-
-    assert str(failure.value) == invalid("hue bridge")
+@pytest.mark.parametrize("address", ["", " \t\n"])
+def test_an_empty_address(address: str) -> None:
+    assert refusal(address) == "The Hue bridge address is empty."
 
 
 @pytest.mark.parametrize(
