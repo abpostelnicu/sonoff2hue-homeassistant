@@ -1,0 +1,1961 @@
+[
+  {
+    "name": "announcement",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000200000002085f6577656c696e6b045f746370056c6f63616c00000c0001000000780028126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00001080010000119402b409747874766572733d310d69643d3130303061626364656609747970653d706c756709617069766572733d31077365713d3737310c656e63727970743d747275650569763d6976ff64617461313d787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878ff64617461323d7878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878786c64617461333d787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c0000210001000000780020000000001f91126557654c696e6b5f31303030616263646566056c6f63616c00126557654c696e6b5f31303030616263646566056c6f63616c00000100010000007800040a000005",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "_ewelink._tcp.local",
+          "type": 12,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": "eWeLink_1000abcdef._ewelink._tcp.local",
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        },
+        {
+          "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": true,
+          "ttl": 4500,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "txtvers",
+              "1"
+            ],
+            [
+              "id",
+              "1000abcdef"
+            ],
+            [
+              "type",
+              "plug"
+            ],
+            [
+              "apivers",
+              "1"
+            ],
+            [
+              "seq",
+              "771"
+            ],
+            [
+              "encrypt",
+              "true"
+            ],
+            [
+              "iv",
+              "iv"
+            ],
+            [
+              "data1",
+              "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            ],
+            [
+              "data2",
+              "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            ],
+            [
+              "data3",
+              "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            ]
+          ]
+        }
+      ],
+      "authorities": [],
+      "additionals": [
+        {
+          "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+          "type": 33,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": "eWeLink_1000abcdef.local",
+          "srvPort": 8081,
+          "txt": null
+        },
+        {
+          "name": "eWeLink_1000abcdef.local",
+          "type": 1,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": "10.0.0.5",
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        }
+      ]
+    },
+    "announcements": [
+      {
+        "deviceId": "1000abcdef",
+        "instanceName": "eWeLink_1000abcdef",
+        "seq": 771,
+        "deviceType": "plug",
+        "encrypted": true,
+        "iv": "iv",
+        "data": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "address": "10.0.0.5"
+      }
+    ],
+    "probes": []
+  },
+  {
+    "name": "plain",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000200000002085f6577656c696e6b045f746370056c6f63616c00000c0001000000780028126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c000010800100001194007609747874766572733d310d69643d3130303061626364656609747970653d706c756709617069766572733d31057365713d314364617461313d7b227377697463686573223a5b7b226f75746c6574223a302c22737769746368223a226f6e227d5d2c2272656c617953657061726174696f6e223a317d126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c0000210001000000780020000000001f91126557654c696e6b5f31303030616263646566056c6f63616c00126557654c696e6b5f31303030616263646566056c6f63616c00000100010000007800040a000005",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "_ewelink._tcp.local",
+          "type": 12,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": "eWeLink_1000abcdef._ewelink._tcp.local",
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        },
+        {
+          "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": true,
+          "ttl": 4500,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "txtvers",
+              "1"
+            ],
+            [
+              "id",
+              "1000abcdef"
+            ],
+            [
+              "type",
+              "plug"
+            ],
+            [
+              "apivers",
+              "1"
+            ],
+            [
+              "seq",
+              "1"
+            ],
+            [
+              "data1",
+              "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1}"
+            ]
+          ]
+        }
+      ],
+      "authorities": [],
+      "additionals": [
+        {
+          "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+          "type": 33,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": "eWeLink_1000abcdef.local",
+          "srvPort": 8081,
+          "txt": null
+        },
+        {
+          "name": "eWeLink_1000abcdef.local",
+          "type": 1,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": "10.0.0.5",
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        }
+      ]
+    },
+    "announcements": [
+      {
+        "deviceId": "1000abcdef",
+        "instanceName": "eWeLink_1000abcdef",
+        "seq": 1,
+        "deviceType": "plug",
+        "encrypted": false,
+        "iv": null,
+        "data": "{\"switches\":[{\"outlet\":0,\"switch\":\"on\"}],\"relaySeparation\":1}",
+        "address": "10.0.0.5"
+      }
+    ],
+    "probes": []
+  },
+  {
+    "name": "probe",
+    "sender": "10.0.0.6",
+    "hex": "000000000002000000020000126557654c696e6b5f31303030414243444546085f6577656c696e6b045f746370056c6f63616c0000ff0001126557654c696e6b5f31303030414243444546056c6f63616c0000ff0001126557654c696e6b5f31303030414243444546085f6577656c696e6b045f746370056c6f63616c0000210001000000780020000000001f91126557654c696e6b5f31303030414243444546056c6f63616c00126557654c696e6b5f31303030414243444546056c6f63616c00000100010000007800040a000005",
+    "message": {
+      "id": 0,
+      "isResponse": false,
+      "questions": [
+        [
+          "eWeLink_1000ABCDEF._ewelink._tcp.local",
+          255,
+          false
+        ],
+        [
+          "eWeLink_1000ABCDEF.local",
+          255,
+          false
+        ]
+      ],
+      "answers": [],
+      "authorities": [
+        {
+          "name": "eWeLink_1000ABCDEF._ewelink._tcp.local",
+          "type": 33,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": "eWeLink_1000ABCDEF.local",
+          "srvPort": 8081,
+          "txt": null
+        },
+        {
+          "name": "eWeLink_1000ABCDEF.local",
+          "type": 1,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": "10.0.0.5",
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        }
+      ],
+      "additionals": []
+    },
+    "announcements": [],
+    "probes": [
+      "1000abcdef"
+    ]
+  },
+  {
+    "name": "goodbye",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000200000002085f6577656c696e6b045f746370056c6f63616c00000c0001000000780028126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c000010800100000000004f09747874766572733d310d69643d3130303061626364656609747970653d706c756709617069766572733d31057365713d310c656e63727970743d747275650569763d69760964617461313d616263126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c0000210001000000780020000000001f91126557654c696e6b5f31303030616263646566056c6f63616c00126557654c696e6b5f31303030616263646566056c6f63616c00000100010000007800040a000005",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "_ewelink._tcp.local",
+          "type": 12,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": "eWeLink_1000abcdef._ewelink._tcp.local",
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        },
+        {
+          "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": true,
+          "ttl": 0,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "txtvers",
+              "1"
+            ],
+            [
+              "id",
+              "1000abcdef"
+            ],
+            [
+              "type",
+              "plug"
+            ],
+            [
+              "apivers",
+              "1"
+            ],
+            [
+              "seq",
+              "1"
+            ],
+            [
+              "encrypt",
+              "true"
+            ],
+            [
+              "iv",
+              "iv"
+            ],
+            [
+              "data1",
+              "abc"
+            ]
+          ]
+        }
+      ],
+      "authorities": [],
+      "additionals": [
+        {
+          "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+          "type": 33,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": "eWeLink_1000abcdef.local",
+          "srvPort": 8081,
+          "txt": null
+        },
+        {
+          "name": "eWeLink_1000abcdef.local",
+          "type": 1,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": "10.0.0.5",
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        }
+      ]
+    },
+    "announcements": [],
+    "probes": []
+  },
+  {
+    "name": "zbbridge",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000200000002085f6577656c696e6b045f746370056c6f63616c00000c000100000078002a147a62627269646765752d31303030616263646566085f6577656c696e6b045f746370056c6f63616c00147a62627269646765752d31303030616263646566085f6577656c696e6b045f746370056c6f63616c000010800100001194004f09747874766572733d310d69643d3130303061626364656609747970653d706c756709617069766572733d31057365713d310c656e63727970743d747275650569763d69760964617461313d616263147a62627269646765752d31303030616263646566085f6577656c696e6b045f746370056c6f63616c0000210001000000780022000000001f91147a62627269646765752d31303030616263646566056c6f63616c00147a62627269646765752d31303030616263646566056c6f63616c00000100010000007800040a000005",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "_ewelink._tcp.local",
+          "type": 12,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": "zbbridgeu-1000abcdef._ewelink._tcp.local",
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        },
+        {
+          "name": "zbbridgeu-1000abcdef._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": true,
+          "ttl": 4500,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "txtvers",
+              "1"
+            ],
+            [
+              "id",
+              "1000abcdef"
+            ],
+            [
+              "type",
+              "plug"
+            ],
+            [
+              "apivers",
+              "1"
+            ],
+            [
+              "seq",
+              "1"
+            ],
+            [
+              "encrypt",
+              "true"
+            ],
+            [
+              "iv",
+              "iv"
+            ],
+            [
+              "data1",
+              "abc"
+            ]
+          ]
+        }
+      ],
+      "authorities": [],
+      "additionals": [
+        {
+          "name": "zbbridgeu-1000abcdef._ewelink._tcp.local",
+          "type": 33,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": "zbbridgeu-1000abcdef.local",
+          "srvPort": 8081,
+          "txt": null
+        },
+        {
+          "name": "zbbridgeu-1000abcdef.local",
+          "type": 1,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": "10.0.0.5",
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        }
+      ]
+    },
+    "announcements": [],
+    "probes": []
+  },
+  {
+    "name": "ihost",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000200000002085f6577656c696e6b045f746370056c6f63616c00000c00010000007800261069686f73742d31303030616263646566085f6577656c696e6b045f746370056c6f63616c001069686f73742d31303030616263646566085f6577656c696e6b045f746370056c6f63616c000010800100001194004f09747874766572733d310d69643d3130303061626364656609747970653d706c756709617069766572733d31057365713d310c656e63727970743d747275650569763d69760964617461313d6162631069686f73742d31303030616263646566085f6577656c696e6b045f746370056c6f63616c000021000100000078001e000000001f911069686f73742d31303030616263646566056c6f63616c001069686f73742d31303030616263646566056c6f63616c00000100010000007800040a000005",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "_ewelink._tcp.local",
+          "type": 12,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": "ihost-1000abcdef._ewelink._tcp.local",
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        },
+        {
+          "name": "ihost-1000abcdef._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": true,
+          "ttl": 4500,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "txtvers",
+              "1"
+            ],
+            [
+              "id",
+              "1000abcdef"
+            ],
+            [
+              "type",
+              "plug"
+            ],
+            [
+              "apivers",
+              "1"
+            ],
+            [
+              "seq",
+              "1"
+            ],
+            [
+              "encrypt",
+              "true"
+            ],
+            [
+              "iv",
+              "iv"
+            ],
+            [
+              "data1",
+              "abc"
+            ]
+          ]
+        }
+      ],
+      "authorities": [],
+      "additionals": [
+        {
+          "name": "ihost-1000abcdef._ewelink._tcp.local",
+          "type": 33,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": "ihost-1000abcdef.local",
+          "srvPort": 8081,
+          "txt": null
+        },
+        {
+          "name": "ihost-1000abcdef.local",
+          "type": 1,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": "10.0.0.5",
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        }
+      ]
+    },
+    "announcements": [],
+    "probes": []
+  },
+  {
+    "name": "eWelink",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000200000002085f6577656c696e6b045f746370056c6f63616c00000c0001000000780028126557656c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00126557656c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c000010800100001194004f09747874766572733d310d69643d3130303061626364656609747970653d706c756709617069766572733d31057365713d310c656e63727970743d747275650569763d69760964617461313d616263126557656c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c0000210001000000780020000000001f91126557656c696e6b5f31303030616263646566056c6f63616c00126557656c696e6b5f31303030616263646566056c6f63616c00000100010000007800040a000005",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "_ewelink._tcp.local",
+          "type": 12,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": "eWelink_1000abcdef._ewelink._tcp.local",
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        },
+        {
+          "name": "eWelink_1000abcdef._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": true,
+          "ttl": 4500,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "txtvers",
+              "1"
+            ],
+            [
+              "id",
+              "1000abcdef"
+            ],
+            [
+              "type",
+              "plug"
+            ],
+            [
+              "apivers",
+              "1"
+            ],
+            [
+              "seq",
+              "1"
+            ],
+            [
+              "encrypt",
+              "true"
+            ],
+            [
+              "iv",
+              "iv"
+            ],
+            [
+              "data1",
+              "abc"
+            ]
+          ]
+        }
+      ],
+      "authorities": [],
+      "additionals": [
+        {
+          "name": "eWelink_1000abcdef._ewelink._tcp.local",
+          "type": 33,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": "eWelink_1000abcdef.local",
+          "srvPort": 8081,
+          "txt": null
+        },
+        {
+          "name": "eWelink_1000abcdef.local",
+          "type": 1,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": "10.0.0.5",
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        }
+      ]
+    },
+    "announcements": [
+      {
+        "deviceId": "1000abcdef",
+        "instanceName": "eWelink_1000abcdef",
+        "seq": 1,
+        "deviceType": "plug",
+        "encrypted": true,
+        "iv": "iv",
+        "data": "abc",
+        "address": "10.0.0.5"
+      }
+    ],
+    "probes": []
+  },
+  {
+    "name": "EWELINKnoUnderscore",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000200000002085f6577656c696e6b045f746370056c6f63616c00000c0001000000780028124557454c494e4b7831303030616263646566085f6577656c696e6b045f746370056c6f63616c00124557454c494e4b7831303030616263646566085f6577656c696e6b045f746370056c6f63616c000010800100001194004f09747874766572733d310d69643d3130303061626364656609747970653d706c756709617069766572733d31057365713d310c656e63727970743d747275650569763d69760964617461313d616263124557454c494e4b7831303030616263646566085f6577656c696e6b045f746370056c6f63616c0000210001000000780020000000001f91124557454c494e4b7831303030616263646566056c6f63616c00124557454c494e4b7831303030616263646566056c6f63616c00000100010000007800040a000005",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "_ewelink._tcp.local",
+          "type": 12,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": "EWELINKx1000abcdef._ewelink._tcp.local",
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        },
+        {
+          "name": "EWELINKx1000abcdef._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": true,
+          "ttl": 4500,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "txtvers",
+              "1"
+            ],
+            [
+              "id",
+              "1000abcdef"
+            ],
+            [
+              "type",
+              "plug"
+            ],
+            [
+              "apivers",
+              "1"
+            ],
+            [
+              "seq",
+              "1"
+            ],
+            [
+              "encrypt",
+              "true"
+            ],
+            [
+              "iv",
+              "iv"
+            ],
+            [
+              "data1",
+              "abc"
+            ]
+          ]
+        }
+      ],
+      "authorities": [],
+      "additionals": [
+        {
+          "name": "EWELINKx1000abcdef._ewelink._tcp.local",
+          "type": 33,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": "EWELINKx1000abcdef.local",
+          "srvPort": 8081,
+          "txt": null
+        },
+        {
+          "name": "EWELINKx1000abcdef.local",
+          "type": 1,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": "10.0.0.5",
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        }
+      ]
+    },
+    "announcements": [
+      {
+        "deviceId": "1000abcdef",
+        "instanceName": "EWELINKx1000abcdef",
+        "seq": 1,
+        "deviceType": "plug",
+        "encrypted": true,
+        "iv": "iv",
+        "data": "abc",
+        "address": "10.0.0.5"
+      }
+    ],
+    "probes": []
+  },
+  {
+    "name": "dotlessI",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000200000002085f6577656c696e6b045f746370056c6f63616c00000c0001000000780029136557654cc4b16e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00136557654cc4b16e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c000010800100001194004f09747874766572733d310d69643d3130303061626364656609747970653d706c756709617069766572733d31057365713d310c656e63727970743d747275650569763d69760964617461313d616263136557654cc4b16e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c0000210001000000780021000000001f91136557654cc4b16e6b5f31303030616263646566056c6f63616c00136557654cc4b16e6b5f31303030616263646566056c6f63616c00000100010000007800040a000005",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "_ewelink._tcp.local",
+          "type": 12,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": "eWeL\u0131nk_1000abcdef._ewelink._tcp.local",
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        },
+        {
+          "name": "eWeL\u0131nk_1000abcdef._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": true,
+          "ttl": 4500,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "txtvers",
+              "1"
+            ],
+            [
+              "id",
+              "1000abcdef"
+            ],
+            [
+              "type",
+              "plug"
+            ],
+            [
+              "apivers",
+              "1"
+            ],
+            [
+              "seq",
+              "1"
+            ],
+            [
+              "encrypt",
+              "true"
+            ],
+            [
+              "iv",
+              "iv"
+            ],
+            [
+              "data1",
+              "abc"
+            ]
+          ]
+        }
+      ],
+      "authorities": [],
+      "additionals": [
+        {
+          "name": "eWeL\u0131nk_1000abcdef._ewelink._tcp.local",
+          "type": 33,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": "eWeL\u0131nk_1000abcdef.local",
+          "srvPort": 8081,
+          "txt": null
+        },
+        {
+          "name": "eWeL\u0131nk_1000abcdef.local",
+          "type": 1,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": "10.0.0.5",
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        }
+      ]
+    },
+    "announcements": [],
+    "probes": []
+  },
+  {
+    "name": "truncated",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000200000002085f6577656c696e6b045f746370056c6f63616c00000c0001000000780028126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c000010800100001194004f09747874766572733d310d69643d3130303061626364656609747970653d706c756709617069766572733d31057365713d310c656e63727970743d747275650569763d69760964617461313d616263126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c0000210001000000780020000000001f91126557654c696e6b5f31303030616263646566056c6f63616c00126557654c696e6b5f31303030616263646566056c6f63616c00000100010000007800040a",
+    "parseError": "DNS packet truncated."
+  },
+  {
+    "name": "short",
+    "sender": "10.0.0.5",
+    "hex": "0000000000",
+    "parseError": "DNS packet shorter than header."
+  },
+  {
+    "name": "loop",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000100000000c00c",
+    "parseError": "Too many DNS name compression pointers."
+  },
+  {
+    "name": "labelType",
+    "sender": "10.0.0.5",
+    "hex": "00008400000000010000000040",
+    "parseError": "Unsupported DNS label type."
+  },
+  {
+    "name": "longName",
+    "sender": "10.0.0.5",
+    "hex": "0000840000000001000000003f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161613f61616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616100000100010000007800040a000001",
+    "parseError": "DNS name too long."
+  },
+  {
+    "name": "emojiName",
+    "sender": "10.0.0.5",
+    "hex": "0000840000000001000000003cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f98803cf09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f988000000100010000007800040a000001",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00.\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00.\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00.\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00.\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00.\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00.\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00.\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00.\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00.\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00.\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00.\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00.\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00.\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00.\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00.\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00.\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00",
+          "type": 1,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": "10.0.0.1",
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        }
+      ],
+      "authorities": [],
+      "additionals": []
+    },
+    "announcements": [],
+    "probes": []
+  },
+  {
+    "name": "query",
+    "sender": "10.0.0.5",
+    "hex": "000000000001000000000000085f6577656c696e6b045f746370056c6f63616c00000c0001",
+    "message": {
+      "id": 0,
+      "isResponse": false,
+      "questions": [
+        [
+          "_ewelink._tcp.local",
+          12,
+          false
+        ]
+      ],
+      "answers": [],
+      "authorities": [],
+      "additionals": []
+    },
+    "announcements": [],
+    "probes": []
+  },
+  {
+    "name": "seqNul",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000100000000126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00001000010000007800160d69643d31303030616263646566077365713d313200",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "id",
+              "1000abcdef"
+            ],
+            [
+              "seq",
+              "12\u0000"
+            ]
+          ]
+        }
+      ],
+      "authorities": [],
+      "additionals": []
+    },
+    "announcements": [
+      {
+        "deviceId": "1000abcdef",
+        "instanceName": "eWeLink_1000abcdef",
+        "seq": 12,
+        "deviceType": null,
+        "encrypted": false,
+        "iv": null,
+        "data": "",
+        "address": "10.0.0.5"
+      }
+    ],
+    "probes": []
+  },
+  {
+    "name": "seqSpaces",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000100000000126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00001000010000007800160d69643d31303030616263646566077365713d203720",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "id",
+              "1000abcdef"
+            ],
+            [
+              "seq",
+              " 7 "
+            ]
+          ]
+        }
+      ],
+      "authorities": [],
+      "additionals": []
+    },
+    "announcements": [
+      {
+        "deviceId": "1000abcdef",
+        "instanceName": "eWeLink_1000abcdef",
+        "seq": 7,
+        "deviceType": null,
+        "encrypted": false,
+        "iv": null,
+        "data": "",
+        "address": "10.0.0.5"
+      }
+    ],
+    "probes": []
+  },
+  {
+    "name": "seqUnderscore",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000100000000126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00001000010000007800160d69643d31303030616263646566077365713d315f30",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "id",
+              "1000abcdef"
+            ],
+            [
+              "seq",
+              "1_0"
+            ]
+          ]
+        }
+      ],
+      "authorities": [],
+      "additionals": []
+    },
+    "announcements": [
+      {
+        "deviceId": "1000abcdef",
+        "instanceName": "eWeLink_1000abcdef",
+        "seq": null,
+        "deviceType": null,
+        "encrypted": false,
+        "iv": null,
+        "data": "",
+        "address": "10.0.0.5"
+      }
+    ],
+    "probes": []
+  },
+  {
+    "name": "seqNegative",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000100000000126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00001000010000007800150d69643d31303030616263646566067365713d2d31",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "id",
+              "1000abcdef"
+            ],
+            [
+              "seq",
+              "-1"
+            ]
+          ]
+        }
+      ],
+      "authorities": [],
+      "additionals": []
+    },
+    "announcements": [
+      {
+        "deviceId": "1000abcdef",
+        "instanceName": "eWeLink_1000abcdef",
+        "seq": -1,
+        "deviceType": null,
+        "encrypted": false,
+        "iv": null,
+        "data": "",
+        "address": "10.0.0.5"
+      }
+    ],
+    "probes": []
+  },
+  {
+    "name": "seqOverflow",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000100000000126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00001000010000007800260d69643d31303030616263646566177365713d39323233333732303336383534373735383038",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "id",
+              "1000abcdef"
+            ],
+            [
+              "seq",
+              "9223372036854775808"
+            ]
+          ]
+        }
+      ],
+      "authorities": [],
+      "additionals": []
+    },
+    "announcements": [
+      {
+        "deviceId": "1000abcdef",
+        "instanceName": "eWeLink_1000abcdef",
+        "seq": null,
+        "deviceType": null,
+        "encrypted": false,
+        "iv": null,
+        "data": "",
+        "address": "10.0.0.5"
+      }
+    ],
+    "probes": []
+  },
+  {
+    "name": "seqArabic",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000100000000126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00001000010000007800150d69643d31303030616263646566067365713dd9a3",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "id",
+              "1000abcdef"
+            ],
+            [
+              "seq",
+              "\u0663"
+            ]
+          ]
+        }
+      ],
+      "authorities": [],
+      "additionals": []
+    },
+    "announcements": [
+      {
+        "deviceId": "1000abcdef",
+        "instanceName": "eWeLink_1000abcdef",
+        "seq": null,
+        "deviceType": null,
+        "encrypted": false,
+        "iv": null,
+        "data": "",
+        "address": "10.0.0.5"
+      }
+    ],
+    "probes": []
+  },
+  {
+    "name": "seqEmpty",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000100000000126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00001000010000007800130d69643d31303030616263646566047365713d",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "id",
+              "1000abcdef"
+            ],
+            [
+              "seq",
+              ""
+            ]
+          ]
+        }
+      ],
+      "authorities": [],
+      "additionals": []
+    },
+    "announcements": [
+      {
+        "deviceId": "1000abcdef",
+        "instanceName": "eWeLink_1000abcdef",
+        "seq": null,
+        "deviceType": null,
+        "encrypted": false,
+        "iv": null,
+        "data": "",
+        "address": "10.0.0.5"
+      }
+    ],
+    "probes": []
+  },
+  {
+    "name": "idBlank",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000100000000126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c000010000100000078000c0569643d2009057365713d31",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "id",
+              " \t"
+            ],
+            [
+              "seq",
+              "1"
+            ]
+          ]
+        }
+      ],
+      "authorities": [],
+      "additionals": []
+    },
+    "announcements": [
+      {
+        "deviceId": "1000abcdef",
+        "instanceName": "eWeLink_1000abcdef",
+        "seq": 1,
+        "deviceType": null,
+        "encrypted": false,
+        "iv": null,
+        "data": "",
+        "address": "10.0.0.5"
+      }
+    ],
+    "probes": []
+  },
+  {
+    "name": "idMissingShortInstance",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000100000000076557654c696e6b085f6577656c696e6b045f746370056c6f63616c0000100001000000780006057365713d31",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "eWeLink._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "seq",
+              "1"
+            ]
+          ]
+        }
+      ],
+      "authorities": [],
+      "additionals": []
+    },
+    "announcements": [],
+    "probes": []
+  },
+  {
+    "name": "idUpperSpaces",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000100000000126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c00001000010000007800181149443d2031303030414243444546e38080057365713d31",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "ID",
+              " 1000ABCDEF\u3000"
+            ],
+            [
+              "seq",
+              "1"
+            ]
+          ]
+        }
+      ],
+      "authorities": [],
+      "additionals": []
+    },
+    "announcements": [
+      {
+        "deviceId": "1000abcdef",
+        "instanceName": "eWeLink_1000abcdef",
+        "seq": 1,
+        "deviceType": null,
+        "encrypted": false,
+        "iv": null,
+        "data": "",
+        "address": "10.0.0.5"
+      }
+    ],
+    "probes": []
+  },
+  {
+    "name": "idTurkish",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000100000000126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c000010000100000078000f0869643dc4b044c4b0057365713d31",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "id",
+              "\u0130D\u0130"
+            ],
+            [
+              "seq",
+              "1"
+            ]
+          ]
+        }
+      ],
+      "authorities": [],
+      "additionals": []
+    },
+    "announcements": [
+      {
+        "deviceId": "\u0130d\u0130",
+        "instanceName": "eWeLink_1000abcdef",
+        "seq": 1,
+        "deviceType": null,
+        "encrypted": false,
+        "iv": null,
+        "data": "",
+        "address": "10.0.0.5"
+      }
+    ],
+    "probes": []
+  },
+  {
+    "name": "encryptVariants",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000400000000096557654c696e6b5f31085f6577656c696e6b045f746370056c6f63616c00001000010000007800130c656e63727970743d54525545057365713d31096557654c696e6b5f32085f6577656c696e6b045f746370056c6f63616c00001000010000007800120b656e63727970743d796573057365713d31096557654c696e6b5f33085f6577656c696e6b045f746370056c6f63616c00001000010000007800230c454e43525950543d74727565057365713d310764617461323d620764617461313d61096557654c696e6b5f34085f6577656c696e6b045f746370054c4f43414c0000100001000000780016057365713d310764617461353d780764617461333d63",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "eWeLink_1._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "encrypt",
+              "TRUE"
+            ],
+            [
+              "seq",
+              "1"
+            ]
+          ]
+        },
+        {
+          "name": "eWeLink_2._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "encrypt",
+              "yes"
+            ],
+            [
+              "seq",
+              "1"
+            ]
+          ]
+        },
+        {
+          "name": "eWeLink_3._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "ENCRYPT",
+              "true"
+            ],
+            [
+              "seq",
+              "1"
+            ],
+            [
+              "data2",
+              "b"
+            ],
+            [
+              "data1",
+              "a"
+            ]
+          ]
+        },
+        {
+          "name": "eWeLink_4._ewelink._tcp.LOCAL",
+          "type": 16,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "seq",
+              "1"
+            ],
+            [
+              "data5",
+              "x"
+            ],
+            [
+              "data3",
+              "c"
+            ]
+          ]
+        }
+      ],
+      "authorities": [],
+      "additionals": []
+    },
+    "announcements": [
+      {
+        "deviceId": "1",
+        "instanceName": "eWeLink_1",
+        "seq": 1,
+        "deviceType": null,
+        "encrypted": true,
+        "iv": null,
+        "data": "",
+        "address": "10.0.0.5"
+      },
+      {
+        "deviceId": "2",
+        "instanceName": "eWeLink_2",
+        "seq": 1,
+        "deviceType": null,
+        "encrypted": false,
+        "iv": null,
+        "data": "",
+        "address": "10.0.0.5"
+      },
+      {
+        "deviceId": "3",
+        "instanceName": "eWeLink_3",
+        "seq": 1,
+        "deviceType": null,
+        "encrypted": true,
+        "iv": null,
+        "data": "ab",
+        "address": "10.0.0.5"
+      },
+      {
+        "deviceId": "4",
+        "instanceName": "eWeLink_4",
+        "seq": 1,
+        "deviceType": null,
+        "encrypted": false,
+        "iv": null,
+        "data": "c",
+        "address": "10.0.0.5"
+      }
+    ],
+    "probes": []
+  },
+  {
+    "name": "addressMatching",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000300000005096557654c696e6b5f31085f6577656c696e6b045f746370056c6f63616c0000100001000000780006057365713d31096557654c696e6b5f32085f6577656c696e6b045f746370056c6f63616c0000100001000000780006057365713d31096557654c696e6b5f33085f6577656c696e6b045f746370056c6f63616c0000100001000000780006057365713d31094557454c494e4b5f31085f4557454c494e4b045f544350054c4f43414c0000210001000000780014000000001f9106486f73742d31056c6f63616c0006686f73742d31054c4f43414c00000100010000007800040a090807096557654c696e6b5f32085f6577656c696e6b045f746370056c6f63616c0000210001000000780014000000001f9106686f73742d32056c6f63616c0006686f73742d32056c6f63616c00001c000100000078001000000000000000000000000000000001096557654c696e6b5f33085f6577656c696e6b045f746370056c6f63616c0000210001000000780005000000001f",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "eWeLink_1._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "seq",
+              "1"
+            ]
+          ]
+        },
+        {
+          "name": "eWeLink_2._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "seq",
+              "1"
+            ]
+          ]
+        },
+        {
+          "name": "eWeLink_3._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "seq",
+              "1"
+            ]
+          ]
+        }
+      ],
+      "authorities": [],
+      "additionals": [
+        {
+          "name": "EWELINK_1._EWELINK._TCP.LOCAL",
+          "type": 33,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": "Host-1.local",
+          "srvPort": 8081,
+          "txt": null
+        },
+        {
+          "name": "host-1.LOCAL",
+          "type": 1,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": "10.9.8.7",
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        },
+        {
+          "name": "eWeLink_2._ewelink._tcp.local",
+          "type": 33,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": "host-2.local",
+          "srvPort": 8081,
+          "txt": null
+        },
+        {
+          "name": "host-2.local",
+          "type": 28,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": "::1",
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        },
+        {
+          "name": "eWeLink_3._ewelink._tcp.local",
+          "type": 33,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        }
+      ]
+    },
+    "announcements": [
+      {
+        "deviceId": "1",
+        "instanceName": "eWeLink_1",
+        "seq": 1,
+        "deviceType": null,
+        "encrypted": false,
+        "iv": null,
+        "data": "",
+        "address": "10.9.8.7"
+      },
+      {
+        "deviceId": "2",
+        "instanceName": "eWeLink_2",
+        "seq": 1,
+        "deviceType": null,
+        "encrypted": false,
+        "iv": null,
+        "data": "",
+        "address": "10.0.0.5"
+      },
+      {
+        "deviceId": "3",
+        "instanceName": "eWeLink_3",
+        "seq": 1,
+        "deviceType": null,
+        "encrypted": false,
+        "iv": null,
+        "data": "",
+        "address": "10.0.0.5"
+      }
+    ],
+    "probes": []
+  },
+  {
+    "name": "probeAuthorities",
+    "sender": "10.0.0.5",
+    "hex": "000000000001000000050000096557654c696e6b5f58085f6577656c696e6b045f746370056c6f63616c0000ff0001096557654c696e6b5f58085f6577656c696e6b045f746370056c6f63616c0000210001000000780017000000001f91096557654c696e6b5f58056c6f63616c00094557454c494e4b5f78056c6f63616c00000100010000007800040a000001086557654c696e6b5f056c6f63616c00000100010000007800040a0000010b6557654c696e6b5fc4b164056c6f63616c00000100010000007800040a000001056f74686572056c6f63616c00000100010000007800040a000001",
+    "message": {
+      "id": 0,
+      "isResponse": false,
+      "questions": [
+        [
+          "eWeLink_X._ewelink._tcp.local",
+          255,
+          false
+        ]
+      ],
+      "answers": [],
+      "authorities": [
+        {
+          "name": "eWeLink_X._ewelink._tcp.local",
+          "type": 33,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": "eWeLink_X.local",
+          "srvPort": 8081,
+          "txt": null
+        },
+        {
+          "name": "EWELINK_x.local",
+          "type": 1,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": "10.0.0.1",
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        },
+        {
+          "name": "eWeLink_.local",
+          "type": 1,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": "10.0.0.1",
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        },
+        {
+          "name": "eWeLink_\u0131d.local",
+          "type": 1,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": "10.0.0.1",
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        },
+        {
+          "name": "other.local",
+          "type": 1,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": "10.0.0.1",
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        }
+      ],
+      "additionals": []
+    },
+    "announcements": [],
+    "probes": [
+      "x",
+      "\u0131d"
+    ]
+  },
+  {
+    "name": "txtOdd",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000100000000126557654c696e6b5f31303030616263646566085f6577656c696e6b045f746370056c6f63616c0000100001000000780022057365713d31055345513d32023d7804666c61670964617461313d613d620002c328",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "eWeLink_1000abcdef._ewelink._tcp.local",
+          "type": 16,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": [
+            [
+              "seq",
+              "1"
+            ],
+            [
+              "",
+              "x"
+            ],
+            [
+              "flag",
+              ""
+            ],
+            [
+              "data1",
+              "a=b"
+            ],
+            [
+              "\ufffd(",
+              ""
+            ]
+          ]
+        }
+      ],
+      "authorities": [],
+      "additionals": []
+    },
+    "announcements": [
+      {
+        "deviceId": "1000abcdef",
+        "instanceName": "eWeLink_1000abcdef",
+        "seq": 1,
+        "deviceType": null,
+        "encrypted": false,
+        "iv": null,
+        "data": "a=b",
+        "address": "10.0.0.5"
+      }
+    ],
+    "probes": []
+  },
+  {
+    "name": "badUtf8Label",
+    "sender": "10.0.0.5",
+    "hex": "000084000000000100000000046162eda0056c6f63616c00000100010000007800040a000001",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "ab\ufffd\ufffd.local",
+          "type": 1,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": "10.0.0.1",
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        }
+      ],
+      "authorities": [],
+      "additionals": []
+    },
+    "announcements": [],
+    "probes": []
+  },
+  {
+    "name": "ptrBadPointer",
+    "sender": "10.0.0.5",
+    "hex": "0000840000000001000000000178056c6f63616c00000c0001000000780002c0ff",
+    "parseError": "DNS packet truncated."
+  },
+  {
+    "name": "srvShort",
+    "sender": "10.0.0.5",
+    "hex": "0000840000000001000000000178056c6f63616c0000210001000000780006000000000000",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "x.local",
+          "type": 33,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        }
+      ],
+      "authorities": [],
+      "additionals": []
+    },
+    "announcements": [],
+    "probes": []
+  },
+  {
+    "name": "aWrongLength",
+    "sender": "10.0.0.5",
+    "hex": "0000840000000001000000000178056c6f63616c0000010001000000780003010203",
+    "message": {
+      "id": 0,
+      "isResponse": true,
+      "questions": [],
+      "answers": [
+        {
+          "name": "x.local",
+          "type": 1,
+          "cacheFlush": false,
+          "ttl": 120,
+          "ptr": null,
+          "address": null,
+          "srvTarget": null,
+          "srvPort": 0,
+          "txt": null
+        }
+      ],
+      "authorities": [],
+      "additionals": []
+    },
+    "announcements": [],
+    "probes": []
+  },
+  {
+    "name": "txtOverrun",
+    "sender": "10.0.0.5",
+    "hex": "0000840000000001000000000178056c6f63616c0000100001000000780003056162",
+    "parseError": "TXT string overruns record."
+  }
+]

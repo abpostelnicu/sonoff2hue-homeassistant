@@ -1,4 +1,6 @@
-"""Tests of the .NET string and number rules, against .NET's own tables (tools/dotnet_oracle)."""
+"""The mDNS layer's string and number rules (engine/text.py): its white space and its case mappings, checked for every
+code point against the tables in mdns_text.json, its case-insensitive comparisons and its integer parsing
+(decision 30)."""
 
 import json
 from pathlib import Path
@@ -7,15 +9,15 @@ import pytest
 
 from custom_components.sonoff2hue.engine import text
 
-_FIXTURE = json.loads((Path(__file__).parent / "fixtures" / "dotnet_text.json").read_text())
+_TABLES = json.loads((Path(__file__).parent / "mdns_text.json").read_text(encoding="utf-8"))
 
 
 def _code_points() -> range:
     return range(0x110000)
 
 
-def test_white_space_is_dotnets() -> None:
-    expected = set(_FIXTURE["whiteSpace"])
+def test_white_space_set() -> None:
+    expected = set(_TABLES["whiteSpace"])
 
     actual = {c for c in range(0x10000) if text.is_white_space(chr(c))}
 
@@ -27,9 +29,9 @@ def test_white_space_is_dotnets() -> None:
     assert not text.is_null_or_white_space("\u200b")
 
 
-def test_upper_and_lower_case_mappings_are_dotnets_for_every_code_point() -> None:
-    upper = dict(_FIXTURE["upper"])
-    lower = dict(_FIXTURE["lower"])
+def test_case_mappings_for_every_code_point() -> None:
+    upper = dict(_TABLES["upper"])
+    lower = dict(_TABLES["lower"])
 
     for c in _code_points():
         if 0xD800 <= c <= 0xDFFF:
@@ -39,7 +41,7 @@ def test_upper_and_lower_case_mappings_are_dotnets_for_every_code_point() -> Non
         assert text.lower_invariant(char) == chr(lower.get(c, c)), hex(c)
 
 
-def test_ordinal_ignore_case_comparisons() -> None:
+def test_case_insensitive_comparisons() -> None:
     assert text.equals_ignore_case("eWeLink_1", "EWELINK_1")
     assert text.equals_ignore_case("Σ", "ς")
     assert not text.equals_ignore_case("\u0131", "i")  # dotless i
@@ -71,7 +73,7 @@ def test_ordinal_ignore_case_comparisons() -> None:
         ("-9223372036854775808", -9223372036854775808),
     ],
 )
-def test_try_parse_long_follows_long_try_parse(value: str | None, expected: int | None) -> None:
+def test_try_parse_int_64_bits(value: str | None, expected: int | None) -> None:
     assert text.try_parse_int(value, 64) == expected
 
 
