@@ -72,6 +72,31 @@ scripts/develop lights     # the fake bridge's lights, rooms and zones, and ever
   environment included. `SONOFF2HUE_DEV_CONFIG` chooses another configuration folder than `.dev/config`, made the same
   way.
 
+### The end-to-end test
+
+`scripts/e2e` tests the integration end to end, as CI's *End-to-end* job does: a real Home Assistant with the
+integration from this checkout, the fake Hue bridge and the simulated wall switch, all on this machine. It needs
+`scripts/setup` done.
+
+```sh
+scripts/e2e
+```
+
+- It sets up the development Home Assistant as `scripts/develop setup` does, but in a configuration folder of its own,
+  `.dev/e2e/config`, and starts it and the fake bridge on 127.0.0.1, on ports that are free at that moment, so it runs
+  next to `scripts/develop`.
+- Through Home Assistant's API, as its frontend does, it onboards a throwaway user, sets up sonoff2hue with the fake
+  bridge's address and its link button pressed, and adds a switch with *Add switch*: a made-up MINIR4M, new at each
+  run, which a press of the simulated switch identifies, with the light `Hallway` and the room `Living room` picked
+  from the bridge's lists.
+- It presses the switch twice and checks what the fake bridge was asked to switch (on, then off), the integration's
+  `sonoff2hue_press` and `sonoff2hue_toggle` events, its status in its diagnostics, its entities Status, Last action and
+  Press, and its log. Then it restarts Home Assistant: the switch's last `seq` again must be no press, and the next one
+  a press.
+- Once `.dev/venv` exists, it takes about 15 seconds. A pass deletes `.dev/e2e`. A failure prints the integration's
+  lines of Home Assistant's log and keeps the folder: `hass.log` (Home Assistant's output), `fake-hue.log` and
+  `config/home-assistant.log*`.
+
 ### Debugging in VS Code
 
 [.vscode/launch.json](.vscode/launch.json) runs Home Assistant and the fake Hue bridge under the debugger, on Linux (WSL

@@ -67,3 +67,41 @@ jobs:
 
       - name: Test the release checks and the Release workflow (release-test.sh)
         run: .github/scripts/release-test.sh
+
+  # The ruleset on main requires this check by its name: rename it only together with the ruleset (decision 27).
+  e2e:
+    name: End-to-end
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # Home Assistant's own environment, .dev/venv, comes from requirements_dev.txt, so its downloads are cached too.
+      - uses: astral-sh/setup-uv@v10.4.0
+        with:
+          version: "0.13.7"
+          enable-cache: true
+          cache-dependency-glob: |
+            requirements_test.txt
+            requirements_dev.txt
+          cache-python: true
+
+      - name: Set up Python and the tools
+        run: scripts/setup
+
+      - name: Home Assistant, the fake Hue bridge and a simulated wall switch (scripts/e2e)
+        run: scripts/e2e
+
+      - name: Keep Home Assistant's and the fake bridge's logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: end-to-end-logs
+          path: |
+            .dev/e2e/*.log
+            .dev/e2e/config/home-assistant.log*
+          if-no-files-found: ignore
+          # .dev is a hidden folder, which the action leaves out unless told.
+          include-hidden-files: true
