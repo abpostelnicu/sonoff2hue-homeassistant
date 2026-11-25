@@ -184,7 +184,7 @@ def test_each_form_of_a_home_assistant_import_is_found(source: str) -> None:
 
 
 def test_relative_imports_are_taken_from_the_modules_package() -> None:
-    assert _imported_modules("from . import text", _ENGINE_PACKAGE) == [_ENGINE_PACKAGE, f"{_ENGINE_PACKAGE}.text"]
+    assert _imported_modules("from . import dns", _ENGINE_PACKAGE) == [_ENGINE_PACKAGE, f"{_ENGINE_PACKAGE}.dns"]
     assert _imported_modules("from ..const import DOMAIN", _ENGINE_PACKAGE) == [
         f"{_PACKAGE}.const",
         f"{_PACKAGE}.const.DOMAIN",
