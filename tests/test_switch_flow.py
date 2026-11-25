@@ -525,8 +525,8 @@ async def test_identify_selects_the_edited_switchs_own_device(hass: HomeAssistan
 
 
 async def test_identify_counts_only_new_presses(hass: HomeAssistant, devices: Devices) -> None:
-    """A baseline, a repeat, another event, and a press whose time the device already had don't select a device, as
-    the web UI's identify skipped them."""
+    """A baseline, a repeat, another event, and a press whose time the device already had don't select a
+    device."""
     entry = await loaded(hass)
     pressed_at = dt_util.utcnow() - timedelta(seconds=5)
     devices.press(DEVICE, at=pressed_at)
@@ -637,7 +637,7 @@ async def test_closing_the_dialog_stops_identify(hass: HomeAssistant, devices: D
     assert not entry._on_state_change
 
 
-async def test_a_pressed_device_with_an_id_the_dialog_refuses_can_be_entered(
+async def test_a_pressed_device_with_an_id_the_form_refuses_can_be_entered(
     hass: HomeAssistant, devices: Devices
 ) -> None:
     result = await identify(hass, await start(hass, await loaded(hass)), devices)
@@ -660,7 +660,9 @@ async def test_a_pressed_device_with_an_id_the_dialog_refuses_can_be_entered(
 # The devices seen on the LAN.
 
 
-async def test_pick_lists_the_devices_as_the_web_ui_did(hass: HomeAssistant, devices: Devices) -> None:
+async def test_pick_lists_unused_devices_first_and_the_latest_press_first(
+    hass: HomeAssistant, devices: Devices
+) -> None:
     entry = await loaded(hass, HALLWAY_SWITCH)
     now = dt_util.utcnow()
     devices.press(OTHER, at=now - timedelta(seconds=1))
@@ -751,7 +753,7 @@ async def test_pick_while_the_entry_is_not_loaded(hass: HomeAssistant, devices: 
         (" 1000999999\t", "This device is already used by Hallway switch."),
     ],
 )
-async def test_the_device_id_is_checked_as_the_dialog_checked_it(hass: HomeAssistant, typed: str, message: str) -> None:
+async def test_the_device_id_is_checked_by_the_form(hass: HomeAssistant, typed: str, message: str) -> None:
     result = await manual(hass, await start(hass, await loaded(hass, HALLWAY_SWITCH)), typed)
 
     assert (result["type"], result["step_id"], result["errors"]) == (
@@ -779,8 +781,8 @@ async def test_editing_a_switch_may_enter_its_own_device(hass: HomeAssistant) ->
     assert (result["step_id"], result["description_placeholders"]["device"]) == ("settings", f"Device {OTHER}.")
 
 
-async def test_keeping_a_device_id_that_the_dialog_refuses(hass: HomeAssistant) -> None:
-    """An imported switch can have an id that the dialog refuses, which then has to be entered anew."""
+async def test_keeping_a_device_id_that_the_form_refuses(hass: HomeAssistant) -> None:
+    """An imported switch can have an id that the form refuses, which then has to be entered anew."""
     entry = await loaded(hass, switch("abc", "Imported"))
 
     result = await choose(hass, await start(hass, entry, "abc"), "keep")
@@ -887,7 +889,7 @@ async def test_editing_a_switch_with_the_fake_bridge(hass: HomeAssistant, https_
 # The lights, rooms and zones.
 
 
-async def test_the_picker_lists_states_and_marks_as_the_web_ui_did(hass: HomeAssistant, hue: HueBridge) -> None:
+async def test_the_picker_lists_names_states_and_rooms_without_lights(hass: HomeAssistant, hue: HueBridge) -> None:
     hue.resources = {
         "light": [light("l1", "Lamp", on=True), light("l2", " lamp "), light("l3", None), light("l4", "Desk")],
         "room": [group("room", "r1", "Kitchen", grouped=False), group("room", "r2", "Kitchen")],
@@ -958,7 +960,7 @@ async def test_entries_that_dont_match_the_bridge_are_kept_until_removed(hass: H
     ]
 
 
-async def test_ambiguous_groups_are_named_as_the_web_ui_named_them(hass: HomeAssistant, hue: HueBridge) -> None:
+async def test_an_ambiguous_group_says_how_many_it_matches(hass: HomeAssistant, hue: HueBridge) -> None:
     hue.resources["zone"].append(group("zone", "z2", "Living room"))
     entry = await loaded(hass, switch(DEVICE, "Hall", groups=["Living room"]))
 
@@ -967,10 +969,10 @@ async def test_ambiguous_groups_are_named_as_the_web_ui_named_them(hass: HomeAss
     assert options(result, "unresolved") == [("1", "Living room — matches 2 rooms/zones")]
 
 
-# The dialog's checks, then the server's.
+# The form's checks, then the switch rules.
 
 
-async def test_the_form_is_checked_as_the_dialog_checked_it(hass: HomeAssistant) -> None:
+async def test_the_form_checks_everything_it_can_at_once(hass: HomeAssistant) -> None:
     entry = await loaded(hass, switch(DEVICE, "Hall", key=KEY))
     result = await settings_for(hass, entry, DEVICE, edit=DEVICE)
 
@@ -989,7 +991,7 @@ async def test_the_form_is_checked_as_the_dialog_checked_it(hass: HomeAssistant)
     assert suggested(result, "advanced", "new_device_key") == " "
 
 
-async def test_the_server_checks_the_rest(hass: HomeAssistant) -> None:
+async def test_the_switch_rules_check_the_rest(hass: HomeAssistant) -> None:
     result = await settings_for(hass, await loaded(hass))
 
     result = await go(hass, result, form(name="Hall\x85x\x07", lights=["0"], advanced={"device_key": "a key"}))
@@ -1107,7 +1109,7 @@ async def test_lights_can_be_typed_and_saved_without_checking_while_the_bridge_i
     assert result["description_placeholders"] == {
         "warning": f"The Hue bridge could not be reached, so the light names were not checked ({unreachable})."
     }
-    # Saved as the server saved it, unchecked: although the bridge answers again, and has no light named Kitchen.
+    # Saved unchecked, although the bridge answers again and has no light named Kitchen.
     hue.heal()
     result = await choose(hass, result, "save")
 
@@ -1116,9 +1118,7 @@ async def test_lights_can_be_typed_and_saved_without_checking_while_the_bridge_i
     assert switches_of(entry)[0][2][CONF_GROUPS] == ["zone:Downstairs"]
 
 
-async def test_typed_entries_are_checked_as_the_dialog_and_the_server_checked_them(
-    hass: HomeAssistant, hue: HueBridge
-) -> None:
+async def test_typed_entries_are_checked_by_the_form_and_the_switch_rules(hass: HomeAssistant, hue: HueBridge) -> None:
     entry = await loaded(hass)
     hue.fail("/clip/v2/resource/light", 503)
     result = await choose(hass, await manual(hass, await start(hass, entry), DEVICE), "typed")
@@ -1438,7 +1438,7 @@ async def test_a_choice_that_was_not_offered_is_refused(hass: HomeAssistant) -> 
         (timedelta(days=330), "Dec 30, 2025 04:00"),
     ],
 )
-async def test_times_read_as_the_web_ui_wrote_them(hass: HomeAssistant, ago: timedelta, text: str) -> None:
+async def test_times_read_relative_to_now(hass: HomeAssistant, ago: timedelta, text: str) -> None:
     """In Home Assistant's time zone, which the tests set to US/Pacific: 'now' is 04:00 on 25 November there."""
     now = datetime.fromisoformat("2026-11-25T12:00:00+00:00")
 

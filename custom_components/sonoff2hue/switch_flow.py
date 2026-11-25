@@ -1,7 +1,7 @@
-"""The switch subentry flow: adds and changes the switches, one config subentry of type ``switch`` per MINIR4M, as the
-.NET app's web UI did with its switch editor (``views/switcheditor.js``, with ``targets.js`` and ``format.js``) and the
-server's checks (``Web/Management/ConfigEndpoints.cs`` and ``HueEndpoints.cs``). Their rules and messages are the
-engine's ``switch_form``, ``switch_rules`` and ``picker``; this module only shows them in Home Assistant's dialogs.
+"""The switch subentry flow: adds and changes the switches, one config subentry of type ``switch`` per MINIR4M. Its
+rules and messages are the engine's: the form's checks (``switch_form``), the rules a switch meets before it is saved
+(``switch_rules``) and the picker of lights, rooms and zones (``picker``); this module shows them in Home Assistant's
+dialogs.
 
 The steps (decision 24): a menu (``user``, or ``reconfigure`` with ``keep`` first) chooses how to find the MINIR4M:
 ``identify``, a progress step that waits up to 60 seconds for a press; ``pick``, the devices seen on the LAN; or
@@ -20,7 +20,7 @@ from collections import Counter
 from collections.abc import AsyncIterator, Callable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 import logging
 import math
 from typing import Any, Final
@@ -72,7 +72,7 @@ from .runtime import Sonoff2HueConfigEntry, config_from_entry
 _LOGGER = logging.getLogger(__name__)
 
 IDENTIFY_TIMEOUT: Final = 60.0
-"""How long ``identify`` waits for a press. The web UI waited until its dialog closed or Identify was turned off."""
+"""How long ``identify`` waits for a press."""
 
 DEVICE_MENU: Final = ["identify", "pick", "manual"]
 """The ways to the MINIR4M: press its wall switch, pick it from the devices seen on the LAN, or enter its device id."""
@@ -98,9 +98,9 @@ KEY_MODES: Final[list[KeyMode]] = ["keep", "replace", "remove"]
 KEY_SELECTOR: Final = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD, autocomplete="off"))
 MANUAL_SCHEMA: Final = probatio.Schema({probatio.Optional(DEVICE_ID): TextSelector()})
 
-# The form's fields that the dialog's and the server's messages go to (``errorTargets`` in switcheditor.js), with their
-# error keys and placeholders. The device and the picker's lights, rooms and zones have no field of their own here: their
-# messages go to the form as a whole, with the messages of keys that no field has.
+# The form's fields that the messages of the form's checks and of the switch rules go to, with their error keys and
+# placeholders. The device and the picker's lights, rooms and zones have no field of their own here: their messages go
+# to the form as a whole, with the messages of keys that no field has.
 _FIELDS: Final = {
     "name": (NAME, "invalid_name", "name_error"),
     "deviceKey": (ADVANCED, "invalid_device_key", "key_error"),
@@ -109,7 +109,6 @@ _FIELDS: Final = {
 }
 _PLACEHOLDERS: Final = ("base_error", *(placeholder for _, _, placeholder in _FIELDS.values()))
 
-_EPOCH: Final = datetime(1970, 1, 1, tzinfo=UTC)
 _MONTHS: Final = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
 
@@ -137,31 +136,32 @@ def _switches_by_subentry(entry: Sonoff2HueConfigEntry) -> dict[str, SwitchSetti
 
 
 def _texts(values: Sequence[str | None]) -> list[str]:
-    """Entries as text. An imported ``sonoff2hue.yaml`` can hold a null entry, which the web UI's ``join`` wrote as an
-    empty text and its picker couldn't save (``trim`` of null); here it is an entry that doesn't match the bridge."""
+    """Entries as text. An imported ``sonoff2hue.yaml`` can hold a null entry, which is an empty entry here: one that
+    doesn't match the bridge."""
     return ["" if value is None else value for value in values]
 
 
-def _milliseconds(at: datetime | None) -> int:
-    """``Date.parse`` of the web UI's time, 0 for none, which ordered the devices by their last press."""
-    return 0 if at is None else (at - _EPOCH) // timedelta(milliseconds=1)
+def _last_press(device: LanDevice) -> float:
+    """When the device last reported a press, as a timestamp; 0 when it hasn't."""
+    return 0.0 if device.last_press_at is None else device.last_press_at.timestamp()
 
 
 def _round(value: float) -> int:
-    """JavaScript's ``Math.round``: halves round up."""
+    """The nearest whole number, halves rounded up."""
     return math.floor(value + 0.5)
 
 
 def _date(at: datetime, now: datetime) -> str:
-    """The web UI's ``formatDate``, as English writes it: "Nov 25 21:04", with the year when it isn't this one."""
+    """A date as English writes it, in Home Assistant's time zone: "Nov 25 21:04", with the year when it isn't this
+    one."""
     local = dt_util.as_local(at)
     year = "" if local.year == dt_util.as_local(now).year else f", {local.year}"
     return f"{_MONTHS[local.month - 1]} {local.day}{year} {local:%H:%M}"
 
 
 def since(at: datetime, now: datetime) -> str:
-    """When something happened, as the web UI's ``relativeTime`` said it, in Home Assistant's time zone instead of the
-    browser's: "just now", "12 s ago", "3 min ago", "2 h ago", "yesterday 21:04" or a date."""
+    """When something happened, seen from ``now`` in Home Assistant's time zone: "just now", "12 s ago", "3 min ago",
+    "2 h ago", "yesterday 21:04" or a date; "in 12 s" or "in 3 min" for a time ahead of ``now``."""
     seconds = _round((now - at).total_seconds())
     if seconds < -5:
         ahead = -seconds
@@ -186,8 +186,8 @@ def since(at: datetime, now: datetime) -> str:
 
 
 def device_label(device: LanDevice, online: bool, owner: str | None, now: datetime) -> str:
-    """A device as the web UI's device list showed it: its id, address and type, whether it is online, its last press,
-    and the switch that uses it."""
+    """A device in the list of the devices seen on the LAN: its id, address and type, whether it is online, its last
+    press, and the switch that uses it."""
     last_press = "none yet" if device.last_press_at is None else since(device.last_press_at, now)
     parts = [
         f"{device.device_id} — {device.address or 'no address'} — {device.device_type or 'unknown type'}",
@@ -200,9 +200,9 @@ def device_label(device: LanDevice, online: bool, owner: str | None, now: dateti
 
 
 def resource_options(items: Sequence[Resource]) -> list[SelectOptionDict]:
-    """The picker's lights, rooms or zones, as the web UI listed them: the name, else the id; the id too when another of
-    the list has the same name; and a light's state, or "no lights" for a room or zone without a grouped light. Their
-    values are their positions, as a resource's id may be missing."""
+    """The picker's lights, rooms or zones: the name, else the id; the id too when another of the list has the same
+    name; and a light's state, or "no lights" for a room or zone without a grouped light. Their values are their
+    positions, as a resource's id may be missing."""
     names = Counter(name_key(item.name) for item in items)
     options: list[SelectOptionDict] = []
     for index, item in enumerate(items):
@@ -218,7 +218,7 @@ def resource_options(items: Sequence[Resource]) -> list[SelectOptionDict]:
 
 
 def unresolved_label(entry: Entry) -> str:
-    """An entry of the switch that doesn't match the bridge, with the web UI's note."""
+    """An entry of the switch that doesn't match the bridge, with what is wrong with it."""
     if entry.status == "ambiguous":
         kinds = "lights" if entry.list_name == "lights" else "rooms/zones"
         return f"{entry.value} — matches {entry.count} {kinds}"
@@ -226,7 +226,7 @@ def unresolved_label(entry: Entry) -> str:
 
 
 def _lists(resources: Resources) -> list[tuple[str, Kind, Sequence[Resource]]]:
-    """The picker's lists, as the web UI's sections had them: each field, its kind and its items."""
+    """The picker's lists: each field, its kind and its items."""
     return [(LIGHTS, "light", resources.lights), (ROOMS, "room", resources.rooms), (ZONES, "zone", resources.zones)]
 
 
@@ -251,11 +251,11 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
         """The switch being changed, as it was when its dialog opened; ``None`` while one is added."""
         self._device_id = ""
         self._manual_device = False
-        """Whether the device id was typed, which changes the dialog's message for an empty one."""
+        """Whether the device id was typed, which changes the form's message for an empty one."""
         self._device_note: str | None = None
         """The status line of identify-by-press that selected the device."""
         self._device_error: tuple[str, str] | None = None
-        """A device that identify-by-press selected, and the dialog's problem with it, for ``manual`` to show."""
+        """A device that identify-by-press selected, and the form's problem with it, for ``manual`` to show."""
         self._identify: asyncio.Task[_Press | None] | None = None
         self._identify_status: str | None = None
         """What the last press of a device that another switch uses said, while identify-by-press goes on."""
@@ -277,7 +277,7 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
 
     @property
     def _original_id(self) -> str | None:
-        """The id of the switch being changed, as the web UI had it (``existing.deviceId``)."""
+        """The device id of the switch being changed, normalized."""
         return None if self._original is None else self._original.normalized_device_id
 
     @property
@@ -295,8 +295,8 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
 
     @asynccontextmanager
     async def _connect(self, hue: HueSettings) -> AsyncIterator[HueResources]:
-        """A fresh client for the paired bridge, closed afterwards, as the server made one with the supervisor's
-        ``HueClientFactory`` for each request. Raises the engine's ``ConfigError`` when the settings can't be used."""
+        """A fresh client for the paired bridge, made by the runtime's factory and closed afterwards. Raises the
+        engine's ``ConfigError`` when the settings can't be used."""
         client = self._hue_clients(hue)
         try:
             yield client
@@ -349,7 +349,7 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
     # The device.
 
     def _device_problem(self, device_id: str, *, manual: bool) -> str | None:
-        """The dialog's problem with the device, if any: no id, a malformed one, or one that another switch uses."""
+        """The form's problem with the device, if any: no id, a malformed one, or one that another switch uses."""
         problems = switch_form.form_problems(
             SwitchInput(device_id=device_id),
             self._switches(),
@@ -372,8 +372,8 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
         return await self.async_step_settings()
 
     async def async_step_identify(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        """Waits up to 60 seconds for a wall switch to report a press, and selects its device, as the web UI's Identify
-        did. A press of a device that another switch uses says so and goes on waiting."""
+        """Waits up to 60 seconds for a wall switch to report a press, and selects its device. A press of a device that
+        another switch uses says so and goes on waiting."""
         if self._identify is None:
             self._identify_status = None
             self._identify = self.hass.async_create_task(self._async_wait_for_press(), eager_start=False)
@@ -396,8 +396,8 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
 
     async def _async_wait_for_press(self) -> _Press | None:
         """The first press that ``switch_form.identify`` selects, or ``None`` after 60 seconds. A device event counts as
-        a press when its last event is a press with a time that the device didn't have before, as in the web UI. When
-        the config entry is reloaded, it follows the new runtime's devices."""
+        a press when its last event is a press with a time that the device didn't have before. When the config entry is
+        reloaded, it follows the new runtime's devices."""
         entry = self._get_entry()
         pressed: asyncio.Future[_Press] = self.hass.loop.create_future()
         last_presses: dict[str, datetime | None] = {}
@@ -454,8 +454,8 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
         return self._device_menu("identify_timeout")
 
     async def async_step_pick(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        """Offers the devices seen on the LAN, in the web UI's order: those that no switch uses first, then the latest
-        press first, then by id."""
+        """Offers the devices seen on the LAN: those that no switch uses first, then the latest press first, then by
+        id."""
         errors: dict[str, str] = {}
         placeholders = {"error": ""}
         chosen = self._device_id
@@ -474,7 +474,7 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
         owners = {
             device.device_id: switch_form.used_by(switches, device.device_id, self._original_id) for device in devices
         }
-        devices.sort(key=lambda device: (owners[device.device_id] is not None, -_milliseconds(device.last_press_at)))
+        devices.sort(key=lambda device: (owners[device.device_id] is not None, -_last_press(device)))
         now = dt_util.utcnow()
         options = [
             SelectOptionDict(
@@ -503,7 +503,7 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
         return self._device_menu("no_devices")
 
     async def async_step_manual(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        """Takes the device id, checked as the dialog checked it."""
+        """Takes the device id, checked as the form checks it."""
         if user_input is None:
             if self._device_error is not None:
                 (selected, error), self._device_error = self._device_error, None
@@ -551,7 +551,7 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
         return self.async_show_menu(step_id="pair_first", menu_options=RETRY_MENU)
 
     async def async_step_lights_unavailable(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        """The bridge couldn't be asked (502): try again, or enter the lights by hand."""
+        """The bridge couldn't be asked (502), or failed unexpectedly: try again, or enter the lights by hand."""
         return self.async_show_menu(
             step_id="lights_unavailable", menu_options=RETRY_MENU, description_placeholders={"error": self._load_error}
         )
@@ -578,7 +578,7 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
         self, errors: dict[str, str] | None = None, messages: dict[str, str] | None = None
     ) -> SubentryFlowResult:
         """The form, with the given values suggested again; the device key's section is open when it has an error or
-        the warning, as the web UI opened its Advanced part."""
+        the warning."""
         errors = errors or {}
         fields: dict[Any, Any] = {probatio.Optional(NAME): TextSelector()}
         suggested: dict[str, Any] = {NAME: self._values.get(NAME, "")}
@@ -588,7 +588,7 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
                     SelectOptionDict(value=str(index), label=unresolved_label(self._selection.entries[index]))
                     for index in unresolved
                 ]
-                # Chips that can be removed, as the web UI showed these entries.
+                # Chips, which can be removed one by one.
                 fields[probatio.Optional(UNRESOLVED)] = _multiple(options, chips=True)
                 suggested[UNRESOLVED] = [str(index) for index in unresolved]
             for field, kind, items in _lists(resources):
@@ -628,8 +628,9 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
         )
 
     def _read(self, user_input: Mapping[str, Any]) -> SwitchInput:
-        """The body the dialog sent (``form_input``): the name, the device, the key and the lights, rooms and zones,
-        from the picker's choices (``selection_to_config``) or split from the typed entries (``split_list``)."""
+        """The switch the form gives the rules (``form_input``): the name, the device, the key and the lights, rooms
+        and zones, from the picker's choices (``selection_to_config``) or split from the typed entries
+        (``split_list``)."""
         self._values[NAME] = name = user_input.get(NAME, "")
         self._values[ADVANCED] = keys = dict(user_input.get(ADVANCED) or {})
         if (resources := self._resources) is not None:
@@ -651,8 +652,8 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
         return switch_form.form_input(name, self._device_id, mode, key, self._lights, self._groups)
 
     async def _async_submit(self, user_input: Mapping[str, Any]) -> SubentryFlowResult:
-        """Checks the switch as the dialog did, then as the server did, and saves it; a switch whose names the bridge
-        couldn't check waits for ``unchecked``."""
+        """Checks the switch with the form's checks, then with the switch rules, and saves it; a switch whose names the
+        bridge couldn't check waits for ``unchecked``."""
         body = self._read(user_input)
         typed = self._resources is None
         problems = switch_form.form_problems(
@@ -663,7 +664,7 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
             manual_targets=typed,
             key_mode=self._key_mode(),
         )
-        # The device was checked when it was chosen; another switch that took it since is the server's conflict.
+        # The device was checked when it was chosen; another switch that took it since is the rules' conflict.
         if problems := [problem for problem in problems if problem.field != "deviceId"]:
             return self._show_errors({problem.field: problem.message for problem in problems}, [])
         try:
@@ -681,8 +682,8 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
         return self._save(write, body)
 
     def _show_errors(self, by_field: Mapping[str, str], unmatched: Sequence[str]) -> SubentryFlowResult:
-        """The form again, with the messages on the fields that the web UI put them on; the device's and those of the
-        picker's lights, rooms and zones, or of keys that no field has, on the form as a whole."""
+        """The form again, with the messages on their fields; the device's and those of the picker's lights, rooms and
+        zones, or of keys that no field has, on the form as a whole."""
         errors: dict[str, str] = {}
         messages: dict[str, str] = {}
         base: list[str] = []
@@ -708,7 +709,7 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
         )
 
     async def async_step_unchecked(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        """The bridge couldn't check the names: save anyway, as the server did with its warning, or try again."""
+        """The bridge couldn't check the names: save the switch anyway, with the warning, or try again."""
         return self.async_show_menu(
             step_id="unchecked",
             menu_options=["save", "settings"],
@@ -716,7 +717,7 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
         )
 
     async def async_step_save(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        """Saves the switch without checking its names. The server's checks of the device id run again, for the switches
+        """Saves the switch without checking its names. The rules' checks of the device id run again, for the switches
         as they are now; an unpaired bridge leaves the names unchecked without asking the bridge again."""
         body = self._body
         assert body is not None  # noqa: S101 - set before unchecked offers to save
@@ -727,8 +728,9 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
         return self._save(write, body)
 
     def _save(self, write: SwitchWrite, body: SwitchInput) -> SubentryFlowResult:
-        """Adds the subentry, or updates the one being changed, with the values the server saved; its unique id is the
-        normalized device id, and its title the name, or that id. The texts name the switch as the web UI's notes did."""
+        """Adds the subentry, or updates the one being changed, with the values that the rules give; its unique id is
+        the normalized device id, and its title the name, or that id. The texts name the switch by the name or the
+        device id that the form was given."""
         if self._removed:
             # Closed while the bridge was asked: the switch isn't saved, as Home Assistant drops what this step returns.
             raise UnknownFlow
