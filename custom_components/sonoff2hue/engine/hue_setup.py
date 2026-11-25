@@ -17,7 +17,7 @@ import unicodedata
 import aiohttp
 
 from . import jsonnode, text
-from .dns import DnsRecordType
+from .dns import DnsRecordType, ends_with_ignoring_case, equals_ignoring_case
 from .errors import UnexpectedError
 from .hue_address import create_base_url, is_ip_address
 from .hue_client import HttpAnswer, HueApiError, HueBridgeInfo, TransportError, TransportFactory, aiohttp_transport
@@ -98,7 +98,7 @@ async def _discover_mdns(
 
     async def query(listener: MdnsListener) -> None:
         for delay in (0, 1, 2):
-            if delay > 0:  # as .NET's Task.Delay(0) doesn't wait, the first query goes out at once
+            if delay > 0:  # a delay of 0 isn't awaited: the first query goes out at once
                 await asyncio.sleep(delay)
             listener.query(SERVICE_TYPE, DnsRecordType.PTR)
 
@@ -110,14 +110,14 @@ async def _discover_mdns(
             if (
                 record.type != DnsRecordType.TXT
                 or record.ttl == 0
-                or not text.ends_with_ignore_case(record.name, "." + SERVICE_TYPE)
+                or not ends_with_ignoring_case(record.name, "." + SERVICE_TYPE)
             ):
                 continue
             target = next(
                 (
                     r.srv_target
                     for r in records
-                    if r.type == DnsRecordType.SRV and text.equals_ignore_case(r.name, record.name)
+                    if r.type == DnsRecordType.SRV and equals_ignoring_case(r.name, record.name)
                 ),
                 None,
             )
@@ -125,7 +125,7 @@ async def _discover_mdns(
                 (
                     r.address
                     for r in records
-                    if r.type == DnsRecordType.A and target is not None and text.equals_ignore_case(r.name, target)
+                    if r.type == DnsRecordType.A and target is not None and equals_ignoring_case(r.name, target)
                 ),
                 None,
             )
@@ -151,7 +151,7 @@ async def _discover_mdns(
             await task
         except asyncio.CancelledError:
             pass
-        except Exception as err:  # noqa: BLE001 - discovery is best effort, as in .NET
+        except Exception as err:  # noqa: BLE001 - discovery is best effort
             _LOGGER.debug("mDNS bridge discovery failed: %s", err)
 
 

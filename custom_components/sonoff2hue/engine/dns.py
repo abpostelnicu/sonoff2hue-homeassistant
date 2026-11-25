@@ -1,6 +1,9 @@
-"""DNS messages as mDNS uses them: parsing packets and building queries.
+"""DNS messages as mDNS uses them: parsing packets, building queries, and comparing names without regard to case.
 
-A port of the .NET app's ``Mdns/DnsMessage.cs``.
+Names and TXT keys compare by each character's simple uppercase form, one character to one character, where a
+non-ASCII character never becomes an ASCII one: 'ü' matches 'Ü', while the dotless i, the long s and the Kelvin sign
+match no ASCII letter, and 'ß' matches only itself. A name's length counts UTF-16 code units, dots included, up to
+:data:`MAX_NAME_LENGTH`. Text is UTF-8, where invalid sequences become U+FFFD.
 """
 
 from collections.abc import Iterable, Iterator, Mapping
@@ -8,7 +11,8 @@ from dataclasses import dataclass, replace
 from enum import IntEnum
 from ipaddress import IPv4Address, IPv6Address
 
-from . import text
+MAX_NAME_LENGTH = 1024
+"""The longest name, in UTF-16 code units, dots included."""
 
 
 class DnsRecordType(IntEnum):
@@ -23,22 +27,22 @@ class DnsRecordType(IntEnum):
 
 
 class DnsFormatError(ValueError):
-    """A packet that isn't a well-formed DNS message (``FormatException`` in .NET)."""
+    """A packet that isn't a well-formed DNS message."""
 
 
 class TxtRecord(Mapping[str, str]):
-    """The key/value strings of a TXT record. Keys are case-insensitive, and only the first occurrence of a key
-    counts (RFC 6763 §6.4)."""
+    """The key/value strings of a TXT record. Keys compare without regard to case (:func:`case_key`), and only the
+    first occurrence of a key counts (RFC 6763 §6.4)."""
 
     __slots__ = ("_entries",)
 
     def __init__(self, entries: Iterable[tuple[str, str]] = ()) -> None:
         self._entries: dict[str, tuple[str, str]] = {}
         for key, value in entries:
-            self._entries.setdefault(text.fold(key), (key, value))
+            self._entries.setdefault(case_key(key), (key, value))
 
     def __getitem__(self, key: str) -> str:
-        return self._entries[text.fold(key)][1]
+        return self._entries[case_key(key)][1]
 
     def __iter__(self) -> Iterator[str]:
         return (key for key, _ in self._entries.values())
@@ -128,6 +132,49 @@ def build_query(name: str, record_type: int, unicast_response: bool = False) -> 
     return bytes(buffer)
 
 
+# Names without regard to case.
+
+# Where a character's simple uppercase form differs from what str.upper() gives: the dotless i and the long s keep their
+# own form, which str.upper() turns into ASCII letters, and the 27 Greek letters with ypogegrammeni become the letter
+# with prosgegrammeni, where str.upper() gives two characters.
+_UPPER_EXCEPTIONS = {
+    "\u0131": "\u0131",
+    "\u017f": "\u017f",
+    **{chr(c): chr(c + 8) for start in (0x1F80, 0x1F90, 0x1FA0) for c in range(start, start + 8)},
+    **{chr(c): chr(c + 9) for c in (0x1FB3, 0x1FC3, 0x1FF3)},
+}
+
+
+def case_key(value: str) -> str:
+    """The key under which names and TXT keys compare without regard to case: each character's simple uppercase form."""
+    if value.isascii():
+        return value.upper()
+    return "".join(_upper(char) for char in value)
+
+
+def equals_ignoring_case(left: str, right: str) -> bool:
+    return len(left) == len(right) and case_key(left) == case_key(right)
+
+
+def starts_with_ignoring_case(value: str, prefix: str) -> bool:
+    return len(value) >= len(prefix) and case_key(value[: len(prefix)]) == case_key(prefix)
+
+
+def ends_with_ignoring_case(value: str, suffix: str) -> bool:
+    return len(value) >= len(suffix) and case_key(value[len(value) - len(suffix) :]) == case_key(suffix)
+
+
+def _upper(char: str) -> str:
+    if (exception := _UPPER_EXCEPTIONS.get(char)) is not None:
+        return exception
+    upper = char.upper()
+    # Only one-to-one mappings count: 'ß' stays 'ß' rather than becoming 'SS'.
+    return upper if len(upper) == 1 else char
+
+
+# Parsing.
+
+
 def _record_type(value: int) -> int:
     try:
         return DnsRecordType(value)
@@ -198,7 +245,7 @@ def _parse_txt(rdata: bytes) -> TxtRecord:
 def _read_name(packet: bytes, offset: int) -> tuple[str, int]:
     """Reads a possibly compressed name at ``offset``; returns it with the offset after it."""
     labels: list[str] = []
-    length_so_far = 0  # string.Length of the name read so far, in UTF-16 units, dots included
+    length_so_far = 0  # of the name read so far, in UTF-16 code units, dots included
     position = offset
     next_offset: int | None = None
     jumps = 0
@@ -227,10 +274,10 @@ def _read_name(packet: bytes, offset: int) -> tuple[str, int]:
 
         _ensure_available(packet, position, length)
         label = _decode(packet[position : position + length])
-        length_so_far += text.utf16_length(label) + (1 if labels else 0)
+        length_so_far += _utf16_length(label) + (1 if labels else 0)
         labels.append(label)
         position += length
-        if length_so_far > 1024:
+        if length_so_far > MAX_NAME_LENGTH:
             raise DnsFormatError("DNS name too long.")
 
     return ".".join(labels), position if next_offset is None else next_offset
@@ -246,6 +293,11 @@ def _write_name(buffer: bytearray, name: str) -> None:
     buffer.append(0)
 
 
+def _utf16_length(value: str) -> int:
+    """The length in UTF-16 code units: a character outside the Basic Multilingual Plane counts twice."""
+    return len(value.encode("utf-16-le", "surrogatepass")) // 2
+
+
 def _decode(data: bytes) -> str:
-    # Encoding.UTF8.GetString never throws; it replaces invalid sequences with U+FFFD.
+    # Invalid UTF-8 becomes U+FFFD, so a label or a TXT string always decodes.
     return data.decode("utf-8", "replace")
