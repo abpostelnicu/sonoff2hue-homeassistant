@@ -66,15 +66,6 @@ def create_base_url(address: str | None) -> BridgeUrl:
     return url
 
 
-def is_ip_address(value: str) -> bool:
-    """Whether ``value`` is an IPv4 or IPv6 address; an IPv6 address may have a zone."""
-    try:
-        ipaddress.ip_address(value)
-    except ValueError:
-        return False
-    return True
-
-
 def _parse(value: str) -> BridgeUrl | None:
     if match := _BRACKETED.fullmatch(value):
         host, port = match["host"], match["port"]

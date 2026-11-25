@@ -3,7 +3,7 @@
 import pytest
 
 from custom_components.sonoff2hue.engine.config import ConfigError
-from custom_components.sonoff2hue.engine.hue_address import create_base_url, is_ip_address, try_create_base_url
+from custom_components.sonoff2hue.engine.hue_address import create_base_url, try_create_base_url
 
 
 def invalid(address: str) -> str:
@@ -128,20 +128,3 @@ def test_the_url_as_shown(address: str, uri: str) -> None:
     base = create_base_url(address)
 
     assert base.uri == str(base) == uri
-
-
-@pytest.mark.parametrize(
-    ("value", "expected"),
-    [
-        ("192.0.2.1", True),
-        ("fe80::1", True),
-        ("fe80::1%eth0", True),
-        ("[fe80::1]", False),
-        ("192.0.2.1:443", False),
-        ("192.168.1", False),
-        ("bridge.local", False),
-        ("", False),
-    ],
-)
-def test_is_ip_address(value: str, expected: bool) -> None:
-    assert is_ip_address(value) is expected

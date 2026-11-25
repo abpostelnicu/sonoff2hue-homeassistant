@@ -171,14 +171,6 @@ class HttpAnswer:
         """The body as JSON; raises ``ValueError`` when it isn't."""
         return load_json(self.text())
 
-    def read_as_string(self) -> str:
-        """The body as text, as :meth:`text` gives it."""
-        return self.text()
-
-    def read_json_text(self) -> str:
-        """The body as text, as :meth:`text` gives it, for a JSON parser."""
-        return self.text()
-
 
 # Transport.
 
