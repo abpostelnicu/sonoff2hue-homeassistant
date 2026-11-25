@@ -1,4 +1,4 @@
-"""Tests of the device registry; a port of the .NET app's ``DeviceRegistry`` test, plus what its users rely on."""
+"""Tests of the device registry: what the LAN monitor's broadcasts make of each device, and what its users rely on."""
 
 from datetime import UTC, datetime, timedelta
 import json
@@ -27,6 +27,7 @@ START = datetime(2026, 11, 24, 12, 0, tzinfo=UTC)
 Kind = SwitchEventKind
 DOTLESS_I = "\u0131"
 SIGMA, FINAL_SIGMA, CAPITAL_SIGMA = "\u03c3", "\u03c2", "\u03a3"
+KELVIN = "\u212a"
 
 
 class Clock:
@@ -178,7 +179,7 @@ def test_is_online_within_five_minutes_of_the_last_broadcast() -> None:
     assert registry.is_online(device)
     clock.now += timedelta(microseconds=1)
     assert not registry.is_online(device)
-    clock.now = START - timedelta(hours=1)  # heard "in the future", as .NET counts it
+    clock.now = START - timedelta(hours=1)  # heard after the clock's time: still online
     assert registry.is_online(device)
 
 
@@ -201,48 +202,51 @@ def tracked(device_id: str, kind: Kind = Kind.BASELINE, at: datetime = START) ->
     return TrackedEvent(entry, SwitchEvent(kind, 1), None, None, None, None)
 
 
-def test_snapshot_sorts_ids_as_ordinal_ignore_case_does() -> None:
+def test_snapshot_sorts_ids_by_casefold() -> None:
     registry = DeviceRegistry(Clock())
     ids = ["\ue000", "_x", "Ab", "\U00010000", "aa", DOTLESS_I, "b", "ab2", "i"]
     registry.apply(TrackerUpdate((), tuple(tracked(device_id) for device_id in ids)), START)
 
-    # By the code points of the invariant uppercase: 'A' and 'I' before '_' (U+005F), the dotless i (U+0131) stays
-    # itself, and U+E000 comes before U+10000, although .NET holds that one as the surrogates U+D800 U+DC00.
+    # By the code points of the casefolded ids: '_' (U+005F) before the lowercase letters, the dotless i (U+0131),
+    # which casefold keeps, after them, and U+E000 before U+10000.
     assert [device.device_id for device in registry.snapshot()] == [
+        "_x",
         "aa",
         "Ab",
         "ab2",
         "b",
         "i",
-        "_x",
         DOTLESS_I,
         "\ue000",
         "\U00010000",
     ]
 
 
-def test_ids_are_the_same_device_when_ordinal_ignore_case_says_so() -> None:
+def test_ids_that_casefold_alike_are_one_device() -> None:
     registry = DeviceRegistry(Clock())
     changes: list[str] = []
     registry.add_changed_callback(lambda device: changes.append(device.device_id))
     later = START + timedelta(seconds=1)
-    sigma, final_sigma, dotless = SIGMA + "1", FINAL_SIGMA + "1", DOTLESS_I + "1"
+    sigma, final_sigma, dotless, kelvin = SIGMA + "1", FINAL_SIGMA + "1", DOTLESS_I + "1", KELVIN + "1"
 
-    registry.apply(TrackerUpdate((), (tracked(sigma), tracked(dotless))), START)
+    registry.apply(TrackerUpdate((), tuple(tracked(id_) for id_ in (sigma, dotless, "stra\u00dfe", kelvin))), START)
     registry.apply(
-        TrackerUpdate((), (tracked(final_sigma, Kind.PRESS, later), tracked("i1", Kind.PRESS, later))), later
+        TrackerUpdate((), tuple(tracked(id_, Kind.PRESS, later) for id_ in (final_sigma, "i1", "STRASSE", "k1"))),
+        later,
     )
 
-    # The final sigma and the sigma have the same uppercase; the dotless i and the i don't.
-    assert [device.device_id for device in registry.snapshot()] == ["i1", dotless, final_sigma]
+    # The sigmas, 'ß' and 'ss', and the Kelvin sign and 'k' casefold alike; the dotless i and the i don't.
+    assert [device.device_id for device in registry.snapshot()] == ["i1", "k1", "STRASSE", dotless, final_sigma]
     found = registry.find(CAPITAL_SIGMA + "1")
     assert found is not None
     assert (found.first_seen_at, found.last_press_at) == (START, later)
-    i1, dotless_i1, _ = registry.snapshot()
+    i1, k1, strasse, dotless_i1, _ = registry.snapshot()
     assert registry.find("I1") == i1
-    assert registry.find(dotless) == dotless_i1  # Python's str.upper() would turn the dotless i into an I
+    assert registry.find("K1") == k1
+    assert registry.find("Stra\u00dfe") == strasse
+    assert registry.find(dotless) == dotless_i1
     assert registry.find("x") is None
-    assert changes == [sigma, dotless, final_sigma, "i1"]
+    assert changes == [sigma, dotless, "stra\u00dfe", kelvin, final_sigma, "i1", "STRASSE", "k1"]
 
 
 def test_listening_changes_are_reported_once() -> None:
@@ -271,7 +275,7 @@ def test_changed_callbacks_run_in_order_and_a_failure_reaches_the_caller() -> No
     remove = registry.add_changed_callback(failing)
     registry.add_changed_callback(lambda device: third.append(device.device_id))
 
-    # As a .NET event: the exception stops the remaining callbacks and reaches the caller, after the update was made.
+    # The exception stops the remaining callbacks and reaches the caller, after the update was made.
     with pytest.raises(RuntimeError, match="boom"):
         registry.apply(TrackerUpdate((), (tracked("1000aaaaaa"), tracked("1000bbbbbb"))), START)
     assert first == ["1000aaaaaa"]

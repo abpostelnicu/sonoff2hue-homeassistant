@@ -1,21 +1,17 @@
 """Every eWeLink device seen on the LAN, as the LAN monitor's broadcasts show it.
 
-A port of the .NET app's ``Web/Monitoring/DeviceRegistry.cs``. An injected clock replaces .NET's ``TimeProvider``, and
-the ``Changed`` and ``ListeningChanged`` events are callbacks.
+Devices are found and ordered by their ids without regard to case (``str.casefold``). The time comes from an injected
+clock, and callbacks report the changes.
 """
 
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
-from functools import cmp_to_key
 
-from . import text
 from .press import SwitchEventKind, TrackerUpdate, summarize
 
 ONLINE_WINDOW = timedelta(minutes=5)
 """A device counts as online when it was heard within this window (the LAN monitor queries every 2 min)."""
-
-_ORDER = cmp_to_key(text.compare_ignore_case)
 
 
 def _now() -> datetime:
@@ -46,7 +42,7 @@ class DeviceRegistry:
 
     def __init__(self, clock: Callable[[], datetime] = _now) -> None:
         self._clock = clock
-        self._devices: dict[str, LanDevice] = {}  # by text.fold(device_id), as .NET's OrdinalIgnoreCase dictionary
+        self._devices: dict[str, LanDevice] = {}  # by casefolded device id
         self._listening = False
         self._last_packet_at: datetime | None = None
         self._changed: list[Callable[[LanDevice], None]] = []
@@ -83,11 +79,11 @@ class DeviceRegistry:
         return self._clock() - device.last_seen_at <= ONLINE_WINDOW
 
     def snapshot(self) -> list[LanDevice]:
-        """The devices in the order of their ids, as ``StringComparer.OrdinalIgnoreCase`` sorts them."""
-        return sorted(self._devices.values(), key=lambda device: _ORDER(device.device_id))
+        """The devices in the order of their casefolded ids."""
+        return [self._devices[key] for key in sorted(self._devices)]
 
     def find(self, device_id: str) -> LanDevice | None:
-        return self._devices.get(text.fold(device_id))
+        return self._devices.get(device_id.casefold())
 
     def apply(self, update: TrackerUpdate, received_at: datetime) -> None:
         changed: list[LanDevice] = []
@@ -95,7 +91,7 @@ class DeviceRegistry:
         for tracked in update.events:
             announcement = tracked.announcement
             kind = tracked.event.kind
-            key = text.fold(announcement.device_id)
+            key = announcement.device_id.casefold()
             previous = self._devices.get(key)
             # What was known before: for a new device, only that it was first seen now.
             known = previous if previous is not None else _first_seen(announcement.device_id, announcement.received_at)
@@ -138,5 +134,5 @@ def _first_seen(device_id: str, at: datetime) -> LanDevice:
 
 
 def _or[T](value: T | None, fallback: T | None) -> T | None:
-    """``value ?? fallback``."""
+    """``value``, or ``fallback`` when it is ``None``."""
     return fallback if value is None else value
