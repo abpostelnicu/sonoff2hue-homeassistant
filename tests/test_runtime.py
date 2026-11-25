@@ -261,7 +261,11 @@ async def test_a_press_toggles_the_lights_and_fires_the_events(
     runtime_data = await start(hass, entry)
     presses = async_capture_events(hass, EVENT_PRESS)
     toggles = async_capture_events(hass, EVENT_TOGGLE)
-    hall = {"device_id": None, "switch_id": DEVICE_ID, "name": "Hall"}
+    # The events name the switch's device, which the platforms made for its subentry, so the logbook finds them.
+    device = dr.async_get(hass).async_get_device_by_identifier((DOMAIN, DEVICE_ID), entry.entry_id)
+    assert device is not None
+    assert device.config_subentry_id == subentry_of(entry).subentry_id
+    hall = {"device_id": device.id, "switch_id": DEVICE_ID, "name": "Hall"}
 
     lan.broadcast(1)
     lan.broadcast(2)
@@ -285,13 +289,6 @@ async def test_a_press_toggles_the_lights_and_fires_the_events(
     assert action is not None
     assert (action.turned_on, action.changed) == (True, 1)
 
-    # Once the platforms made the switch's device, the events name it.
-    devices = dr.async_get(hass)
-    devices.async_get_or_create(config_entry_id=entry.entry_id, identifiers={(DOMAIN, BRIDGE_ID)})
-    device = devices.async_get_or_create(
-        config_entry_id=entry.entry_id, config_subentry_id=subentry_of(entry).subentry_id, identifiers={(DOMAIN, "x")}
-    )
-    hall["device_id"] = device.id
     bridge.fail("/clip/v2/resource/light", 503)
     lan.broadcast(3)
     await settle()

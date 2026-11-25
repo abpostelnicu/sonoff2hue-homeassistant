@@ -1,0 +1,152 @@
+"""The devices of the integration and what their entities share (decision 25).
+
+The Hue bridge has a device, identified by the bridge id, with the service's state: the .NET app's dashboard banner, its
+Hue card and its LAN card. Each ``switch`` subentry has a device, identified by the switch's normalized eWeLink device
+id and named by the subentry's title, with the dashboard's card of that switch. An entity's unique id is its device's
+identifier, an underscore and its translation key.
+
+The entities show what the dashboard showed, from the same state: the status tracker's snapshots, which come on
+``SIGNAL_STATUS``, and the LAN registry. A platform adds the entities of the switches that exist when it is set up, and
+those of a switch added later when ``SIGNAL_SUBENTRY_ADDED`` brings it; Home Assistant removes a removed switch's device
+and entities itself.
+"""
+
+from collections.abc import Callable, Iterable
+from typing import Final
+
+from homeassistant.config_entries import ConfigSubentry
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+
+from .const import CONF_BRIDGE_ID, CONF_DEVICE_ID, CONF_DEVICE_KEY, CONF_NAME, DOMAIN, SUBENTRY_SWITCH
+from .engine.config import SwitchSettings
+from .engine.status import StatusSnapshot
+from .runtime import (
+    SIGNAL_STATUS,
+    SIGNAL_SUBENTRY_ADDED,
+    SIGNAL_SUBENTRY_UPDATED,
+    Sonoff2HueConfigEntry,
+    Sonoff2HueData,
+)
+
+BRIDGE_NAME: Final = "Hue bridge"
+BRIDGE_MANUFACTURER: Final = "Signify Netherlands B.V."
+"""The maker of Hue bridges, as their CLIP v2 device resource and Home Assistant's Hue integration name it."""
+SWITCH_MANUFACTURER: Final = "SONOFF"
+SWITCH_MODEL: Final = "MINIR4M"
+
+
+def bridge_identifier(entry: Sonoff2HueConfigEntry) -> str:
+    """The bridge device's identifier: the paired bridge's id, which pairing always stores, else the entry's id."""
+    bridge_id: str | None = entry.data.get(CONF_BRIDGE_ID)
+    return bridge_id or entry.entry_id
+
+
+def switch_of(subentry: ConfigSubentry) -> SwitchSettings:
+    """The parts of a switch subentry's settings that its device and entities use, with the values as stored."""
+    data = subentry.data
+    return SwitchSettings(
+        device_id=data.get(CONF_DEVICE_ID) or "", name=data.get(CONF_NAME), device_key=data.get(CONF_DEVICE_KEY)
+    )
+
+
+class Sonoff2HueEntity(Entity):
+    """An entity of the config entry's runtime, named by its translation key on its device, and updated by the
+    runtime rather than polled."""
+
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+
+    def __init__(self, data: Sonoff2HueData, key: str) -> None:
+        self._data = data
+        self._attr_translation_key = key
+
+    @callback
+    def _follow_status(self) -> None:
+        """Shows the status tracker's snapshot as it is now, then each one that the tracker publishes, until the entity
+        is removed. For :meth:`async_added_to_hass`."""
+        signal = SIGNAL_STATUS.format(self._data.entry.entry_id)
+        self.async_on_remove(async_dispatcher_connect(self.hass, signal, self._on_status))
+        self._show(self._data.status.snapshot())
+
+    @callback
+    def _on_status(self, snapshot: StatusSnapshot) -> None:
+        self._show(snapshot)
+        self.async_write_ha_state()
+
+    @callback
+    def _show(self, snapshot: StatusSnapshot) -> None:
+        """Takes what the entity shows from ``snapshot``."""
+
+
+class BridgeEntity(Sonoff2HueEntity):
+    """An entity of the bridge's device, which follows the status tracker's snapshots."""
+
+    def __init__(self, data: Sonoff2HueData, key: str) -> None:
+        super().__init__(data, key)
+        identifier = bridge_identifier(data.entry)
+        self._attr_unique_id = f"{identifier}_{key}"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, identifier)}, name=BRIDGE_NAME, manufacturer=BRIDGE_MANUFACTURER
+        )
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self._follow_status()
+
+
+class WallSwitchEntity(Sonoff2HueEntity):
+    """An entity of a switch subentry's device. ``_switch`` follows the subentry's settings, and :meth:`_refresh` runs
+    after each change of them."""
+
+    def __init__(self, data: Sonoff2HueData, subentry: ConfigSubentry, key: str) -> None:
+        super().__init__(data, key)
+        self._subentry_id = subentry.subentry_id
+        self._switch = switch_of(subentry)
+        identifier = self._switch.normalized_device_id
+        self._attr_unique_id = f"{identifier}_{key}"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, identifier)},
+            name=subentry.title,
+            manufacturer=SWITCH_MANUFACTURER,
+            model=SWITCH_MODEL,
+            serial_number=identifier,
+        )
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        signal = SIGNAL_SUBENTRY_UPDATED.format(self._data.entry.entry_id)
+        self.async_on_remove(async_dispatcher_connect(self.hass, signal, self._on_subentry_updated))
+
+    @callback
+    def _on_subentry_updated(self, subentry: ConfigSubentry) -> None:
+        if subentry.subentry_id == self._subentry_id:
+            self._switch = switch_of(subentry)
+            self._refresh()
+
+    @callback
+    def _refresh(self) -> None:
+        """Shows the switch again after its settings changed."""
+
+
+@callback
+def async_add_switch_entities(
+    hass: HomeAssistant,
+    entry: Sonoff2HueConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
+    create: Callable[[Sonoff2HueData, ConfigSubentry], Iterable[Entity]],
+) -> None:
+    """Adds the entities that ``create`` makes for each switch subentry, now and when one is added, to its subentry."""
+    data = entry.runtime_data
+
+    @callback
+    def add(subentry: ConfigSubentry) -> None:
+        async_add_entities(create(data, subentry), config_subentry_id=subentry.subentry_id)
+
+    for subentry in entry.subentries.values():
+        if subentry.subentry_type == SUBENTRY_SWITCH:
+            add(subentry)
+    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_SUBENTRY_ADDED.format(entry.entry_id), add))

@@ -1,0 +1,37 @@
+{
+  "entity": {
+    "button": {
+      "test_toggle": {
+        "default": "mdi:play"
+      }
+    },
+    "event": {
+      "press": {
+        "default": "mdi:light-switch"
+      }
+    },
+    "sensor": {
+      "devices_seen": {
+        "default": "mdi:radar"
+      },
+      "last_action": {
+        "default": "mdi:lightbulb-outline",
+        "state": {
+          "dropped": "mdi:timer-alert-outline",
+          "failed": "mdi:alert-circle-outline",
+          "turned_off": "mdi:lightbulb-off-outline",
+          "turned_on": "mdi:lightbulb-on-outline"
+        }
+      },
+      "status": {
+        "default": "mdi:information-outline",
+        "state": {
+          "connecting": "mdi:clock-outline",
+          "error": "mdi:alert-circle-outline",
+          "invalid_config": "mdi:alert-circle-outline",
+          "running": "mdi:check-circle-outline"
+        }
+      }
+    }
+  }
+}

@@ -255,8 +255,8 @@ async def test_the_logbook_shows_the_entries_and_a_switchs_device_shows_its_own(
     logbook_first: bool,
 ) -> None:
     """The real logbook, with the events stored by the recorder: it finds the integration's descriptions whichever of
-    the two Home Assistant sets up first, and matches an event to the switch's device by the ``device_id`` in its data.
-    A switch whose subentry has no device yet is in the logbook, but on no device's page."""
+    the two Home Assistant sets up first, and matches an event to the switch's device, which the platforms made, by the
+    ``device_id`` in its data. The logbook also shows the entities' changes (decision 25), which this test leaves out."""
     mock_component(hass, "frontend")
     if logbook_first:
         assert await async_setup_component(hass, "logbook", {})
@@ -266,12 +266,13 @@ async def test_the_logbook_shows_the_entries_and_a_switchs_device_shows_its_own(
     if not logbook_first:
         assert await async_setup_component(hass, "logbook", {})
     devices = dr.async_get(hass)
-    bridge_device = devices.async_get_or_create(config_entry_id=entry.entry_id, identifiers={(DOMAIN, BRIDGE_ID)})
-    hall_device = devices.async_get_or_create(
-        config_entry_id=entry.entry_id,
-        config_subentry_id=subentry_of(entry).subentry_id,
-        identifiers={(DOMAIN, DEVICE_ID)},
-    )
+    bridge_device = devices.async_get_device_by_identifier((DOMAIN, BRIDGE_ID), entry.entry_id)
+    hall_device = devices.async_get_device_by_identifier((DOMAIN, DEVICE_ID), entry.entry_id)
+    desk_device = devices.async_get_device_by_identifier((DOMAIN, OTHER_DEVICE_ID), entry.entry_id)
+    assert bridge_device is not None
+    assert hall_device is not None
+    assert desk_device is not None
+    assert hall_device.config_subentry_id == subentry_of(entry).subentry_id
     for device_id in (DEVICE_ID, OTHER_DEVICE_ID):
         lan.broadcast(1, device_id)
         lan.broadcast(2, device_id)
@@ -286,7 +287,8 @@ async def test_the_logbook_shows_the_entries_and_a_switchs_device_shows_its_own(
         await client.send_json_auto_id(query)
         response = await client.receive_json()
         assert response["success"]
-        return [(entry["domain"], entry["name"], entry["message"]) for entry in response["result"]]
+        # The integration's own entries, without the entities' changes.
+        return [(entry["domain"], entry["name"], entry["message"]) for entry in response["result"] if "domain" in entry]
 
     hall = [
         (DOMAIN, HALL, "wall switch operated (seq 2)."),
@@ -298,4 +300,5 @@ async def test_the_logbook_shows_the_entries_and_a_switchs_device_shows_its_own(
     ]
     assert await logbook_of(None) == hall + desk
     assert await logbook_of([hall_device.id]) == hall
+    assert await logbook_of([desk_device.id]) == desk
     assert await logbook_of([bridge_device.id]) == []

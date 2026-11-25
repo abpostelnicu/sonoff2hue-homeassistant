@@ -338,5 +338,147 @@
       "title": "Can't decode the broadcasts of {name}",
       "description": "{name}: cannot read the LAN payload ({error}); falling back to sequence numbers only."
     }
+  },
+  "entity": {
+    "binary_sensor": {
+      "online": {
+        "name": "Online",
+        "state": {
+          "off": "Offline",
+          "on": "Online"
+        },
+        "state_attributes": {
+          "address": {
+            "name": "Address"
+          },
+          "decode_error": {
+            "name": "Decode error"
+          },
+          "detached": {
+            "name": "Detached relay"
+          },
+          "encrypted": {
+            "name": "Encrypted"
+          },
+          "has_device_key": {
+            "name": "Device key set"
+          },
+          "last_press_at": {
+            "name": "Last press"
+          },
+          "last_seen_at": {
+            "name": "Last seen"
+          },
+          "seq": {
+            "name": "Sequence number"
+          }
+        }
+      },
+      "reachable": {
+        "name": "Reachable",
+        "state": {
+          "off": "Unreachable",
+          "on": "Reachable"
+        },
+        "state_attributes": {
+          "address": {
+            "name": "Address"
+          },
+          "checked_at": {
+            "name": "Checked"
+          },
+          "message": {
+            "name": "Message"
+          }
+        }
+      }
+    },
+    "button": {
+      "test_toggle": {
+        "name": "Test toggle"
+      }
+    },
+    "event": {
+      "press": {
+        "name": "Press",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "press": "Press"
+            }
+          },
+          "seq": {
+            "name": "Sequence number"
+          }
+        }
+      }
+    },
+    "sensor": {
+      "devices_seen": {
+        "name": "eWeLink devices seen",
+        "state_attributes": {
+          "last_packet_at": {
+            "name": "Last packet"
+          },
+          "listening": {
+            "name": "Listening"
+          }
+        },
+        "unit_of_measurement": "devices"
+      },
+      "last_action": {
+        "name": "Last action",
+        "state": {
+          "dropped": "Dropped",
+          "failed": "Failed",
+          "turned_off": "Turned off",
+          "turned_on": "Turned on"
+        },
+        "state_attributes": {
+          "at": {
+            "name": "Time"
+          },
+          "changed": {
+            "name": "Changed"
+          },
+          "elapsed_ms": {
+            "name": "Elapsed (ms)"
+          },
+          "failed": {
+            "name": "Failed"
+          },
+          "message": {
+            "name": "Message"
+          },
+          "targets": {
+            "name": "Toggles"
+          },
+          "unchanged": {
+            "name": "Unchanged"
+          }
+        }
+      },
+      "status": {
+        "name": "Status",
+        "state": {
+          "connecting": "Connecting",
+          "error": "Error",
+          "invalid_config": "Invalid configuration",
+          "not_configured": "Not configured",
+          "running": "Running"
+        },
+        "state_attributes": {
+          "message": {
+            "name": "Message"
+          },
+          "problems": {
+            "name": "Problems"
+          },
+          "since": {
+            "name": "Since"
+          }
+        }
+      }
+    }
   }
 }

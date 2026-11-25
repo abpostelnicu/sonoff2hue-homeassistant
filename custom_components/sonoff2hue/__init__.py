@@ -7,8 +7,8 @@ from .runtime import Sonoff2HueConfigEntry, Sonoff2HueData
 
 __all__ = ["Sonoff2HueConfigEntry", "Sonoff2HueData"]
 
-PLATFORMS: list[Platform] = []
-"""The entity platforms. They are set up once the runtime runs, and unloaded before it stops."""
+PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.EVENT, Platform.SENSOR]
+"""The entity platforms (decision 25). They are set up once the runtime runs, and unloaded before it stops."""
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: Sonoff2HueConfigEntry) -> bool:
