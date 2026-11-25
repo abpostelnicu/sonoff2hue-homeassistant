@@ -1,7 +1,11 @@
 """Finding Hue bridges and pairing with one.
 
-Pairing pins the certificate the bridge presents when it is asked for its public config (trust on first use), then asks
-it for an application key every 2 seconds for 60 seconds, while the user presses its link button.
+Discovery runs for 5 seconds: it asks for ``_hue._tcp.local`` with an mDNS listener of its own, from the integration's
+own mDNS layer, and asks Signify's discovery endpoint, which lists the bridges that reach the internet from this
+network. It lists the bridges by address, each as the first answer for that address gave it.
+
+Pairing reads the bridge's public config and pins the certificate it presents (trust on first use), then asks the bridge
+for an application key every 2 seconds for 60 seconds, while the user presses its link button.
 """
 
 import asyncio
