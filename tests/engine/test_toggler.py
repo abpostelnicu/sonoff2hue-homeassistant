@@ -1,5 +1,5 @@
-"""Toggling the targets of a switch as one unit; the .NET app's ``HueTests`` for ``HueToggler``, and the toggle of
-its ``FakeHueTests``."""
+"""Toggling the targets of a switch as one unit: which way they go, the retry of a transient failure, failures that
+don't stop the other targets, and a light and a room of the fake bridge over HTTPS."""
 
 import asyncio
 import logging
@@ -109,6 +109,61 @@ async def test_transient_errors_are_retried_once_and_failures_dont_stop_the_othe
     assert [r.getMessage() for r in caplog.records if r.levelno == logging.ERROR] == [
         "Could not switch light 'l2' on: bridge busy"
     ]
+
+
+def answers(*replies: tuple[str, int, str]) -> InMemoryBridge:
+    """A bridge in memory that gives the requests of each method and path its replies in turn, then 200 and no
+    errors."""
+    queues: dict[str, list[tuple[int, str]]] = {}
+    for request, status, body in replies:
+        queues.setdefault(request, []).append((status, body))
+
+    def respond(request: RecordedRequest) -> tuple[int, str]:
+        queue = queues.get(f"{request.method} {request.path}", [])
+        return queue.pop(0) if queue else (200, '{"errors":[],"data":[]}')
+
+    return InMemoryBridge(respond)
+
+
+LIGHT_OFF = '{"errors":[],"data":[{"id":"l1","on":{"on":false}}]}'
+
+
+async def test_a_state_read_that_fails_transiently_is_tried_once_more() -> None:
+    bridge = answers(("GET /clip/v2/resource/light", 503, ""), ("GET /clip/v2/resource/light", 200, LIGHT_OFF))
+
+    result = await HueToggler(bridge.client(), LOGGER).toggle([light("l1")])
+
+    assert result == ToggleResult(turned_on=True, changed=1, unchanged=0, failed=0)
+    assert [f"{r.method} {r.path}" for r in bridge.requests] == [
+        "GET /clip/v2/resource/light",
+        "GET /clip/v2/resource/light",
+        "PUT /clip/v2/resource/light/l1",
+    ]
+
+
+@pytest.mark.parametrize(("statuses", "reads"), [([503, 502], 2), ([401], 1), ([404], 1)])
+async def test_a_state_read_that_fails_again_or_for_good_ends_the_toggle(statuses: list[int], reads: int) -> None:
+    bridge = answers(*[("GET /clip/v2/resource/light", status, "") for status in statuses])
+
+    with pytest.raises(HueApiError) as failure:
+        await HueToggler(bridge.client(), LOGGER).toggle([light("l1")])
+
+    assert failure.value.status == statuses[-1]
+    assert [r.method for r in bridge.requests] == ["GET"] * reads
+
+
+async def test_a_write_refused_for_good_is_not_tried_again(caplog: pytest.LogCaptureFixture) -> None:
+    bridge = answers(
+        ("GET /clip/v2/resource/light", 200, LIGHT_OFF),
+        ("PUT /clip/v2/resource/light/l1", 404, '{"errors":[{"description":"not found"}]}'),
+    )
+
+    result = await HueToggler(bridge.client(), LOGGER).toggle([light("l1")])
+
+    assert result == ToggleResult(turned_on=True, changed=0, unchanged=0, failed=1)
+    assert [r.method for r in bridge.requests] == ["GET", "PUT"]
+    message = "Could not switch light 'l1' on: Hue bridge returned 404 Not Found for PUT /clip/v2/resource/light/l1"
+    assert [r.getMessage() for r in caplog.records if r.levelno == logging.ERROR] == [f"{message}: not found"]
 
 
 async def test_targets_with_an_unknown_state_are_switched() -> None:
