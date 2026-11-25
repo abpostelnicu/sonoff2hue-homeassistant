@@ -1,6 +1,4 @@
-"""The setup flow, with reconfigure and reauth: it finds the Hue bridge or takes its address, then pairs with it, as the
-.NET app's Hue bridge page (``Web/Management/HueEndpoints.cs``, ``HuePairing.cs`` and the UI's ``views/hue.js``) and its
-``hue-pair`` command did, with the same rules and messages.
+"""The setup flow, with reconfigure and reauth: it finds the Hue bridge or takes its address, then pairs with it.
 
 The steps (decision 22): a menu (``user``, or ``reconfigure``) leads to the search (``discover``, a progress step) and
 the bridges found (``pick``), or to the address (``address``). The bridge's identity and the certificate to pin are read
@@ -8,10 +6,10 @@ from there, then ``link``, a progress step, waits up to 60 seconds for the link 
 bridge; otherwise ``link_timeout`` or ``link_failed`` offers to retry. Reauth goes from ``reauth_confirm`` to ``link``
 with the stored bridge.
 
-The menu's third way, ``import_yaml``, reads a pasted ``sonoff2hue.yaml`` as the .NET app read its file and runs the
-checks of its ``run``. With the bridge's address and key, it connects as ``run`` did at startup and adds the entry with
-the file's switches as subentries; ``import_failed`` offers to try again, to pair the bridge instead, or to paste the
-file again. Without them, ``import_pair`` leads to the search or the address and to ``link`` first.
+The menu's third way, ``import_yaml``, reads a pasted ``sonoff2hue.yaml`` and runs the checks that the bridge supervisor
+runs before it starts. With the bridge's address and key, it connects as the supervisor does when it starts and adds the
+entry with the file's switches as subentries; ``import_failed`` offers to try again, to pair the bridge instead, or to
+paste the file again. Without them, ``import_pair`` leads to the search or the address and to ``link`` first.
 """
 
 import asyncio
@@ -124,7 +122,7 @@ class _BridgeError(Exception):
 
 
 def _bridge_name(info: HueBridgeInfo) -> str | None:
-    """How the .NET app's log lines name the bridge: ``info.Name ?? info.BridgeId``."""
+    """How the log lines name the bridge: by its name, else by its id."""
     return info.name if info.name is not None else info.bridge_id
 
 
@@ -134,8 +132,8 @@ def _label(bridge: DiscoveredBridge) -> str:
 
 
 def _check_for_run(config: EngineConfig) -> None:
-    """The checks of the .NET app's ``run`` (``ValidateForRun``). Without the bridge's address and key, which pairing
-    gives, only the switches' are left: stand-ins take the bridge's place."""
+    """The checks that the bridge supervisor runs before it starts (``validate_for_run``). Without the bridge's address
+    and key, which pairing gives, only the switches' are left: stand-ins take the bridge's place."""
     if is_paired(config.hue):
         config.validate_for_run()
     else:
@@ -224,7 +222,7 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
     # Finding the bridge.
 
     async def async_step_discover(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """Searches the network for 5 seconds, with mDNS and Signify's discovery endpoint, as the web UI did."""
+        """Searches the network for 5 seconds, with mDNS and Signify's discovery endpoint."""
         if self._search is None:
             self._search = self.hass.async_create_task(self._async_search(), eager_start=False)
         if not self._search.done():
@@ -241,7 +239,7 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
         try:
             return await discover(async_get_clientsession(self.hass), DISCOVERY_TIMEOUT)
         except Exception as err:
-            # The .NET app answered 500 for any failure of the search, and the web UI said "The search failed".
+            # Whatever stops the search, the user can search again or enter the address.
             _LOGGER.exception("Searching for Hue bridges failed.")
             return _Failed("discovery_failed", str(err))
 
@@ -284,8 +282,7 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     def _default_bridge(self) -> str:
-        """The bridge chosen at first: when reconfiguring, the paired one if it was found again (the web UI marked it as
-        the current one), else the first, which the command line chose by default."""
+        """The bridge chosen at first: when reconfiguring, the paired one if it was found again, else the first."""
         if self.source == SOURCE_RECONFIGURE:
             current: str | None = self._get_reconfigure_entry().data.get(CONF_BRIDGE_ID)
             for bridge in self._bridges:
@@ -294,7 +291,7 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
         return self._bridges[0].ip
 
     async def async_step_address(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """Takes the bridge's address, checked as the .NET app checks it (``HueBridgeAddress``)."""
+        """Takes the bridge's address, a host name or an IP address with an optional port."""
         errors: dict[str, str] = {}
         placeholders: dict[str, str] = {}
         address = ""
@@ -324,8 +321,8 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
     # Pairing.
 
     async def _async_start_pairing(self, address: str) -> ConfigFlowResult:
-        """Reads the bridge's identity and the certificate to pin (trust on first use), then waits for its link button,
-        as ``HuePairing.StartAsync`` did. Raises :class:`_BridgeError` when no Hue bridge answers there."""
+        """Reads the bridge's identity and the certificate to pin (trust on first use), then waits for its link button.
+        Raises :class:`_BridgeError` when no Hue bridge answers there."""
         try:
             info = await get_bridge_info(address)
         except HueApiError as err:
@@ -353,7 +350,7 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_link(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Asks the bridge for an application key every 2 seconds for 60 seconds, while the user presses its link
-        button. While the bridge doesn't answer, the text says so, as the web UI did."""
+        button. While the bridge doesn't answer, the text says so."""
         if self._pairing is None:
             self._attempt_error = None
             self._pairing = self.hass.async_create_task(self._async_pair(self._info), eager_start=False)
@@ -373,7 +370,7 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_progress_done(next_step_id="paired")
 
     def _link_placeholders(self) -> dict[str, str]:
-        """What ``hue-pair`` printed about the bridge, and why the last attempt failed."""
+        """The bridge and the certificate to pin, and why the last attempt failed."""
         info = self._info
         return {
             "name": info.name or "",
@@ -386,7 +383,7 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
         }
 
     async def _async_pair(self, info: HueBridgeInfo) -> _Paired | _Failed:
-        """``HuePairing.PollAsync``, with its log lines; the outcome goes to the step that shows it."""
+        """Pairs with the bridge and logs how it went; the outcome goes to the step that shows it."""
         device_type = build_device_type()
         _LOGGER.info("Pairing with the Hue bridge %s at %s: waiting for its link button.", _bridge_name(info), info.ip)
         try:
@@ -432,8 +429,8 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
         return {"error": self._failure.message}
 
     def _retry_menu(self) -> list[str]:
-        """Retry, or choose another bridge, as the web UI offered; reauth is bound to the stored bridge, and an import
-        goes back to pairing the bridge for its switches."""
+        """Retry, or choose another bridge; reauth is bound to the stored bridge, and an import goes back to pairing the
+        bridge for its switches."""
         if self.source == SOURCE_REAUTH:
             return ["retry"]
         if self.source == SOURCE_RECONFIGURE:
@@ -441,7 +438,7 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
         return ["retry", "user" if self._import is None else "import_pair"]
 
     async def async_step_retry(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """Pairs again at the same address, reading the bridge again, as the web UI's Retry did."""
+        """Pairs again at the same address, reading the bridge again."""
         if self.source == SOURCE_REAUTH:
             return await self.async_step_reauth_confirm({})
         return await self.async_step_address({ADDRESS: self._info.ip})
@@ -484,7 +481,7 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     async def async_on_create_entry(self, result: ConfigFlowResult) -> ConfigFlowResult:
-        """Keeps the switches' data, with their device keys, out of the answer to the browser, which gets a new entry's
+        """Keeps the switches' data, with their device keys, out of the answer to the frontend, which gets a new entry's
         result without its data but with its subentries. The entry holds them already."""
         result.pop("subentries", None)
         return result
@@ -492,8 +489,8 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
     # Importing a sonoff2hue.yaml.
 
     async def async_step_import_yaml(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """Takes a pasted ``sonoff2hue.yaml``, read as ``AppConfig.Parse`` reads the file and checked as the .NET app's
-        ``run`` checks it. The text holds the keys, so it is never shown back, not even after an error."""
+        """Takes a pasted ``sonoff2hue.yaml``, read with ``yaml_import`` and checked as the bridge supervisor checks a
+        configuration before it starts. The text holds the keys, so it is never shown back, not even after an error."""
         errors: dict[str, str] = {}
         placeholders: dict[str, str] = {}
         if user_input is not None:
@@ -517,8 +514,8 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_import_check(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """With the file's bridge address and key: connects with the key and the pin, as the .NET app's ``run`` did at
-        startup, then adds the entry with the file's switches."""
+        """With the file's bridge address and key: connects with the key and the pin, as the bridge supervisor does when
+        it starts, then adds the entry with the file's switches."""
         config = self._imported()
         hue = config.hue
         connected = await self._async_connect(hue)

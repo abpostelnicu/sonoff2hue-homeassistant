@@ -1,4 +1,4 @@
-"""The buttons (decision 25): each switch's Test toggle, the web UI's switch test, with the LAN on a fake network and
+"""The buttons (decision 25): each switch's Test toggle, which runs the switch test, with the LAN on a fake network and
 the Hue bridge in memory."""
 
 import logging

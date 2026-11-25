@@ -18,8 +18,8 @@ from .runtime import Sonoff2HueConfigEntry, Sonoff2HueData
 PARALLEL_UPDATES = 0
 
 LAN_REFRESH: Final = timedelta(seconds=30)
-"""How often eWeLink devices seen shows the time of the last packet again, as the dashboard read the status every 30
-seconds: every packet moves it, and the status tracker publishes it only with other changes."""
+"""How often eWeLink devices seen shows the time of the last packet again: every packet moves it, and the status tracker
+publishes it only with other changes."""
 
 ACTION_TURNED_ON: Final = "turned_on"
 ACTION_TURNED_OFF: Final = "turned_off"
@@ -40,7 +40,7 @@ async def async_setup_entry(
 
 
 class StatusSensor(BridgeEntity, SensorEntity):
-    """The service's state, the dashboard's banner: its message, its problems, and since when."""
+    """The service's state, with its message, its problems, and since when."""
 
     _attr_device_class = SensorDeviceClass.ENUM
 
@@ -60,9 +60,9 @@ class StatusSensor(BridgeEntity, SensorEntity):
 
 
 class DevicesSeenSensor(BridgeEntity, SensorEntity):
-    """The dashboard's LAN card: how many eWeLink devices the LAN has shown, whether the listener runs, and when the
-    last packet came. It follows the LAN registry, which the status tracker publishes only for the configured switches'
-    devices: a new device shows at once, and the last packet every 30 seconds."""
+    """How many eWeLink devices the LAN has shown, whether the listener runs, and when the last packet came. It follows
+    the LAN registry, which the status tracker publishes only for the configured switches' devices: a new device shows
+    at once, and the last packet every 30 seconds."""
 
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _unrecorded_attributes = frozenset({"last_packet_at"})
@@ -102,9 +102,8 @@ class DevicesSeenSensor(BridgeEntity, SensorEntity):
 
 
 class LastActionSensor(WallSwitchEntity, SensorEntity):
-    """The dashboard's last action of a switch, or its last error when that came later: turned on or off, with the
-    toggle's counts and time, or failed or dropped, with the message. Its targets are the ones it toggles while the
-    bridge runs."""
+    """A switch's last action, or its last error when that came later: turned on or off, with the toggle's counts and
+    time, or failed or dropped, with the message. Its targets are the ones it toggles while the bridge runs."""
 
     _attr_device_class = SensorDeviceClass.ENUM
 

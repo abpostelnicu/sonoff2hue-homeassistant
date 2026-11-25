@@ -50,7 +50,8 @@ def no_retry_delay(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 async def download(hass: HomeAssistant, hass_client: ClientSessionGenerator, entry_id: str) -> str:
-    """The diagnostics file as the browser downloads it, with what Home Assistant adds, such as the repair issues."""
+    """The diagnostics file as Home Assistant's frontend downloads it, with what Home Assistant adds, such as the repair
+    issues."""
     assert await async_setup_component(hass, "diagnostics", {})
     client = await hass_client()
     response = await client.get(f"/api/diagnostics/config_entry/{entry_id}")

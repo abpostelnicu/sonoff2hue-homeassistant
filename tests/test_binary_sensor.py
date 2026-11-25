@@ -1,5 +1,5 @@
-"""The binary sensors (decision 25): Reachable on the bridge's device, and each switch's Online, as the .NET app's
-dashboard showed them, with the LAN on a fake network and the Hue bridge in memory."""
+"""The binary sensors (decision 25): Reachable on the bridge's device, and each switch's Online, with the LAN on a fake
+network and the Hue bridge in memory."""
 
 from datetime import timedelta
 
@@ -93,7 +93,7 @@ async def test_online_means_heard_within_the_last_5_minutes(
 ) -> None:
     await start(hass, paired(switch()))
 
-    # Never heard: offline, as the dashboard showed it.
+    # Never heard: offline.
     assert online(hass) == (STATE_OFF, NOT_HEARD)
     assert state_of(hass, ONLINE).attributes[ATTR_DEVICE_CLASS] == BinarySensorDeviceClass.CONNECTIVITY
     registry_entry = er.async_get(hass).async_get(ONLINE)
@@ -182,7 +182,7 @@ async def test_online_shows_the_relay_mode_the_key_and_a_payload_it_cannot_decod
 
 @pytest.mark.parametrize("key", ["", " \t"])
 async def test_online_counts_a_blank_key_as_none(hass: HomeAssistant, lan: Lan, bridge: Bridge, key: str) -> None:
-    """As the .NET app's ``hasDeviceKey`` did, with ``string.IsNullOrWhiteSpace``."""
+    """A key that is empty or only white space is no key."""
     await start(hass, paired(switch(key=key)))
 
     assert online(hass)[1]["has_device_key"] is False

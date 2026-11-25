@@ -1,4 +1,4 @@
-"""The buttons (decision 25): each switch's Test toggle, the web UI's switch test."""
+"""The buttons (decision 25): each switch's Test toggle, which runs the switch test."""
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigSubentry
@@ -23,8 +23,8 @@ async def async_setup_entry(
 
 
 class SwitchTestButton(WallSwitchEntity, ButtonEntity):
-    """Toggles the switch's lights, rooms and zones once, as the web UI's Test button did. The runtime logs the result;
-    the reason it couldn't toggle is the action's error."""
+    """Toggles the switch's lights, rooms and zones once. The runtime logs the result; the reason it couldn't toggle is
+    the action's error."""
 
     _attr_entity_category = EntityCategory.CONFIG
 

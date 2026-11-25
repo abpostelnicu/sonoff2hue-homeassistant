@@ -1,8 +1,6 @@
-"""The config entry's diagnostics: what the .NET app's web interface showed, in one download (decision 26).
+"""The config entry's diagnostics: the integration's state, in one download (decision 26).
 
-The web interface read four views of the running service from its API: the configuration (``/api/config``), the status
-(``/api/status``), every eWeLink device on the LAN (``/api/devices``) and the log (``/api/logs``). The diagnostics hold
-the same, as the runtime has them (decision 23):
+They hold four views of the running integration, as the runtime has them (decision 23):
 
 - ``config``: the configuration that the bridge supervisor runs, the entry's data and its switches as stored;
 - ``status``: the status tracker's snapshot, the service, the Hue bridge, the LAN and each switch with its resolved

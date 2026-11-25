@@ -470,7 +470,7 @@ async def test_pairing_waits_for_the_link_button(hass: HomeAssistant, fake_hue: 
         ("\u3000 ", "The Hue bridge address is empty."),
     ],
 )
-async def test_the_address_is_checked_as_dotnet_checks_it(hass: HomeAssistant, address: str, message: str) -> None:
+async def test_the_address_is_checked(hass: HomeAssistant, address: str, message: str) -> None:
     result = await pair_at(hass, address)
 
     assert (result["type"], result["step_id"]) == (FlowResultType.FORM, "address")
@@ -1052,7 +1052,7 @@ SWITCHES = """switches:
     groups:
       - room:Living room
 """
-"""Two switches as the .NET app's file has them: one named with a device key, one without either."""
+"""Two switches as a sonoff2hue.yaml has them: one named with a device key, one without either."""
 IMPORTED_SWITCHES = [
     (
         "1000abcdef",
@@ -1129,7 +1129,7 @@ async def test_importing_a_file_with_its_bridge_adds_the_entry_and_the_switches(
         "imported",
         {"address": fake_hue.address, "switches": "Hallway switch, 1000999999"},
     )
-    assert "subentries" not in result  # their device keys stay out of the answer to the browser
+    assert "subentries" not in result  # their device keys stay out of the answer to the frontend
     requests = fake_hue.bridge.describe_requests()
     assert "GET /clip/v2/resource/bridge 200" in requests
     assert "GET /api/0/config 200" in requests  # the bridge's own id, even when the file has one
@@ -1406,14 +1406,14 @@ async def test_choosing_another_bridge_while_importing_goes_back_to_pairing_for_
     ],
     ids=["an unknown key", "an empty switch", "a duplicate key"],
 )
-async def test_a_file_that_dotnet_cannot_read(hass: HomeAssistant, text: str) -> None:
-    with pytest.raises(ConfigError) as dotnet:
+async def test_a_file_that_the_import_refuses(hass: HomeAssistant, text: str) -> None:
+    with pytest.raises(ConfigError) as refused:
         yaml_import.parse(text)
 
     result = await import_file(hass, text)
 
     assert (result["step_id"], result["errors"]) == ("import_yaml", {"config": "invalid_config"})
-    assert result["description_placeholders"] == {"error": str(dotnet.value)}
+    assert result["description_placeholders"] == {"error": str(refused.value)}
     assert suggested(result, "config") is None  # the keys in it are never shown back
 
 

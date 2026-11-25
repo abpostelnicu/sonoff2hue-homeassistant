@@ -1,5 +1,5 @@
-"""The sensors (decision 25): Status and eWeLink devices seen on the bridge's device, and each switch's Last action, as
-the .NET app's dashboard showed them, with the LAN on a fake network and the Hue bridge in memory."""
+"""The sensors (decision 25): Status and eWeLink devices seen on the bridge's device, and each switch's Last action,
+with the LAN on a fake network and the Hue bridge in memory."""
 
 from datetime import timedelta
 
@@ -67,7 +67,7 @@ def no_retry_delay(monkeypatch: pytest.MonkeyPatch) -> None:
     ],
     ids=["running", "connecting", "error", "invalid config", "no switch", "not paired"],
 )
-async def test_status_shows_the_service_as_the_dashboards_banner(
+async def test_status_shows_the_service(
     hass: HomeAssistant,
     lan: Lan,
     bridge: Bridge,

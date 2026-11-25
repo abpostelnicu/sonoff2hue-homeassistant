@@ -18,8 +18,8 @@ from .runtime import Sonoff2HueConfigEntry, Sonoff2HueData
 PARALLEL_UPDATES = 0
 
 OFFLINE_RECHECK: Final = timedelta(seconds=30)
-"""How often an offline switch looks at the LAN registry again, as the dashboard read the status every 30 seconds: a
-switch heard again only with a repeated broadcast changes nothing that the registry reports."""
+"""How often an offline switch looks at the LAN registry again: a switch heard again only with a repeated broadcast
+changes nothing that the registry reports."""
 
 
 async def async_setup_entry(
@@ -35,8 +35,8 @@ async def async_setup_entry(
 
 
 class ReachableSensor(BridgeEntity, BinarySensorEntity):
-    """The dashboard's Hue card: whether the bridge was usable when last checked, unknown until then and while it isn't
-    paired, with its address, the message while it isn't usable, and the time of the check."""
+    """Whether the Hue bridge was usable when last checked, unknown until then and while it isn't paired, with its
+    address, the message while it isn't usable, and the time of the check."""
 
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
     _attr_entity_category = EntityCategory.DIAGNOSTIC

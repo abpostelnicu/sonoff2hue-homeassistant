@@ -1,17 +1,16 @@
 """The config entry's runtime: the engine's parts that run as long as the entry, and the bridge supervisor, which starts
 again for every change of the configuration (decision 23).
 
-The .NET app ran its LAN monitor, device registry, status tracker and log buffer for as long as its process, and its
-bridge supervisor restarted the bridge after every change of the config file. Here the config entry stands for the
-process. When the entry is set up, :meth:`Sonoff2HueData.async_start` adds the activity buffer to the integration's
+The parts that run as long as the entry are the LAN monitor, the device registry, the status tracker and the activity
+buffer. When the entry is set up, :meth:`Sonoff2HueData.async_start` adds the activity buffer to the integration's
 logger and starts the LAN monitor, which runs the entry's mDNS listener, and a bridge supervisor. When the entry's data
 or one of its ``switch`` subentries changes, the entry's update listener calls
 :meth:`Sonoff2HueData.async_config_changed`, which restarts only the supervisor: the listener's socket, the LAN registry,
 the status and the activity stay. Unloading the entry stops them all, and so does Home Assistant's stop.
 
-What the runtime adds for Home Assistant: the runner's presses and their outcomes as bus events, Home Assistant's
+What the runtime adds to the engine: the runner's presses and their outcomes as bus events, Home Assistant's
 reauthentication when the bridge rejects the application key, repair issues for the problems that the status shows,
-and the web UI's switch test.
+and the switch test.
 
 The API for the platforms and the flows, on ``entry.runtime_data``:
 
@@ -25,7 +24,7 @@ The API for the platforms and the flows, on ``entry.runtime_data``:
   callback. They run on the event loop as packets arrive, in the order they were added, and one that raises stops the
   others for that packet, so a callback must not raise.
 - ``activity``: the :class:`ActivityBuffer`, the integration's latest log entries, for diagnostics.
-- :meth:`Sonoff2HueData.async_test_toggle`: the web UI's switch test, for a switch's Test toggle button.
+- :meth:`Sonoff2HueData.async_test_toggle`: the switch test, for a switch's Test toggle button.
 - The dispatcher signals, each formatted with the entry's id, such as ``SIGNAL_STATUS.format(entry.entry_id)``:
   :data:`SIGNAL_STATUS`, :data:`SIGNAL_CONFIG_CHANGED`, :data:`SIGNAL_SUBENTRY_ADDED`, :data:`SIGNAL_SUBENTRY_UPDATED`
   and :data:`SIGNAL_SUBENTRY_REMOVED`. A platform adds the entities of the ``switch`` subentries that exist in its
@@ -35,7 +34,7 @@ The API for the platforms and the flows, on ``entry.runtime_data``:
   which describes their data.
 
 Identify by press, for the switch subentry flow: add a callback with ``registry.add_changed_callback`` and take a device
-whose ``last_event`` is :attr:`SwitchEventKind.PRESS` with a new ``last_press_at``, as the web UI's dialog took it
+whose ``last_event`` is :attr:`SwitchEventKind.PRESS` with a new ``last_press_at``, as the switch flow takes it
 (``engine/switch_form.py``). The LAN monitor's tracker sees every eWeLink device, so a MINIR4M that no switch maps yet
 reports its presses too: without its device key, every new ``seq`` is one. Remove the callback once a press came, and
 when the flow is removed.
@@ -100,7 +99,7 @@ from .engine.toggler import HueToggler, ToggleResult
 
 INTEGRATION_LOGGER: Final = logging.getLogger(__name__.rpartition(".")[0])
 """``custom_components.sonoff2hue``, which every logger of the integration is under. The activity buffer is its handler,
-and the switch test logs on it, as the .NET app's test logged in its ``sonoff2hue`` category."""
+and the switch test logs on it, so its lines have the category ``sonoff2hue``."""
 
 SIGNAL_STATUS: SignalTypeFormat[StatusSnapshot] = SignalTypeFormat(f"{DOMAIN}_{{}}_status")
 """A snapshot of the status, published 500 ms after the first of the changes it holds."""
@@ -121,7 +120,7 @@ ISSUE_NOT_DETACHED: Final = "not_detached"
 ISSUE_DECODE_ERROR: Final = "decode_error"
 
 TEST_NOT_PAIRED: Final = "Pair the Hue bridge first: reconfigure the sonoff2hue integration."
-""".NET's "Pair the Hue bridge first.", with how to pair in Home Assistant."""
+"""Why the switch test can't run while the bridge isn't paired, with how to pair it."""
 
 
 def new_listener(clock: Callable[[], datetime]) -> MdnsListener:
@@ -157,7 +156,7 @@ def _switch(data: Mapping[str, Any]) -> SwitchSettings:
 
 @dataclass(frozen=True, slots=True)
 class SwitchTestResult:
-    """The .NET app's ``TestResult``: what the test's toggle did, how long it took, and the targets it toggled."""
+    """What the switch test's toggle did, how long it took, and the targets it toggled."""
 
     turned_on: bool
     changed: int
@@ -168,8 +167,8 @@ class SwitchTestResult:
 
 
 class SwitchTestError(Exception):
-    """The switch test couldn't toggle, with the .NET app's message. For lights, rooms or zones that aren't on the
-    bridge, ``problems`` lists them, and the message joins them as the web UI showed them."""
+    """The switch test couldn't toggle; the message says why. For lights, rooms or zones that aren't on the bridge,
+    ``problems`` lists them, and the message joins them with spaces."""
 
     def __init__(self, message: str, problems: Sequence[str] = ()) -> None:
         super().__init__(message)
@@ -266,9 +265,9 @@ class Sonoff2HueData:
     @callback
     def async_config_changed(self) -> None:
         """The entry's update listener, after any change of the entry. A change of the configuration restarts the
-        supervisor, as the .NET app's ``ConfigStore`` did: the old one logs "Configuration changed; restarting the
-        bridge." and is cancelled, the LAN monitor and the status take the new configuration, and a new supervisor
-        starts once the old one has stopped. Then the signals go out."""
+        supervisor: the old one logs "Configuration changed; restarting the bridge." and is cancelled, the LAN monitor
+        and the status take the new configuration, and a new supervisor starts once the old one has stopped. Then the
+        signals go out."""
         if self._stopped:
             return
         config = config_from_entry(self.entry)
@@ -293,10 +292,10 @@ class Sonoff2HueData:
             async_dispatcher_send(self.hass, SIGNAL_SUBENTRY_ADDED.format(entry_id), subentry)
 
     async def async_test_toggle(self, device_id: str) -> SwitchTestResult:
-        """The .NET app's switch test (``ConfigEndpoints.TestAsync``): toggles the switch's lights, rooms and zones once,
-        resolved with a client of its own from the bridge's lights and groups as they are now, and logs it. Raises
-        :class:`SwitchTestError` with .NET's message when no switch has ``device_id``, when the bridge isn't paired,
-        when its settings can't be used, when some targets aren't on the bridge, and with the bridge's error."""
+        """The switch test: toggles the switch's lights, rooms and zones once, resolved with a client of its own from
+        the bridge's lights and groups as they are now, and logs it. Raises :class:`SwitchTestError` when no switch has
+        ``device_id``, when the bridge isn't paired, when its settings can't be used, when some targets aren't on the
+        bridge, and with the bridge's error."""
         config = self.config
         settings = config.find_switch(device_id.strip())
         if settings is None:
@@ -443,8 +442,7 @@ def _cancel_once(tasks: list[asyncio.Task[None]]) -> None:
 
 
 async def _run_after(previous: list[asyncio.Task[None]], supervisor: BridgeSupervisor) -> None:
-    """Runs ``supervisor`` once the cancelled ones have stopped and closed their clients, as the .NET app's supervisor
-    started a run after the last one had ended."""
+    """Runs ``supervisor`` once the cancelled ones have stopped and closed their clients, so that no two runs overlap."""
     if previous:
         await asyncio.wait(previous)
     await supervisor.run()

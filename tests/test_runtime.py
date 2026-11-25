@@ -372,7 +372,7 @@ async def test_the_bridge_is_waited_for_and_watched_across_time(
     assert (status.service.state, status.service.message) == (ServiceState.RUNNING, RUNNING)
     assert (status.snapshot().hue.reachable, status.snapshot().hue.message) == (True, None)
 
-    # The runner's keep-alive, every 45 seconds, watches the bridge; the state stays running, as in .NET.
+    # The runner's keep-alive, every 45 seconds, watches the bridge; the state stays running.
     bridge.fail("/clip/v2/resource/bridge", 503)
     await tick(freezer, 45)
 
@@ -469,7 +469,7 @@ async def test_a_switch_added_changed_and_removed_restarts_only_the_supervisor(
 async def test_a_new_device_key_reaches_the_lan_monitor(
     hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
 ) -> None:
-    """The LAN monitor takes a new tracker with the new configuration's keys, as .NET's ``OnConfigChanged`` did."""
+    """The LAN monitor takes a new tracker with the new configuration's keys."""
     entry = paired(switch())
     runtime_data = await start(hass, entry)
     lan.broadcast(1, params=relay(detached=False), key=DEVICE_KEY)
@@ -598,7 +598,7 @@ async def test_a_key_rejected_while_running_starts_one_reauthentication(
     await hass.async_block_till_done()
 
     assert len(reauth_flows(hass)) == 1
-    # The bridge goes on running and is shown as unreachable, as in .NET.
+    # The bridge goes on running and is shown as unreachable.
     assert runtime_data.status.service.state is ServiceState.RUNNING
     assert runtime_data.status.snapshot().hue.reachable is False
 
@@ -631,7 +631,7 @@ async def test_reauthentication_restarts_the_bridge_with_the_new_key(
     assert entry.runtime_data is runtime_data
     assert fake_hue_pressed.bridge.is_authorized(entry.data[CONF_APP_KEY])
     assert runtime_data.config.hue.app_key == entry.data[CONF_APP_KEY]
-    # The supervisor that waited for a change after the rejected key restarted, as in .NET.
+    # The supervisor that waited for a change after the rejected key restarted.
     assert logged(caplog, "custom_components.sonoff2hue.engine.supervisor").count(RESTARTING) == 1
     assert reauth_flows(hass) == []
 
@@ -952,7 +952,7 @@ async def test_the_switch_test_toggles_and_logs(
     ids=["unknown switch", "blank id", "not paired", "unusable settings"],
 )
 @pytest.mark.usefixtures("lan")
-async def test_the_switch_test_refuses_with_dotnets_messages(
+async def test_the_switch_test_refuses_with_its_reasons(
     hass: HomeAssistant, bridge: Bridge, entry: MockConfigEntry, device_id: str, message: str
 ) -> None:
     runtime_data = await start(hass, entry)

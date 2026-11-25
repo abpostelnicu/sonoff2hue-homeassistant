@@ -1,15 +1,15 @@
 """The devices of the integration and what their entities share (decision 25).
 
-The Hue bridge has a device, identified by the bridge id, with the service's state: the .NET app's dashboard banner, its
-Hue card and its LAN card. Each ``switch`` subentry has a device, identified by the switch's normalized eWeLink device
-id and named by the subentry's title, with the dashboard's card of that switch. An entity's unique id is its device's
-identifier, an underscore and its translation key.
+The Hue bridge has a device, identified by the bridge id, with the service's state, the bridge's reachability and the
+eWeLink devices seen on the LAN. Each ``switch`` subentry has a device, identified by the switch's normalized eWeLink
+device id and named by the subentry's title, with that switch's presses, last action, presence on the LAN and test. An
+entity's unique id is its device's identifier, an underscore and its translation key.
 
-The entities show what the dashboard showed, from the same state: the status tracker's snapshots, which come on
-``SIGNAL_STATUS``, and the LAN registry. A platform adds the entities of the switches that exist when it is set up, and
-those of a switch added later when ``SIGNAL_SUBENTRY_ADDED`` brings it; Home Assistant removes a removed switch's device
-and entities itself. :func:`async_track_devices` keeps the devices and the unique ids in step with the bridge id and the
-switches' device ids and titles, which reconfiguring can change.
+The entities show the runtime's state: the status tracker's snapshots, which come on ``SIGNAL_STATUS``, and the LAN
+registry. A platform adds the entities of the switches that exist when it is set up, and those of a switch added later
+when ``SIGNAL_SUBENTRY_ADDED`` brings it; Home Assistant removes a removed switch's device and entities itself.
+:func:`async_track_devices` keeps the devices and the unique ids in step with the bridge id and the switches' device ids
+and titles, which reconfiguring can change.
 """
 
 from collections.abc import Callable, Iterable
