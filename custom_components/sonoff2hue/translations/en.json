@@ -132,10 +132,166 @@
       "paired_imported": "Paired with {name} as {device_type}, and added the switches from the file: {switches}."
     }
   },
+  "config_subentries": {
+    "switch": {
+      "entry_type": "Switch",
+      "initiate_flow": {
+        "user": "Add switch",
+        "reconfigure": "Edit switch"
+      },
+      "step": {
+        "user": {
+          "title": "Add switch",
+          "description": "Find the MINIR4M that the wall switch is wired to: press the switch, pick the MINIR4M from the eWeLink devices seen on the LAN, or enter its device id.",
+          "menu_options": {
+            "identify": "Press the wall switch",
+            "pick": "Pick a device seen on the LAN",
+            "manual": "Enter the device ID"
+          }
+        },
+        "reconfigure": {
+          "title": "Edit {switch}",
+          "description": "Keep the switch's MINIR4M, or find another one: press the wall switch, pick it from the eWeLink devices seen on the LAN, or enter its device id.",
+          "menu_options": {
+            "keep": "Keep device {device_id}",
+            "identify": "Press the wall switch",
+            "pick": "Pick a device seen on the LAN",
+            "manual": "Enter the device ID"
+          }
+        },
+        "identify": {
+          "title": "Press the wall switch"
+        },
+        "identify_timeout": {
+          "title": "No press reported",
+          "description": "No eWeLink device reported a press within 60 seconds. The MINIR4M has to be on the same network as Home Assistant.",
+          "menu_options": {
+            "keep": "Keep device {device_id}",
+            "identify": "Press the wall switch again",
+            "pick": "Pick a device seen on the LAN",
+            "manual": "Enter the device ID"
+          }
+        },
+        "pick": {
+          "title": "Pick a device",
+          "description": "The eWeLink devices seen on the LAN: those that no switch uses first, then by their last press.",
+          "data": {
+            "device": "Device"
+          }
+        },
+        "no_devices": {
+          "title": "No devices seen",
+          "description": "No eWeLink devices seen on the LAN yet. Operate the wall switch, or enter the device id manually.",
+          "menu_options": {
+            "keep": "Keep device {device_id}",
+            "identify": "Press the wall switch",
+            "pick": "Look again",
+            "manual": "Enter the device ID"
+          }
+        },
+        "manual": {
+          "title": "Enter the device ID",
+          "data": {
+            "device_id": "Device id"
+          },
+          "data_description": {
+            "device_id": "Letters and digits, 4 to 40 characters, e.g. 1000abcdef. The devices seen on the LAN show their ids."
+          }
+        },
+        "settings": {
+          "title": "Switch settings",
+          "description": "{device}\n\nChoose what this switch toggles. If any of them is on, the switch turns them all off; otherwise it turns them all on.",
+          "data": {
+            "name": "Name",
+            "unresolved": "Entries that don't match the bridge",
+            "lights": "Lights",
+            "rooms": "Rooms",
+            "zones": "Zones",
+            "light_names": "Lights",
+            "group_names": "Rooms and zones"
+          },
+          "data_description": {
+            "name": "Shown on the dashboard and in the log. Up to 64 characters.",
+            "unresolved": "These entries of the current mapping don't match the bridge. Remove them, or fix the names on the bridge.",
+            "light_names": "Hue light names or ids, separated by commas, e.g. Ceiling, Floor lamp",
+            "group_names": "room:Name or zone:Name (or ids), separated by commas, e.g. room:Hallway"
+          },
+          "sections": {
+            "advanced": {
+              "name": "Advanced",
+              "description": "The eWeLink device key lets sonoff2hue ignore relay and setting changes made in the eWeLink app. It also lets it check that the switch is in detached relay mode.",
+              "data": {
+                "key_mode": "A key is set",
+                "new_device_key": "New device key",
+                "device_key": "Device key"
+              },
+              "data_description": {
+                "key_mode": "{key_warning}"
+              }
+            }
+          }
+        },
+        "pair_first": {
+          "title": "Pair the Hue bridge first",
+          "description": "Then you can choose lights, rooms and zones from a list: reconfigure the sonoff2hue integration to pair the bridge. You can also enter them by hand, separated by commas.",
+          "menu_options": {
+            "settings": "Try again",
+            "typed": "Enter them by hand"
+          }
+        },
+        "lights_unavailable": {
+          "title": "Couldn't load the lights from the Hue bridge",
+          "description": "{error}\n\nYou can also enter them by hand, separated by commas.",
+          "menu_options": {
+            "settings": "Try again",
+            "typed": "Enter them by hand"
+          }
+        },
+        "unchecked": {
+          "title": "Save without checking?",
+          "description": "{warning}",
+          "menu_options": {
+            "save": "Save without checking",
+            "settings": "Try again"
+          }
+        }
+      },
+      "progress": {
+        "identify": "Operate the wall switch now. The device that reports a press is selected.\n\nWaiting up to 60 seconds for a press…",
+        "identify_used": "Operate the wall switch now. The device that reports a press is selected.\n\n{message}"
+      },
+      "error": {
+        "invalid_device": "{error}",
+        "not_saved": "{base_error}",
+        "unexpected": "The switch was not saved: {base_error}",
+        "invalid_name": "{name_error}",
+        "invalid_device_key": "{key_error}",
+        "invalid_light_names": "{light_names_error}",
+        "invalid_group_names": "{group_names_error}"
+      },
+      "abort": {
+        "entry_not_loaded": "The sonoff2hue integration isn't loaded, so its switches can't be changed. Reload it, then try again.",
+        "conflict": "{error}",
+        "not_found": "{error}",
+        "already_configured": "This device is already configured. Edit that switch instead.",
+        "saved": "Saved {switch}."
+      },
+      "create_entry": {
+        "added": "Added {switch}."
+      }
+    }
+  },
   "selector": {
     "bridge": {
       "options": {
         "other": "Another address"
+      }
+    },
+    "key_mode": {
+      "options": {
+        "keep": "Keep it",
+        "replace": "Replace it",
+        "remove": "Remove it"
       }
     }
   },

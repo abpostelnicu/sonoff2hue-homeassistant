@@ -39,6 +39,10 @@ scripts/develop lights     # the fake bridge's lights, rooms and zones, and ever
   After that, Home Assistant starts in a few seconds and installs nothing. Ctrl+C stops it, and the fake bridge with it.
 - Open http://127.0.0.1:8123 and create a throwaway user. The integration is under Settings › Devices & services ›
   Add integration › sonoff2hue: choose *Enter the bridge address* and enter the fake bridge's, `127.0.0.1:18443`.
+- *Add switch* on the integration's page maps a MINIR4M to lights: choose *Press the wall switch*, then run
+  `scripts/develop press`, and the simulated switch `1000abcdef` is selected (or *Enter the device ID* takes it). The
+  fake bridge's lights, rooms and zones are offered, and once the switch is added, `scripts/develop press` toggles its
+  lights. *Edit switch* changes one, and its menu deletes it.
 - Home Assistant listens on 127.0.0.1 only. `SONOFF2HUE_DEV_PORT=8124 scripts/develop` moves it to another port, also
   later.
 - It loads `custom_components/sonoff2hue` from this checkout, with nothing copied or linked: it runs from the

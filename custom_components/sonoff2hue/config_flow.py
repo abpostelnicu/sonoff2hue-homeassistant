@@ -23,9 +23,11 @@ from typing import Any, Final
 from homeassistant.config_entries import (
     SOURCE_REAUTH,
     SOURCE_RECONFIGURE,
+    ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
     ConfigSubentryData,
+    ConfigSubentryFlow,
 )
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import UnknownFlow
@@ -73,6 +75,7 @@ from .engine.hue_setup import (
 )
 from .engine.supervisor import NOT_PINNED, create_hue_client
 from .engine.switch_rules import is_paired
+from .switch_flow import SwitchSubentryFlow
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -187,6 +190,12 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
         self._removed = False
         self._import: EngineConfig | None = None
         """The imported file, once it passed the run's checks."""
+
+    @classmethod
+    @callback
+    def async_get_supported_subentry_types(cls, config_entry: ConfigEntry) -> dict[str, type[ConfigSubentryFlow]]:
+        """The switches, one subentry per MINIR4M, which the integration's page adds and changes (decision 24)."""
+        return {SUBENTRY_SWITCH: SwitchSubentryFlow}
 
     # The ways in.
 
