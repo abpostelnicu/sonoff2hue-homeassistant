@@ -1403,8 +1403,9 @@ async def test_choosing_another_bridge_while_importing_goes_back_to_pairing_for_
         "hue:\n  bridgeIP: 192.0.2.10\n",
         "switches:\n  - deviceId: 1000abcdef\n    lights: [Hallway]\n  -\n",
         "hue:\n  appKey: a\n  appKey: b\n" + SWITCHES,
+        "a\n",
     ],
-    ids=["an unknown key", "an empty switch", "a duplicate key"],
+    ids=["an unknown key", "an empty switch", "a duplicate key", "not key-value lines"],
 )
 async def test_a_file_that_the_import_refuses(hass: HomeAssistant, text: str) -> None:
     with pytest.raises(ConfigError) as refused:
