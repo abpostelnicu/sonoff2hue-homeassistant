@@ -1733,7 +1733,50 @@ documentation:
       `RecursionError`; the event pass refuses 33 levels before either composes. `check-commits.sh` passed for the
       three commits.
   - **D `switches`:**
-    - Pending.
+    - **What changed:** four commits on `py/switches`, from `main` at cc3b702 and rebased onto 0a20e10 after slices
+      F, E, C and A, and this entry's. `config.py`, `targets.py`, `picker.py`, `switch_form.py`, `switch_rules.py` and
+      `switch_flow.py` import neither `text`, `jsonnode`, `errors` nor `jstext`, and `jstext.py` is gone. One rule for
+      names: the target resolver, the picker and the switch rules compare names and ids stripped and casefolded
+      (`targets.name_key` and `targets.refers_to`, which the picker uses too), an empty entry names nothing, a `room:`
+      or `zone:` prefix is taken in any case (`targets.split_kind`), and the known names in the resolver's messages are
+      in `str.casefold` order. A null entry is an empty name, which matches nothing and is reported, and a resource
+      without a name matches by its id. A device id is normalized with `strip().lower()` and compared with
+      `casefold()`, by a new `SwitchSettings.has_device_id`, which `find_switch`, the duplicate check of
+      `validate_for_run` and the switch rules use; blank is `not s or s.isspace()`. The switch rules and the form count
+      characters with `len()`, find control characters by their category Cc and white space in a key with
+      `isspace()`, and remove duplicate entries by casefold; the picker's resources are ordered by the casefolded name,
+      and its selections key resources by kind and id, so a null id and the id "null" stay apart. The switch flow
+      catches `Exception` and logs the traceback with `_LOGGER.exception` where it caught `UnexpectedError`, on the
+      same steps and texts, and turns the rules' conflict and missing switch into its aborts before that catch-all. As
+      in F, ruff counts the logging call as handling the exception, so these handlers have no `# noqa: BLE001`.
+      Docstrings, comments and test names describe the form's checks, the switch rules and the picker on their own
+      terms. The limits, the messages, their fields and order, the 409 and 404 rules, the device key's rules, and the
+      flow's steps, menus and translation keys stay.
+    - **User-visible:** edge cases only, none for valid device ids and ordinary names. Names and ids match under
+      Unicode case folding in the picker and the resolver alike, which can no longer disagree about an entry:
+      `STRASSE` names `Straße`, and `Straße` and `STRASSE`, or the Kelvin sign and `k`, are one entry when duplicates
+      are removed. White space is Python's everywhere: U+001C-U+001F are stripped too, and alone count as a missing
+      value; the picker also strips U+0085, and no longer U+FEFF. Lengths count characters, so a name of 63 letters and
+      an emoji fits in 64. The known names list `_Spare` before `Arc lamp`. A null entry is reported as "no Hue light
+      named ''" where the resolver raised, and any other failure while the flow lists the lights or checks a switch
+      shows the flow's existing texts.
+    - **Tests:** 293 in six files, where four had 164. `test_targets.py` (41, new): resolution by name, id and
+      prefix, case, ambiguity, a room without lights, duplicates, empty and null entries, and the order of the known
+      names. `test_config.py` (11, new): the device id, blank and duplicate rules. `test_picker.py` (37): resolving,
+      encoding, selections and their edits, and `split_list`. `test_switch_form.py` (39) adds `same_id` and the
+      labels. `test_switch_rules.py` (86): every validation limit and its neighbours, control characters, white space,
+      empty values, the order of the fields, and the write scenarios: 409, 404, and a key kept, replaced, removed and
+      dropped. `test_switch_flow.py` keeps its 79; its two unexpected failures come from a client whose `get_lights`
+      raises `RuntimeError`, so they don't depend on how the Hue client reads a malformed answer. Together they cover
+      every statement and branch of the six modules, 884 and 250. 19 of 20 mutations each failed a test; the 20th,
+      identify-by-press keyed by the raw device id, is equivalent, as the registry's ids are lowercase.
+    - **Outside the slice:** nothing in the end. Until slice C's rewrite of `tests/engine/test_yaml_import.py` was
+      merged, a first commit removed its test that expected the resolver to raise for a null entry; the rewrite has
+      no such test, so the rebase dropped that commit. `test_targets.py` covers the null entry as a reported empty
+      name.
+    - **Checks:** `scripts/check` passed with 1,150 tests, where 0a20e10 has 1,021. `check-commits.sh` and
+      `test-each-commit.sh` passed for every commit, before and after each rebase. `scripts/e2e` passed all 45
+      checks in 36.0 s on 2a958f9, its setup taking 11.6 s for a new `.dev/venv`, and in 16.2 s after the last rebase.
   - **E `engine-core`:**
     - **What changed:** on `py/engine-core`, from `main` at cc3b702 and rebased onto 72b6372 after slice F, in two
       commits and this entry's. `runner.py`, `supervisor.py`, `status.py` and `activity.py` import neither `text` nor
