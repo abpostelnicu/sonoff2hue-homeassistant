@@ -187,7 +187,7 @@ def flow_log(caplog: pytest.LogCaptureFixture) -> list[tuple[int, str]]:
 
 @pytest.fixture(autouse=True)
 def setup_entry() -> Iterator[AsyncMock]:
-    """The config entry's setup and unload, which these tests don't check; a reload calls both."""
+    """The config entry's setup and unload, which these tests don't check (``test_runtime.py`` does)."""
     with (
         patch("custom_components.sonoff2hue.async_setup_entry", return_value=True) as setup,
         patch("custom_components.sonoff2hue.async_unload_entry", return_value=True),
@@ -893,7 +893,8 @@ async def test_reconfigure_pairs_again_and_keeps_the_switches(
     assert entry.data[CONF_APP_KEY] != "old-app-key"
     assert fake_hue_pressed.bridge.is_authorized(entry.data[CONF_APP_KEY])
     assert entry.data[CONF_CERTIFICATE_SHA256] == fake_hue_pressed.fingerprint
-    assert setup_entry.call_count == 2
+    # Not reloaded: the runtime's update listener restarts the bridge (decision 23).
+    assert setup_entry.call_count == 1
 
 
 async def test_reconfigure_can_pair_another_bridge(hass: HomeAssistant, fake_hue_pressed: FakeHueHost) -> None:
@@ -984,7 +985,8 @@ async def test_reauth_pairs_the_stored_bridge_again(
     )
     assert fake_hue_pressed.bridge.is_authorized(entry.data[CONF_APP_KEY])
     assert (entry.unique_id, entry.data[CONF_BRIDGE_IP]) == (BRIDGE_ID, fake_hue_pressed.address)
-    assert setup_entry.call_count == 2
+    # Not reloaded: the runtime's update listener restarts the bridge (decision 23).
+    assert setup_entry.call_count == 1
 
 
 async def test_reauth_refuses_another_bridge_at_the_stored_address(hass: HomeAssistant, fake_hue: FakeHueHost) -> None:

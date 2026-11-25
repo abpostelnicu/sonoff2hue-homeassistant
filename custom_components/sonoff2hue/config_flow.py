@@ -441,8 +441,8 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
         return await self.async_step_address({ADDRESS: self._info.ip})
 
     async def async_step_paired(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """Saves the bridge: in a new config entry, or in the one being reconfigured or reauthenticated, which then
-        reloads."""
+        """Saves the bridge: in a new config entry, or in the one being reconfigured or reauthenticated, whose update
+        listener then restarts the bridge with the new key and pin, without reloading the entry (decision 23)."""
         info = self._info
         data = {
             CONF_BRIDGE_IP: info.ip,
@@ -456,9 +456,9 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
             info.ip,
         )
         if self.source == SOURCE_REAUTH:
-            return self.async_update_reload_and_abort(self._get_reauth_entry(), data_updates=data)
+            return self.async_update_and_abort(self._get_reauth_entry(), data_updates=data)
         if self.source == SOURCE_RECONFIGURE:
-            return self.async_update_reload_and_abort(
+            return self.async_update_and_abort(
                 self._get_reconfigure_entry(), unique_id=info.bridge_id, data_updates=data
             )
         placeholders = {

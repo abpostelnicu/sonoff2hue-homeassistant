@@ -27,3 +27,29 @@ CONF_NAME: Final = "name"
 CONF_DEVICE_KEY: Final = "device_key"
 CONF_LIGHTS: Final = "lights"
 CONF_GROUPS: Final = "groups"
+
+# The bus events of the runtime (decision 23), for the logbook, the entities and automations. Each names its switch:
+# ``device_id``, the Home Assistant device of the switch's subentry, or None while it has none; ``switch_id``; and
+# ``name``, the switch's name as configured, or None.
+EVENT_PRESS: Final = "sonoff2hue_press"
+"""A wall switch was operated: its switch, and ``seq``, the broadcast's sequence number. A toggle follows."""
+EVENT_TOGGLE: Final = "sonoff2hue_toggle"
+"""What came of a press: its switch, ``targets`` (such as ``light 'Ceiling'``) and ``result``. With ``toggled``, also
+``turned_on``, ``changed``, ``unchanged``, ``failed`` and ``elapsed_ms``; with ``failed`` (the toggle couldn't run) or
+``dropped`` (the press waited more than 5 seconds for the bridge), ``message``. A toggle stopped by a change of the
+configuration fires nothing, as the runner reports nothing for it."""
+ATTR_SWITCH_ID: Final = "switch_id"
+"""The switch's eWeLink device id, normalized: its subentry's unique id."""
+ATTR_SEQ: Final = "seq"
+ATTR_TARGETS: Final = "targets"
+ATTR_RESULT: Final = "result"
+ATTR_TURNED_ON: Final = "turned_on"
+ATTR_CHANGED: Final = "changed"
+ATTR_UNCHANGED: Final = "unchanged"
+ATTR_FAILED: Final = "failed"
+"""How many targets the bridge didn't switch."""
+ATTR_ELAPSED_MS: Final = "elapsed_ms"
+ATTR_MESSAGE: Final = "message"
+RESULT_TOGGLED: Final = "toggled"
+RESULT_FAILED: Final = "failed"
+RESULT_DROPPED: Final = "dropped"

@@ -2,14 +2,16 @@
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
-from pytest_homeassistant.common import MockConfigEntry
+import pytest
 
 from custom_components.sonoff2hue import Sonoff2HueData
-from custom_components.sonoff2hue.const import DOMAIN
+
+from .fakes import paired, switch
 
 
+@pytest.mark.usefixtures("lan", "bridge")
 async def test_the_entry_sets_up_and_unloads(hass: HomeAssistant) -> None:
-    entry = MockConfigEntry(domain=DOMAIN, title="sonoff2hue")
+    entry = paired(switch())
     entry.add_to_hass(hass)
 
     assert await hass.config_entries.async_setup(entry.entry_id)

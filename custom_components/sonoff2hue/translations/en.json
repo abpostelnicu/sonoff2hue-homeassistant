@@ -138,5 +138,49 @@
         "other": "Another address"
       }
     }
+  },
+  "issues": {
+    "certificate_not_pinned": {
+      "title": "The Hue bridge's certificate is not pinned",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Pin the Hue bridge's certificate",
+            "description": "hue.certificateSha256 is not set, so the bridge certificate is not verified. Pair the bridge again to pin it: select Submit to reconfigure the sonoff2hue integration."
+          }
+        },
+        "abort": {
+          "reconfigure": "Reconfigure the sonoff2hue integration to pair the bridge again.",
+          "not_loaded": "The sonoff2hue integration is no longer set up."
+        }
+      }
+    },
+    "certificate_changed": {
+      "title": "The Hue bridge's certificate changed",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Pair the Hue bridge again",
+            "description": "The Hue bridge TLS certificate does not match the pinned certificateSha256. If the bridge was replaced or reset, pair the bridge again: select Submit to reconfigure the sonoff2hue integration."
+          }
+        },
+        "abort": {
+          "reconfigure": "Reconfigure the sonoff2hue integration to pair the bridge again.",
+          "not_loaded": "The sonoff2hue integration is no longer set up."
+        }
+      }
+    },
+    "invalid_config": {
+      "title": "The configuration has problems",
+      "description": "{message}\n\n{problems}\n\nReview the switches of the sonoff2hue integration."
+    },
+    "not_detached": {
+      "title": "{name} is not in detached relay mode",
+      "description": "{name} is not in detached relay mode, so the wall switch cuts power to the lights. Enable 'Detach relay' in the eWeLink app."
+    },
+    "decode_error": {
+      "title": "Can't decode the broadcasts of {name}",
+      "description": "{name}: cannot read the LAN payload ({error}); falling back to sequence numbers only."
+    }
   }
 }
