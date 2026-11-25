@@ -1674,6 +1674,29 @@ documentation:
     Desk's payload. The other tests decrypt what they encrypt with the same key, which succeeds under any IV.
   - **Checked:** with the plugin forcing that IV as before, the test passed, as the fake no longer draws one. It passed
     25 runs in a row, and `scripts/check` passed with its 1,307 tests.
+- 2026-11-25: the live test on the user's Home Assistant OS (Status), on Home Assistant OS 18.4 with Core 2026.11.3 on
+  Python 3.14.10, in an x86_64 virtual machine.
+  - **Before:** the integration had run there since that morning from `9dccc0e`, from before decision 30, with the
+    paired bridge and 4 switches. Their broadcasts are encrypted and none has a device key, so the runner reads their
+    presses by `seq` alone. Real presses on two of them had toggled their lights, a group in 74 ms and 10 lights in
+    542 ms, and *Test toggle* on a third had turned its 3 lights on.
+  - **Deployed:** `main` at 2bec130, by hand over SSH in the Terminal & SSH app. The installed folder was saved off the
+    host, its 83 files compared by SHA-256; the 38 files of `custom_components/sonoff2hue` at 2bec130 were unpacked next
+    to it and compared by SHA-256 with git; then the new folder took the old one's place, and the old one was deleted.
+    A copy renamed inside `custom_components` would compete for the domain: Home Assistant 2026.11.3's loader
+    (`_get_custom_components`) resolves every folder there that has a `manifest.json`, and keys the integrations by
+    their manifests' domain. `ha core check` passed, and `ha core restart` took 22 s.
+  - **After the restart:** the entry loaded, and Home Assistant compiled the 33 modules of the new build, none of the
+    six that decision 30 removed. Status was running, "4 wall switches toggle 17 Hue lights, rooms and zones.", without
+    problems; Reachable on; each switch Online at its own address, not the `hassio` bridge's (decision 19); eWeLink
+    devices seen 21. No false press: each Press kept its last event and `seq`, each switch's `seq` was the one before
+    the restart, and no light changed; Last action was unknown, as each setup starts the status tracker afresh. The log
+    had no warning or error of the integration, only Home Assistant's notice about custom integrations.
+  - **Switch test:** *Test toggle* turned a switch's 3 lights on, then off again, as they had been; Press and Last
+    action stayed as they were, as the test reaches neither.
+  - **Log levels:** the log had the integration's info lines before the restart and only its warnings afterwards:
+    `configuration.yaml` has no `logger:` section, and the level set while it ran didn't outlast the restart.
+  - **Not checked yet:** a real press on this build.
 
 ## Status
 
@@ -1697,5 +1720,6 @@ documentation:
 - [x] The integration stands alone (decision 30): Phase 1, the recorded cases kept and the guard added (#27); the six
   slices, A `lan` (#31), B `hue` (#33), C `yaml` (#30), D `switches` (#32), E `engine-core` (#29) and F `ha-layer`
   (#28); the cleanup (#34); and the README, `en.json` and this file rewritten
-- [ ] Live test on the user's Home Assistant OS
+- [ ] Live test on the user's Home Assistant OS: `main` at 2bec130 runs there and passed every check but a real press
+  (Verification log)
 - [ ] Release 1.0.0
