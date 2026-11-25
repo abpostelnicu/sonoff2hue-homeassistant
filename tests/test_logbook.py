@@ -1,6 +1,7 @@
 """The logbook (decision 26): Home Assistant's own entries for each press, the switch's Press and its Last action, and
 nothing for the runtime's bus events, in the real logbook on the recorder and on the switch's device page."""
 
+from collections import Counter
 from typing import Any
 
 from freezegun.api import FrozenDateTimeFactory
@@ -82,6 +83,26 @@ def changes(entries: list[dict[str, Any]]) -> list[Change]:
     return [(entry["entity_id"], entry.get("attributes", {}).get("event_type", entry["state"])) for entry in entries]
 
 
+def moments(entries: list[dict[str, Any]]) -> list[Counter[Change]]:
+    """The changes of each moment, in the order of the moments. The entities write what one status snapshot changes at
+    the same moment, in the order in which they started following the status, which varies, as Home Assistant sets
+    their platforms up side by side; and the logbook sorts its entries by their time alone. So the entries of one
+    moment come in no fixed order."""
+    grouped: list[Counter[Change]] = []
+    when: object = None
+    for entry, change in zip(entries, changes(entries), strict=True):
+        if not grouped or entry["when"] != when:
+            grouped.append(Counter())
+            when = entry["when"]
+        grouped[-1][change] += 1
+    return grouped
+
+
+def together(*changes: Change) -> Counter[Change]:
+    """Changes of the same moment, in any order."""
+    return Counter(changes)
+
+
 @pytest.mark.usefixtures("logbook", "socket_enabled")
 async def test_each_press_gives_the_logbook_press_and_last_action_and_nothing_else(
     hass: HomeAssistant, hass_ws_client: WebSocketGenerator, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
@@ -117,7 +138,8 @@ async def test_last_action_shows_only_when_its_state_changes(
     hass: HomeAssistant, hass_ws_client: WebSocketGenerator, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
 ) -> None:
     """The logbook lists changes of a state, not of its attributes alone, and the entities show the status 500 ms after
-    a change: an outcome like the one before, or one that another replaces within the 500 ms, adds only the press."""
+    a change: an outcome like the one before, or one that another replaces within the 500 ms, adds only the press. Last
+    action and the bridge's Reachable change at the same moment, from the same snapshot, in either order."""
     entry = paired(switch())
     await start(hass, entry)
     logbook = Logbook(hass, hass_ws_client, freezer)
@@ -129,8 +151,8 @@ async def test_last_action_shows_only_when_its_state_changes(
     bridge.fail("/clip/v2/resource/light", 503)
     await press(lan, freezer, 2)
     await press(lan, freezer, 3)
-    # A press that the bridge takes 6 s to toggle, and the next, dropped as it waited more than 5 s: the toggle and the
-    # dropped press come together, and Last action shows the newer.
+    # Two presses at once: the bridge takes 6 s to toggle for the first, and the second is dropped, as it waited more
+    # than 5 s. The toggle and the dropped press come together, and Last action shows the newer.
     bridge.heal()
     held = bridge.hold("/clip/v2/resource/light")
     await tick(freezer, 1)
@@ -142,23 +164,19 @@ async def test_last_action_shows_only_when_its_state_changes(
     await settle()
     await tick(freezer, 0.5)
 
-    assert changes(await logbook.everything(since)) == [
-        (PRESS, "press"),
-        (REACHABLE, "off"),
-        (LAST_ACTION, "failed"),
-        (PRESS, "press"),
-        (PRESS, "press"),
-        (PRESS, "press"),
-        (REACHABLE, "on"),
-        (LAST_ACTION, "dropped"),
+    assert moments(await logbook.everything(since)) == [
+        together((PRESS, "press")),
+        together((REACHABLE, "off"), (LAST_ACTION, "failed")),
+        together((PRESS, "press")),
+        together((PRESS, "press"), (PRESS, "press")),
+        together((REACHABLE, "on"), (LAST_ACTION, "dropped")),
     ]
     device = dr.async_get(hass).async_get_device_by_identifier((DOMAIN, DEVICE_ID), entry.entry_id)
     assert device is not None
-    assert changes(await logbook.device_page(since, device.id)) == [
-        (PRESS, "press"),
-        (LAST_ACTION, "failed"),
-        (PRESS, "press"),
-        (PRESS, "press"),
-        (PRESS, "press"),
-        (LAST_ACTION, "dropped"),
+    assert moments(await logbook.device_page(since, device.id)) == [
+        together((PRESS, "press")),
+        together((LAST_ACTION, "failed")),
+        together((PRESS, "press")),
+        together((PRESS, "press"), (PRESS, "press")),
+        together((LAST_ACTION, "dropped")),
     ]

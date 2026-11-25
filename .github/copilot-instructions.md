@@ -541,7 +541,11 @@ Home Assistant 2026.11, checked on 2026-11-23 and 2026-11-24 in the developer do
   - Tests: the real logbook runs in pytest-homeassistant 2026.11.3 with `recorder_mock`, listed before `hass`, and the
     frontend marked as set up (`mock_component`), as `home-assistant-frontend` isn't installed; `logbook/get_events`
     reads it over the websocket API once `async_wait_recording_done` has stored the events. With the clock frozen, a
-    test moves it on after the last change it expects and before the first, as both ends are left out.
+    test moves it on after the last change it expects and before the first, as both ends are left out. Entries of the
+    same moment come in no fixed order: the logbook sorts by time alone, and the entities that one status snapshot
+    changes write their states at the same moment, in the order in which they started following the status, which
+    varies, as Home Assistant sets an entry's platforms up side by side (`asyncio.gather`). A test compares them
+    without regard to their order.
 - **Subentry flows** (the switch flow, decision 24; checked on 2026-11-25 in the installed 2026.11.3, in the sources
   of its frontend, 20261028.8, and in a development Home Assistant):
   - Progress steps work in subentry flows. The flow manager is the same as for config flows,
@@ -1602,6 +1606,13 @@ documentation:
     read it. `scripts/check` passes. On pull request #25, before three rebases and this line (CI run 45578371321,
     Validate run 45578371560, Commits run 45578371548), *Lint*, *Test*, the commit's own checks, *hassfest* and *HACS*
     passed, the last with all 10 of its checks, `information` among them.
+- 2026-11-25: `test_last_action_shows_only_when_its_state_changes` made deterministic (decision 26).
+  - Run alone on `main` 3aa1322 it failed 4 of 25 times, and 10 of 25 for the docs agent: Reachable and Last action,
+    which one status snapshot changes at the same moment, came in the other order. A scratch test that recorded the
+    state writes found them in both orders from run to run, the logbook listing them as written.
+  - The test now compares the changes of each moment as counts, without regard to their order; counts, as two
+    presses at once give two Press changes at the same moment. Run alone 50 times and the whole file 10 times, it
+    passed every time.
 
 ## Status
 
