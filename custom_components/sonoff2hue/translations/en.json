@@ -82,7 +82,7 @@
       },
       "import_yaml": {
         "title": "Import sonoff2hue.yaml",
-        "description": "Paste the whole sonoff2hue.yaml of the sonoff2hue app; it is read as the app reads it. Stop the app first: with both running, every press would toggle the lights twice.\n\nWith the bridge's bridgeIp and appKey, sonoff2hue connects to the bridge with them; without them, you pair the bridge next. Each switch in the file becomes a switch of the integration.",
+        "description": "Paste the whole sonoff2hue.yaml: the Hue bridge under hue, and the MINIR4Ms under switches. If something else already toggles the lights for these switches, stop it first: with both running, every press would toggle the lights twice.\n\nWith the bridge's bridgeIp and appKey, sonoff2hue connects to the bridge with them; without them, you pair the bridge next. Each switch in the file becomes a switch of the integration.",
         "data": {
           "config": "sonoff2hue.yaml"
         },
@@ -211,7 +211,7 @@
             "group_names": "Rooms and zones"
           },
           "data_description": {
-            "name": "Shown on the dashboard and in the log. Up to 64 characters.",
+            "name": "Names the switch and its device, also in the log; without a name, the device id does. Up to 64 characters.",
             "unresolved": "These entries of the current mapping don't match the bridge. Remove them, or fix the names on the bridge.",
             "light_names": "Hue light names or ids, separated by commas, e.g. Ceiling, Floor lamp",
             "group_names": "room:Name or zone:Name (or ids), separated by commas, e.g. room:Hallway"
