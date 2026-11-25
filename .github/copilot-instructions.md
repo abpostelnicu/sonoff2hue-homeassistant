@@ -1687,7 +1687,73 @@ documentation:
       switch back failed its new test. `scripts/e2e` passed all 45 checks, in 19.9 s. `check-commits.sh` and
       `test-each-commit.sh` passed for all seven commits.
   - **B `hue`:**
-    - Pending.
+    - **Changed:** eight commits on `py/hue`, from `main` at cc3b702, rebased onto 7a81c91 after slices F, E, C, A and
+      D, the last of them this entry.
+      - `hue_address.py`, from 790 lines to 123: an address is an IPv4 address as `ipaddress` reads it; an IPv6 address,
+        compressed and in brackets, with a zone of letters, digits and `._~-`, in brackets when a port follows; or a
+        host name whose labels, in the ASCII form that yarl's IDNA gives an internationalized name, hold 1-63 letters,
+        digits and hyphens, neither first nor last a hyphen, at most 253 characters in all, the last label not all
+        digits. A port is 1-65535 in ASCII digits, else 443. `BridgeUrl` keeps the yarl URL that requests go to, with
+        `uri`, `host` and `port`, and the messages stay word for word.
+      - `hue_client.py`, from 700 lines to 523: a body is decoded by its charset, quotes removed, through Python's
+        codecs, as UTF-8 without one or for a charset Python can't decode text with, invalid bytes replaced and a byte
+        order mark dropped; a reason phrase is the status line's, else `HTTPStatus`'s. A CLIP v2 answer is read with
+        `json` into the client's dataclasses by the keys the bridge writes: a null counts as missing, and an answer
+        that isn't one, such as a null in a list of objects, a value of another kind or a resource without an id, is
+        `HueApiError("Unexpected response from the Hue bridge for '<type>'.")` without a status, so transient. URLs are
+        built with yarl, and an id is one segment, `urllib.parse.quote` with its dots escaped too, so `..` stays an id.
+        Requests carry aiohttp's default headers and are decompressed. The connector of its own keeps idle
+        connections 300 s and now uses `ThreadedResolver`, the system's resolver: with aiodns installed, as in Home
+        Assistant, aiohttp's default is c-ares. A failure without an answer is told in the system's words
+        (`os.strerror`), and a TLS failure or another certificate gives `CERTIFICATE_MISMATCH`.
+      - `hue_setup.py`, all but slice A's discovery part: the bridge's config and the pairing answers are read with
+        `json`, `not_success_message` gives "HTTP 404 Not Found", and the device type takes what `str.isalnum` takes.
+        Its one module docstring describes discovery and pairing.
+      - `toggler.py` raises no emulated exception: a target without an id has no known state. The fake bridge reads
+        its bodies with `json`, checks them with `str` methods and `len`, and its settings with `ipaddress` and `int`.
+      - None of these files imports `text`, `jsonnode` or `errors`, and their docstrings, comments and tests describe
+        the code on its own. Once slice A's discovery read Signify's answer with aiohttp, `HttpAnswer.read_as_string`
+        and `read_json_text` and `hue_address.is_ip_address` had no callers left, and a commit of their own removes
+        them.
+    - **User-visible:**
+      - Bridge addresses: refused now are `192.168.1`, `0x7f.1` and octets with a leading zero, a name with `_`, a
+        trailing dot or an `xn--` label that doesn't decode, `@bridge`, `bridge/a/..` and an empty port (`bridge:`).
+        An internationalized name is mapped by IDNA (UTS 46), and the "(host:port)" of a failure shows an IPv6 address
+        in brackets and a name in its Unicode form.
+      - Messages: "No Hue bridge answered at …: HTTP 404 Not Found", "…: The request timed out." and, for a device
+        without TLS, "…: The TLS handshake failed (…)"; "Hue bridge not reachable: Connection reset by peer (…)" or
+        "Server disconnected (…)" where the texts came from another platform; a JSON answer that isn't an object
+        "does not look like a Hue bridge"; a status without a reason phrase no longer leaves two spaces.
+      - A malformed answer is a transient `HueApiError`: a toggle is tried once more and fails with its message, the
+        supervisor waits for the bridge every 10 s instead of stopping and restarting 30 s later, and the flows show it
+        as `cannot_connect`, `lights_unavailable` or `import_failed` with its message instead of `unexpected`.
+      - Edge cases: keys only as the bridge writes them (`bridgeid`, not `BridgeID`), the last of a repeated key, any
+        charset that Python decodes (UTF-7 too, US-ASCII with U+FFFD), byte order marks of UTF-16 and UTF-32 only with
+        their charset, a pairing error with a blank description reads "no description", letters outside the Basic
+        Multilingual Plane count in the device type, and a shortened answer counts characters. Names resolve with the
+        system's resolver. The fake bridge counts a device type of U+001C-U+001F alone as blank and its length in
+        characters, and `FAKE_HUE_PORT` takes what `int()` takes.
+    - **Outside the slice:** nothing in the end. Two earlier commits made the tests of the runner's, the supervisor's
+      and the flows' unexpected failures raise from the in-memory bridge, through a `Bridge.fail` that took an
+      exception, instead of reading `{"data":[null]}`, which the client now reads as a `HueApiError`. They were dropped
+      at the rebases, as slices F, E and D had already made those failures in their own way.
+    - **Tests:** 257 cases in the slice's files, where there were 91: `tests/engine/test_hue_address.py`, new, 67
+      cases of addresses accepted and refused, table-driven; `test_hue_client.py` 92 (was 18): pins, connections, the
+      system's resolver, one TLS handshake for three requests, request URLs and ids, every failed status, 21 answers
+      that aren't CLIP answers, nulls, keys, charsets and reason phrases; the bridge info and pairing tests of
+      `test_hue_setup.py` 48 (was 29), with the pairing answers table-driven; `test_toggler.py` 13 (was 8), with the
+      requests and log lines of failed reads and writes; `tests/tools/test_fake_hue.py` 37 (was 36). They cover all of
+      `hue_address.py` and `toggler.py`; all of `hue_client.py` but the branches of a transport closed unused and of a
+      connection without a certificate; and all of `hue_setup.py` outside discovery. 19 mutations, one at a time, each
+      failed a test, among them a last label of digits, any zone, port 0, unescaped dots, a null as malformed, 429 as
+      not transient, aiohttp's default resolver, a byte order mark kept, a charset ignored, errors of a 2xx ignored,
+      keys matched without regard to case, ASCII-only device types, a retry after a read refused for good and a fake
+      bridge counting bytes; two more survived, an explicit check for white space and a lowercasing that yarl already
+      does, both then removed.
+    - **Checks:** `scripts/check` passed on each commit (`test-each-commit.sh`), ending with 1,316 tests, where `main`
+      at 7a81c91 has 1,150, and `check-commits.sh` passed. `scripts/e2e` passed all 45 checks in 13.6 s. Two TLS tests
+      that depend on how a closed connection is reported each passed 10 runs in a row: a server that hangs up at once
+      gives "Connection reset by peer", and a plain HTTP server "The TLS handshake failed".
   - **C `yaml`:**
     - **Changed:** three commits on `py/yaml`, from `main` at 2a958f9, the last of them this entry. `yaml_import.py`
       reads the pasted text with PyYAML, through a subclass of `getattr(yaml, "CSafeLoader", yaml.SafeLoader)` whose
