@@ -1,9 +1,8 @@
-"""Tests of the activity buffer: the entries it keeps, their format, and the callbacks."""
+"""Tests of the activity buffer: the entries it keeps and their format."""
 
 from collections.abc import Iterator
 from datetime import UTC, datetime
 import logging
-import threading
 
 import pytest
 
@@ -120,53 +119,3 @@ def test_an_entry_has_the_time_it_was_logged(logger: logging.Logger) -> None:
     assert entry == ActivityEntry(
         1, datetime(2026, 11, 24, 12, 0, tzinfo=UTC), LogLevel.INFORMATION, "lan_monitor", "at noon", None
     )
-
-
-def test_added_callbacks_get_every_entry_outside_the_buffers_lock(logger: logging.Logger) -> None:
-    buffer = ActivityBuffer()
-    logger.addHandler(buffer)
-    added: list[str] = []
-    read: list[list[str]] = []
-    readers: list[threading.Thread] = []
-    in_time: list[bool] = []
-
-    def reader(entry: ActivityEntry) -> None:
-        # Another thread can read the buffer while the callback runs.
-        thread = threading.Thread(target=lambda: read.append([e.message for e in buffer.get(after=0, limit=10)]))
-        readers.append(thread)
-        thread.start()
-        thread.join(1)
-        in_time.append(not thread.is_alive())
-
-    remove = buffer.add_added_callback(lambda entry: added.append(entry.message))
-    buffer.add_added_callback(reader)
-    logger.info("one")
-    remove()
-    logger.info("two")
-    for thread in readers:
-        thread.join()
-
-    assert added == ["one"]
-    assert in_time == [True, True]
-    assert read == [["one"], ["one", "two"]]
-
-
-def test_a_failing_callback_never_fails_the_code_that_logs(
-    logger: logging.Logger, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    buffer = ActivityBuffer()
-    logger.addHandler(buffer)
-    failed: list[logging.LogRecord] = []
-    monkeypatch.setattr(buffer, "handleError", failed.append)
-    later: list[str] = []
-
-    def failing(entry: ActivityEntry) -> None:
-        raise RuntimeError("boom")
-
-    buffer.add_added_callback(failing)
-    buffer.add_added_callback(lambda entry: later.append(entry.message))
-    logger.info("kept")
-
-    assert [entry.message for entry in buffer.get(after=0, limit=10)] == ["kept"]
-    assert [record.getMessage() for record in failed] == ["kept"]
-    assert later == []

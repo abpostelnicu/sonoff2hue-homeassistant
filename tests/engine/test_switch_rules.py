@@ -113,7 +113,6 @@ async def test_create_switch_validates_the_input() -> None:
     with pytest.raises(SwitchValidationError) as unknown_light:
         await create(switches, SwitchInput(device_id=_DEVICE, lights=["Kitchen"]))
 
-    assert invalid.value.status == 400
     assert list(invalid.value.errors) == ["deviceId", "targets"]
     assert unknown_light.value.errors == {
         "targets": [f"{_DEVICE}: no Hue light named 'Kitchen'. Known lights: 'Ceiling', 'Floor lamp'"]
@@ -170,12 +169,9 @@ async def test_a_device_id_is_configured_once() -> None:
     with pytest.raises(SwitchNotFoundError) as missing:
         await update(switches, "1000BBBBBB ", SwitchInput(device_id=_DEVICE, lights=["Ceiling"]))
 
-    assert (again.value.status, str(again.value)) == (
-        409,
-        "Device 1000abcdef is already configured. Edit that switch instead.",
-    )
+    assert str(again.value) == "Device 1000abcdef is already configured. Edit that switch instead."
     assert str(taken.value) == "Device 1000999999 is already configured by another switch."
-    assert (missing.value.status, str(missing.value)) == (404, "No switch with device id 1000bbbbbb is configured.")
+    assert str(missing.value) == "No switch with device id 1000bbbbbb is configured."
 
 
 async def test_a_changed_device_id_drops_a_kept_key() -> None:

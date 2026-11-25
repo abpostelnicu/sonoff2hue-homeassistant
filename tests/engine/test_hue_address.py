@@ -112,17 +112,3 @@ def test_a_refused_address(address: str) -> None:
 @pytest.mark.parametrize("address", ["", " \t\n"])
 def test_an_empty_address(address: str) -> None:
     assert refusal(address) == "The Hue bridge address is empty."
-
-
-@pytest.mark.parametrize(
-    ("address", "uri"),
-    [
-        ("192.168.1.20", "https://192.168.1.20/"),
-        ("[fe80::1%eth0]:8443", "https://[fe80::1%eth0]:8443/"),
-        ("xn--bcher-kva.local:8443", "https://b\u00fccher.local:8443/"),
-    ],
-)
-def test_the_url_as_shown(address: str, uri: str) -> None:
-    base = create_base_url(address)
-
-    assert base.uri == str(base) == uri

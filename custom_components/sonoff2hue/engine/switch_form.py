@@ -66,11 +66,6 @@ def used_by(switches: Iterable[SwitchSettings], device_id: str | None, original_
     return None
 
 
-def current_device_id(manual: bool, typed: str, selected: str | None) -> str:
-    """The typed id, stripped, or the chosen one."""
-    return typed.strip() if manual else (selected or "")
-
-
 def device_key_value(mode: KeyMode, typed: str) -> str | None:
     """``None`` keeps the current key, ``""`` removes it, else the typed key, stripped."""
     if mode == "keep":

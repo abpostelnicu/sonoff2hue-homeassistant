@@ -99,12 +99,6 @@ def test_the_edited_switch_may_keep_its_device() -> None:
     ]
 
 
-def test_current_device_id() -> None:
-    assert switch_form.current_device_id(True, " 1000abcdef\u3000", "1000999999") == _DEVICE
-    assert switch_form.current_device_id(False, "typed", " 1000999999 ") == " 1000999999 "
-    assert switch_form.current_device_id(False, "typed", None) == ""
-
-
 def test_identify_by_press_skips_devices_of_other_switches() -> None:
     assert switch_form.identify(SWITCHES, None, "1000aaaaaa") == switch_form.Identified(
         True, "Selected 1000aaaaaa: it reported a press."
@@ -242,8 +236,7 @@ async def test_a_switch_added_with_the_picker_is_saved_with_the_encoded_entries(
     selection.zone.add("z1")
     targets = picker.selection_to_config(selection, resources)
 
-    device_id = switch_form.current_device_id(True, " 1000ABCDEF ", None)
-    body = switch_form.form_input(" Kitchen ", device_id, "set", "", targets.lights, targets.groups)
+    body = switch_form.form_input(" Kitchen ", "1000ABCDEF", "set", "", targets.lights, targets.groups)
     assert switch_form.form_problems(body, [], None, manual_device=True, manual_targets=False, key_mode="set") == []
     write = await switch_rules.create_switch(list, body, hue, bridge.connect)
 

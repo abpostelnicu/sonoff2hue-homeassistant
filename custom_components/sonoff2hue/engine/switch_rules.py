@@ -59,15 +59,11 @@ class SwitchInput:
 
 
 class SwitchError(Exception):
-    """A switch that wasn't saved; ``status`` says why, as an HTTP status code would."""
-
-    status = 0
+    """A switch that wasn't saved; the subclass says why."""
 
 
 class SwitchValidationError(SwitchError):
-    """400: ``errors`` holds the messages by field, and ``str()`` joins them."""
-
-    status = 400
+    """The switch breaks the rules: ``errors`` holds the messages by field, and ``str()`` joins them."""
 
     def __init__(self, errors: Errors) -> None:
         super().__init__(" ".join(message for messages in errors.values() for message in messages))
@@ -75,15 +71,11 @@ class SwitchValidationError(SwitchError):
 
 
 class SwitchConflictError(SwitchError):
-    """409: the device id belongs to another switch."""
-
-    status = 409
+    """The device id belongs to another switch."""
 
 
 class SwitchNotFoundError(SwitchError):
-    """404: the switch to change doesn't exist."""
-
-    status = 404
+    """The switch to change doesn't exist."""
 
 
 def _blank(value: str | None) -> bool:

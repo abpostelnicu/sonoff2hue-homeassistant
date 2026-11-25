@@ -504,7 +504,7 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
                 return self._show_manual(selected, error)
             return self._show_manual("", None)
         typed = user_input.get(DEVICE_ID, "")
-        device_id = switch_form.current_device_id(True, typed, None)
+        device_id = typed.strip()
         if (problem := self._device_problem(device_id, manual=True)) is not None:
             return self._show_manual(typed, problem)
         self._select(device_id, manual=True)

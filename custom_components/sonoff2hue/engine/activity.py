@@ -6,7 +6,6 @@ in Home Assistant's log.
 """
 
 from collections import deque
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -59,28 +58,11 @@ class ActivityBuffer(logging.Handler):
         self._sync = threading.Lock()
         self._entries: deque[ActivityEntry] = deque(maxlen=capacity)
         self._ids = itertools.count(1)
-        self._added: list[Callable[[ActivityEntry], None]] = []
-
-    def add_added_callback(self, callback: Callable[[ActivityEntry], None]) -> Callable[[], None]:
-        """Calls ``callback`` for every new entry, outside the buffer's lock and on the thread that logged it; returns a
-        function that removes it. A callback that raises is reported as ``logging`` reports a failing handler."""
-        self._added.append(callback)
-        return lambda: self._added.remove(callback)
 
     def get(self, after: int, limit: int) -> list[ActivityEntry]:
         """The newest ``limit`` entries with an id above ``after``, oldest first; a limit of 0 gives none."""
         with self._sync:
             return list(deque((entry for entry in self._entries if entry.id > after), maxlen=limit))
-
-    def handle(self, record: logging.LogRecord) -> bool:
-        # logging.Handler.handle emits under the handler's I/O lock, which the buffer doesn't need: it has a lock of its
-        # own, and the callbacks run outside any lock, so that one can't block another thread that logs.
-        result = self.filter(record)
-        if isinstance(result, logging.LogRecord):
-            record = result
-        if result:
-            self.emit(record)
-        return bool(result)
 
     def emit(self, record: logging.LogRecord) -> None:
         try:
@@ -89,10 +71,9 @@ class ActivityBuffer(logging.Handler):
             message = record.getMessage()
             exception = _describe(record)
             with self._sync:
-                entry = ActivityEntry(next(self._ids), at, level, _category(record.name), message, exception)
-                self._entries.append(entry)
-            for callback in list(self._added):
-                callback(entry)
+                self._entries.append(
+                    ActivityEntry(next(self._ids), at, level, _category(record.name), message, exception)
+                )
         except Exception:  # noqa: BLE001 - logging must never fail the code that logs
             self.handleError(record)
 

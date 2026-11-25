@@ -34,15 +34,6 @@ class BridgeUrl:
     """The host as shown: a lowercased host name, an IPv4 address, or an IPv6 address in brackets."""
     port: int
 
-    @property
-    def uri(self) -> str:
-        """The URL as shown, such as ``https://192.168.1.20/`` or ``https://bridge.local:8443/``."""
-        port = "" if self.port == DEFAULT_PORT else f":{self.port}"
-        return f"https://{self.host}{port}/"
-
-    def __str__(self) -> str:
-        return self.uri
-
 
 def create_base_url(address: str) -> BridgeUrl:
     """The bridge's base URL; raises :class:`ConfigError` with the reason when the address can't be used."""
