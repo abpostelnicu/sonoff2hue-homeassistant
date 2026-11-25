@@ -1632,7 +1632,8 @@ documentation:
       unchanged.
     - **Checks:** `scripts/check` passed on each commit (`test-each-commit.sh`), and `check-commits.sh` for all eight.
       `scripts/e2e` passed all 45 checks, in 13.0 s at the head. On the pull request, all 16 checks passed; one
-      per-commit job failed on its first run, in the flaky test below, and passed when run again.
+      per-commit job failed on its first run, in the test that the entry below made deterministic, and passed when run
+      again.
   - **The README, `en.json` and this file**: three commits on `py/docs`, prepared on 5a5f3eb and rebased onto the
     cleanup at b19800d.
     - `README.md` describes sonoff2hue on its own, and *How it works* says that it listens with an mDNS socket of its
@@ -1662,11 +1663,17 @@ documentation:
       `check-commits.sh` and `test-each-commit.sh` for each of the three commits. A sweep of the three files for the
       names of the other platform, its tools and its interface found only `radio_browser`, a Home Assistant integration,
       and the README's "your browser", where VS Code opens Home Assistant.
-- 2026-11-25, open: `tests/test_diagnostics.py::test_no_secret_reaches_the_diagnostics_or_the_log` fails about 1 run in
-  256, on `main` too. It sends the switch Desk a payload encrypted under Hall's device key with a random IV, and expects
-  the decode error "decryption failed, check the deviceKey"; when the wrong key's plaintext happens to end in valid
-  PKCS7 padding, the error is "payload is not valid JSON, check the deviceKey" instead. A fixed IV in that broadcast
-  would make it deterministic.
+- 2026-11-25: `tests/test_diagnostics.py::test_no_secret_reaches_the_diagnostics_or_the_log` made deterministic
+  (decision 26). It sends the switch Desk a payload encrypted under Hall's device key, and expects the decode error
+  "decryption failed, check the deviceKey". The fake LAN (`Lan` in `tests/fakes.py`) encrypted it under a random IV,
+  and under the wrong key the plaintext ended in valid PKCS7 padding for 755 of 200,000 random IVs, 1 in 265: then the
+  error is "payload is not valid JSON, check the deviceKey", and the test failed, on `main` too.
+  - **Reproduced:** with one of those IVs forced on every IV that `ewelink.encrypt` draws, by a throwaway pytest
+    plugin, the test failed at that assertion every time.
+  - **Fixed:** `Lan` encrypts its broadcasts under a fixed IV, `ENCRYPTION_IV`, under which Hall's key fails to decrypt
+    Desk's payload. The other tests decrypt what they encrypt with the same key, which succeeds under any IV.
+  - **Checked:** with the plugin forcing that IV as before, the test passed, as the fake no longer draws one. It passed
+    25 runs in a row, and `scripts/check` passed with its 1,307 tests.
 
 ## Status
 

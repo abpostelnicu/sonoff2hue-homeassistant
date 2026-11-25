@@ -334,6 +334,7 @@ async def test_no_secret_reaches_the_diagnostics_or_the_log(
     await until(lambda: runtime_data.status.service.state is ServiceState.RUNNING)
     lan.broadcast(1, params=relay(True), key=device_key)
     lan.broadcast(2, params=relay(True), key=device_key)
+    # Desk's payload under Hall's key, which Desk's key fails to decrypt: under the fake LAN's fixed IV, in every run.
     lan.broadcast(1, OTHER_DEVICE_ID, params=relay(True), key=device_key)
     await until(lambda: runtime_data.status.snapshot().switches[0].last_action is not None)
     await runtime_data.async_test_toggle(DEVICE_ID)

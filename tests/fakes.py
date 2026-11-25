@@ -44,6 +44,10 @@ BRIDGE_ID = "001788FFFE000001"
 APP_KEY = "app-key"
 PIN = "AB" * 32
 DEVICE_KEY = "test-device-key"
+ENCRYPTION_IV = bytes(range(16))
+"""The IV of the broadcasts that :class:`Lan` encrypts. A device draws a random one; a fixed one makes a payload sent
+under another switch's key fail the same way in every run. Under a wrong key, about one IV in 265 decrypts to valid
+padding, and the decode error then says that the payload is not valid JSON instead of that decryption failed."""
 NO_ERRORS = '{"errors":[],"data":[]}'
 
 
@@ -69,14 +73,14 @@ class Lan:
         key: str | None = None,
         iv: str = "iv",
     ) -> None:
-        """A MINIR4M's state broadcast: ``params`` in plain text, or encrypted with ``key``; without either, an encrypted
-        payload that nothing decrypts without its key."""
+        """A MINIR4M's state broadcast: ``params`` in plain text, or encrypted with ``key`` under
+        :data:`ENCRYPTION_IV`; without either, an encrypted payload that nothing decrypts without its key."""
         if params is None:
             data, encrypted = f"payload{seq}", True
         elif key is None:
             data, encrypted = json.dumps(params, separators=(",", ":")), False
         else:
-            data, iv = ewelink.encrypt(json.dumps(params, separators=(",", ":")), key)
+            data, iv = ewelink.encrypt(json.dumps(params, separators=(",", ":")), key, ENCRYPTION_IV)
             encrypted = True
         self.network.deliver(
             announcement(device_id, seq, data, iv, encrypted=encrypted, ip=DEVICE_ADDRESS), (DEVICE_ADDRESS, 5353)
