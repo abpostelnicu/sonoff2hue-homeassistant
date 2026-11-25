@@ -41,7 +41,6 @@ from custom_components.sonoff2hue.const import (
 )
 from custom_components.sonoff2hue.engine import hue_setup, supervisor, yaml_import
 from custom_components.sonoff2hue.engine.config import ConfigError
-from custom_components.sonoff2hue.engine.errors import UnexpectedError
 from custom_components.sonoff2hue.engine.hue_client import AiohttpTransport, HueApiError, HueBridgeInfo
 from custom_components.sonoff2hue.engine.hue_setup import (
     DiscoveredBridge,
@@ -504,17 +503,18 @@ async def test_an_address_of_something_else(hass: HomeAssistant, fake_hue: FakeH
     }
 
 
-async def test_an_answer_that_dotnet_fails_on(
-    hass: HomeAssistant, fake_hue: FakeHueHost, caplog: pytest.LogCaptureFixture
+async def test_an_unexpected_failure_while_reading_the_bridge(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
 ) -> None:
-    fake_hue.fail(Fault("/api/0/config", status=200, body='{"bridgeid":"a","BRIDGEID":"b"}'))
+    failure = RuntimeError("The bridge's answer couldn't be read.")
 
-    result = await pair_at(hass, fake_hue.address)
+    with patch.object(config_flow, "get_bridge_info", AsyncMock(side_effect=failure)):
+        result = await pair_at(hass, "192.0.2.10")
 
     assert (result["step_id"], result["errors"]) == ("address", {"base": "unexpected"})
-    assert result["description_placeholders"]["error"].startswith("An item with the same key has already been added.")
+    assert result["description_placeholders"] == {"error": str(failure)}
     [(level, message)] = flow_log(caplog)
-    assert (level, message) == (logging.ERROR, f"Reading the Hue bridge at {fake_hue.address} failed.")
+    assert (level, message) == (logging.ERROR, "Reading the Hue bridge at 192.0.2.10 failed.")
     assert flow_records(caplog)[-1].exc_info is not None
 
 
@@ -608,8 +608,8 @@ async def test_when_no_bridge_answers_the_search_can_run_again(hass: HomeAssista
 
 
 async def test_a_search_that_fails(hass: HomeAssistant, search: Search, caplog: pytest.LogCaptureFixture) -> None:
-    message = "An item with the same key has already been added. Key: id (Parameter 'key')"
-    search.results.append(UnexpectedError("ArgumentException", message))
+    message = "The search stopped unexpectedly."
+    search.results.append(RuntimeError(message))
 
     result = await done(hass, await choose(hass, await start(hass), "discover"))
 
@@ -755,14 +755,12 @@ async def test_a_bridge_that_refuses_ends_the_pairing(
 async def test_an_unexpected_failure_ends_the_pairing(
     hass: HomeAssistant, fake_hue: FakeHueHost, caplog: pytest.LogCaptureFixture
 ) -> None:
-    with pairing_ends(
-        UnexpectedError("NullReferenceException", "Object reference not set to an instance of an object.")
-    ):
+    with pairing_ends(RuntimeError("The bridge's answer couldn't be read.")):
         result = await done(hass, await pair_at(hass, fake_hue.address))
 
     assert (result["step_id"], result["description_placeholders"]) == (
         "link_failed",
-        {"error": "Pairing failed: Object reference not set to an instance of an object."},
+        {"error": "Pairing failed: The bridge's answer couldn't be read."},
     )
     assert flow_log(caplog)[-1] == (logging.ERROR, f"Pairing with the Hue bridge at {fake_hue.address} failed.")
     assert flow_records(caplog)[-1].exc_info is not None
@@ -1286,18 +1284,16 @@ async def test_a_bridge_that_gives_no_bridge_id(hass: HomeAssistant, fake_hue: F
     )
 
 
-async def test_a_bridge_answer_that_dotnet_fails_on(
+async def test_an_unexpected_failure_while_connecting_to_the_files_bridge(
     hass: HomeAssistant, fake_hue: FakeHueHost, caplog: pytest.LogCaptureFixture
 ) -> None:
     app_key = await fake_hue.pair()
-    fake_hue.fail(Fault("/clip/v2/resource/bridge", status=200, body='{"errors":[null]}'))
+    failure = RuntimeError("The bridge's answer couldn't be read.")
 
-    result = await import_file(hass, config_file(bridgeIp=fake_hue.address, appKey=app_key))
+    with patch.object(config_flow, "get_bridge_info", AsyncMock(side_effect=failure)):
+        result = await import_file(hass, config_file(bridgeIp=fake_hue.address, appKey=app_key))
 
-    assert (result["step_id"], result["description_placeholders"]) == (
-        "import_failed",
-        {"error": "Object reference not set to an instance of an object."},
-    )
+    assert (result["step_id"], result["description_placeholders"]) == ("import_failed", {"error": str(failure)})
     assert flow_log(caplog) == [(logging.ERROR, f"Connecting to the Hue bridge at {fake_hue.address} failed.")]
     assert flow_records(caplog)[-1].exc_info is not None
 
@@ -1459,12 +1455,19 @@ async def test_a_file_that_the_run_would_refuse(hass: HomeAssistant, text: str, 
     assert result["description_placeholders"] == {"error": message}
 
 
-async def test_a_file_whose_reading_ends_dotnet(hass: HomeAssistant, caplog: pytest.LogCaptureFixture) -> None:
-    result = await import_file(hass, "a\n")
+async def test_an_unexpected_failure_while_reading_a_file(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    failure = RuntimeError("The file stopped the reader.")
+
+    with patch.object(yaml_import, "parse", side_effect=failure):
+        result = await import_file(hass, SWITCHES)
 
     assert (result["step_id"], result["errors"]) == ("import_yaml", {"config": "unreadable_config"})
-    assert result["description_placeholders"] == {"error": "Stack overflow."}
+    assert result["description_placeholders"] == {"error": str(failure)}
+    assert suggested(result, "config") is None
     assert flow_log(caplog) == [(logging.ERROR, "Reading the pasted sonoff2hue.yaml failed.")]
+    assert flow_records(caplog)[-1].exc_info is not None
 
 
 async def test_an_imported_entry_is_answered_over_http_without_its_keys(

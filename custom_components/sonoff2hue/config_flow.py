@@ -58,7 +58,6 @@ from .const import (
 )
 from .engine import yaml_import
 from .engine.config import ConfigError, EngineConfig, HueSettings, SwitchSettings
-from .engine.errors import UnexpectedError
 from .engine.hue_address import try_create_base_url
 from .engine.hue_client import PAIR_AGAIN, HueApiError, HueBridgeInfo
 from .engine.hue_setup import (
@@ -333,7 +332,7 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
             raise _BridgeError("cannot_connect", str(err)) from err
         except ConfigError as err:
             raise _BridgeError("invalid_address", str(err)) from err
-        except UnexpectedError as err:
+        except Exception as err:
             _LOGGER.exception("Reading the Hue bridge at %s failed.", address)
             raise _BridgeError("unexpected", str(err)) from err
         if self._removed:
@@ -504,7 +503,7 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
             except ConfigError as err:
                 errors[CONFIG] = "invalid_config"
                 placeholders["error"] = str(err)
-            except UnexpectedError as err:
+            except Exception as err:
                 _LOGGER.exception("Reading the pasted sonoff2hue.yaml failed.")
                 errors[CONFIG] = "unreadable_config"
                 placeholders["error"] = str(err)
@@ -565,7 +564,7 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
             info = await get_bridge_info(hue.bridge_ip or "")
         except HueApiError as err:
             return _Failed("import_failed", str(err).replace(PAIR_AGAIN, PAIR_INSTEAD))
-        except UnexpectedError as err:
+        except Exception as err:
             _LOGGER.exception("Connecting to the Hue bridge at %s failed.", hue.bridge_ip)
             return _Failed("import_failed", str(err))
         finally:
