@@ -18,9 +18,10 @@ from custom_components.sonoff2hue.engine.errors import UnexpectedError
 from custom_components.sonoff2hue.engine.hue_client import HueClient
 from custom_components.sonoff2hue.engine.mdns import MdnsListener
 from custom_components.sonoff2hue.engine.registry import DeviceRegistry
-from custom_components.sonoff2hue.engine.runner import RunnerObserver
+from custom_components.sonoff2hue.engine.runner import RunnerObserver, SwitchBinding
 from custom_components.sonoff2hue.engine.status import ServiceState, ServiceStatus, StatusTracker
 from custom_components.sonoff2hue.engine.supervisor import BridgeSupervisor, HueClientFactory, create_hue_client
+from custom_components.sonoff2hue.engine.toggler import ToggleResult
 
 from ..hue import InMemoryBridge, RecordedRequest
 from .fakes import FakeNetwork, VirtualTime, until
@@ -134,6 +135,7 @@ class Harness:
         config: EngineConfig,
         hue_clients: HueClientFactory | None = None,
         on_key_rejected: Callable[[], None] | None = None,
+        observer: RunnerObserver | None = None,
     ) -> None:
         self.time = time
         self.bridge = Bridge(time)
@@ -147,6 +149,7 @@ class Harness:
             self.status,
             hue_clients=hue_clients or self.bridge.clients(),
             on_key_rejected=on_key_rejected,
+            observer=observer,
             clock=time.utc,
         )
         self.listening: asyncio.Task[None] | None = None
@@ -491,25 +494,36 @@ async def test_a_key_rejected_while_running_calls_the_hook_after_each_refusal(ti
     await harness.stop()
 
 
-def test_the_runners_observer_passes_every_report_to_the_tracker() -> None:
-    """Each of the runner's reports reaches the tracker with its arguments, and a rejected key reaches the hook too."""
-    calls: list[tuple[str, tuple[object, ...]]] = []
+@pytest.mark.parametrize("with_observer", [False, True])
+def test_the_runners_observer_passes_every_report_to_the_tracker(with_observer: bool) -> None:
+    """Each of the runner's reports reaches the tracker with its arguments, then the supervisor's observer if it has
+    one, and a rejected key reaches the hook too."""
+    calls: list[tuple[str, str, tuple[object, ...]]] = []
 
-    class Tracker:
+    class Recorder:
+        def __init__(self, who: str) -> None:
+            self._who = who
+
         def __getattr__(self, name: str) -> Callable[..., None]:
-            return lambda *args: calls.append((name, args))
+            return lambda *args: calls.append((self._who, name, args))
 
     hooked: list[bool] = []
-    observer = supervisor._Observer(Tracker(), lambda: hooked.append(True))
-    expected: list[tuple[str, tuple[object, ...]]] = []
+    observer = supervisor._Observer(
+        Recorder("tracker"),  # type: ignore[arg-type]
+        lambda: hooked.append(True),
+        Recorder("observer") if with_observer else None,  # type: ignore[arg-type]
+    )
+    expected: list[tuple[str, str, tuple[object, ...]]] = []
     for name, method in vars(RunnerObserver).items():
         if callable(method) and not name.startswith("_"):
             args = tuple(object() for _ in list(inspect.signature(method).parameters)[1:])
             getattr(observer, name)(*args)
-            expected.append((name, args))
+            expected.append(("tracker", name, args))
+            if with_observer:
+                expected.append(("observer", name, args))
 
     assert calls == expected
-    assert [name for name, _ in expected][-1] == "on_key_rejected"
+    assert [name for _, name, _ in expected][-1] == "on_key_rejected"
     assert hooked == [True]
 
 
@@ -570,7 +584,23 @@ async def test_running_names_the_switches_and_their_targets(start: Callable[...,
 
 
 async def test_presses_toggle_the_lights_and_reach_the_tracker(start: Callable[..., Awaitable[Harness]]) -> None:
-    harness = await start(EngineConfig(PAIRED, [hall()]))
+    reports: list[tuple[str, object]] = []
+
+    class Observer(RunnerObserver):
+        """Records what the runner reports, and what the tracker knew by then."""
+
+        status: StatusTracker
+
+        def on_press(self, binding: SwitchBinding, seq: int | None) -> None:
+            reports.append(("press", seq))
+
+        def on_toggled(self, binding: SwitchBinding, result: ToggleResult, elapsed: timedelta) -> None:
+            (switch,) = self.status.snapshot().switches
+            reports.append(("toggled", switch.last_action is not None and switch.last_action.turned_on))
+
+    observer = Observer()
+    harness = await start(EngineConfig(PAIRED, [hall()]), observer=observer)
+    observer.status = harness.status
     await asyncio.sleep(1)
 
     harness.broadcast(1)
@@ -582,6 +612,8 @@ async def test_presses_toggle_the_lights_and_reach_the_tracker(start: Callable[.
     assert switch.last_action is not None
     assert (switch.last_action.turned_on, switch.last_action.changed, switch.last_action.failed) == (True, 1, 0)
     assert switch.last_error is None
+    # The supervisor's observer got the runner's reports, each after the tracker.
+    assert reports == [("press", 2), ("toggled", True)]
 
 
 # Failures.

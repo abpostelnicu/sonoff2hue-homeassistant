@@ -12,9 +12,9 @@ lock has no counterpart. An injected clock that returns an aware UTC datetime re
 
 Use, for the Home Assistant runtime: make one for a configuration and its registry, add a listener with
 :meth:`StatusTracker.add_listener`, pass the tracker to the bridge supervisor, read :meth:`StatusTracker.snapshot`
-whenever needed, and :meth:`StatusTracker.close` it when the config entry unloads, after the supervisor stopped. A runtime
-that keeps the tracker and its registry across a reload calls :meth:`StatusTracker.config_changed` instead, as .NET kept
-them across configuration changes.
+whenever needed, and :meth:`StatusTracker.close` it when the config entry unloads. The runtime keeps the tracker and its
+registry while the configuration changes, as .NET kept them, and calls :meth:`StatusTracker.config_changed` for each
+change (decision 23).
 """
 
 import asyncio
@@ -32,6 +32,8 @@ from .toggler import ToggleResult
 
 PUBLISH_DELAY = 0.5
 """Seconds that changes are collected before the listeners get a snapshot with all of them."""
+PRESS_DROPPED = "A press was dropped because it waited more than 5 seconds for the Hue bridge."
+"""A switch's last error after the runner dropped a press."""
 
 
 class ServiceState(StrEnum):
@@ -228,7 +230,7 @@ class StatusTracker(RunnerObserver):
         self._record_error(binding, message)
 
     def on_press_dropped(self, binding: SwitchBinding) -> None:
-        self._record_error(binding, "A press was dropped because it waited more than 5 seconds for the Hue bridge.")
+        self._record_error(binding, PRESS_DROPPED)
 
     def on_bridge_reachability(self, reachable: bool, message: str | None) -> None:
         self.set_bridge_reachability(reachable, message)
@@ -276,9 +278,9 @@ class StatusTracker(RunnerObserver):
         )
 
     def config_changed(self, config: EngineConfig) -> None:
-        """``OnConfigChanged``, for a runtime that keeps the tracker across a reload of the config entry: snapshots show
-        the new configuration. Reachability belongs to one bridge: editing switches keeps it, pairing again or another
-        bridge resets it."""
+        """``OnConfigChanged``, for each change of the configuration, which the runtime applies without reloading the
+        config entry: snapshots show the new configuration. Reachability belongs to one bridge: editing switches keeps
+        it, pairing again or another bridge resets it."""
         self._config = config
         bridge = _bridge_identity(config.hue)
         if bridge != self._bridge:

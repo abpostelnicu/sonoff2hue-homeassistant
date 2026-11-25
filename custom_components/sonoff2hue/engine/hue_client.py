@@ -31,6 +31,11 @@ from .jsonnode import MAX_DEPTH, nesting_depth, reject_constant
 
 PAIR_AGAIN = "reconfigure the sonoff2hue integration to pair the bridge again"
 """What the .NET app's messages said with "run 'sonoff2hue hue-pair' again"."""
+CERTIFICATE_MISMATCH = (
+    "The Hue bridge TLS certificate does not match the pinned certificateSha256. If the bridge was replaced or reset, "
+    f"{PAIR_AGAIN}."
+)
+"""Why a request failed when the bridge's certificate isn't the pinned one, or the TLS handshake failed."""
 
 REQUEST_TIMEOUT = 5.0
 CONNECT_TIMEOUT = 4.0
@@ -445,10 +450,7 @@ class HueClient:
             answer = await self._transport.send(method, path, body, self._headers)
         except TransportError as err:
             if err.kind == "certificate":
-                raise HueApiError(
-                    "The Hue bridge TLS certificate does not match the pinned certificateSha256. If the bridge was "
-                    f"replaced or reset, {PAIR_AGAIN}."
-                ) from err
+                raise HueApiError(CERTIFICATE_MISMATCH) from err
             if err.kind == "timeout":
                 raise HueApiError("Hue bridge request timed out.") from err
             raise HueApiError(f"Hue bridge not reachable: {err.detail}") from err

@@ -7,18 +7,19 @@ entry's mDNS listener, which the LAN monitor runs and keeps running. Every step 
 
 What Home Assistant replaces:
 
-- .NET's ``ConfigStore`` restarted the supervisor's run with the new configuration after every change. Home Assistant
-  reloads the config entry for every change instead, so a supervisor runs one :class:`EngineConfig` until it is
-  cancelled, and the reload starts a new one. :meth:`BridgeSupervisor.config_changed` logs, as .NET did then, that the
-  bridge restarts.
+- .NET's ``ConfigStore`` restarted the supervisor's run with the new configuration after every change. The runtime
+  restarts the supervisor for every change instead (decision 23): a supervisor runs one :class:`EngineConfig` until it
+  is cancelled, and the runtime starts one for the new configuration. :meth:`BridgeSupervisor.config_changed` logs, as
+  .NET did then, that the bridge restarts.
 - .NET's "The config file can't be read." state has no counterpart: there is no config file.
 - ``HueClientFactory`` is the ``hue_clients`` parameter, so that tests can pass an in-memory bridge.
 
 Use, for the Home Assistant runtime: run :meth:`BridgeSupervisor.run` as the config entry's background task. Call
-:meth:`BridgeSupervisor.config_changed` from the entry's update listener, before the reload cancels the task. Cancelling
-it stops the runner and closes the Hue client, and leaves the listener running. ``on_key_rejected`` is called whenever
-the bridge rejects the application key, while the supervisor connects to it and while the runner runs, which is when
-the runtime starts Home Assistant's reauthentication.
+:meth:`BridgeSupervisor.config_changed` from the entry's update listener, before cancelling the task. Cancelling it
+stops the runner and closes the Hue client, and leaves the listener running. ``on_key_rejected`` is called whenever the
+bridge rejects the application key, while the supervisor connects to it and while the runner runs, which is when the
+runtime starts Home Assistant's reauthentication. ``observer`` gets the runner's reports after the status tracker, for
+the runtime's bus events.
 """
 
 import asyncio
@@ -78,27 +79,29 @@ class BridgeSupervisor:
         *,
         hue_clients: HueClientFactory = create_hue_client,
         on_key_rejected: Callable[[], None] | None = None,
+        observer: RunnerObserver | None = None,
         clock: Callable[[], datetime] = _now,
     ) -> None:
         """``listener`` is the config entry's mDNS listener, which the runner shares and which keeps running when the
         supervisor stops. ``on_key_rejected`` runs on the event loop soon after the bridge rejected the application key:
         while the supervisor connects to it, which leaves it in the error state until the next change, and after each
         keep-alive request or toggle that the bridge refuses so while the runner runs, which goes on as in .NET. One
-        that raises goes to the loop's exception handler. ``clock`` is the runner's, for the age of a press, and has to
-        agree with the listener's."""
+        that raises goes to the loop's exception handler. ``observer`` gets each of the runner's reports right after the
+        status tracker. ``clock`` is the runner's, for the age of a press, and has to agree with the listener's."""
         self._config = config
         self._listener = listener
         self._status = status
         self._hue_clients = hue_clients
         self._on_key_rejected = on_key_rejected
+        self._observer = observer
         self._clock = clock
         self._running = False
         self._waiting_after_failure = False
 
     def config_changed(self) -> None:
         """Logs that the bridge restarts with a new configuration, as .NET's supervisor did when its configuration
-        changed: while it runs, unless it is waiting to start again after an unexpected stop. Home Assistant then reloads
-        the config entry, which cancels this supervisor and starts one for the new configuration."""
+        changed: while it runs, unless it is waiting to start again after an unexpected stop. The runtime then cancels
+        this supervisor and starts one for the new configuration."""
         if self._running and not self._waiting_after_failure:
             _LOGGER.info("Configuration changed; restarting the bridge.")
 
@@ -170,7 +173,7 @@ class BridgeSupervisor:
                 _LOGGER.warning(NOT_PINNED)
 
             self._status.set_running(bindings)
-            observer = _Observer(self._status, self._report_key_rejected)
+            observer = _Observer(self._status, self._report_key_rejected, self._observer)
             await Runner(settings, bindings, hue, observer, self._clock).run(self._listener)
         finally:
             await hue.close()
@@ -204,36 +207,44 @@ class BridgeSupervisor:
 
 
 class _Observer(RunnerObserver):
-    """The runner's observer: every report goes to the status tracker, as in .NET, and a rejected key to the supervisor's
-    hook as well."""
+    """The runner's observer: every report goes to the status tracker, as in .NET, then to the supervisor's ``observer``
+    if it has one, and a rejected key to the supervisor's hook as well."""
 
-    def __init__(self, status: StatusTracker, key_rejected: Callable[[], None]) -> None:
-        self._status = status
+    def __init__(
+        self, status: StatusTracker, key_rejected: Callable[[], None], observer: RunnerObserver | None = None
+    ) -> None:
+        self._observers: tuple[RunnerObserver, ...] = (status,) if observer is None else (status, observer)
         self._key_rejected = key_rejected
 
     def on_press(self, binding: SwitchBinding, seq: int | None) -> None:
-        self._status.on_press(binding, seq)
+        for observer in self._observers:
+            observer.on_press(binding, seq)
 
     def on_toggled(self, binding: SwitchBinding, result: ToggleResult, elapsed: timedelta) -> None:
-        self._status.on_toggled(binding, result, elapsed)
+        for observer in self._observers:
+            observer.on_toggled(binding, result, elapsed)
 
     def on_toggle_failed(self, binding: SwitchBinding, message: str) -> None:
-        self._status.on_toggle_failed(binding, message)
+        for observer in self._observers:
+            observer.on_toggle_failed(binding, message)
 
     def on_press_dropped(self, binding: SwitchBinding) -> None:
-        self._status.on_press_dropped(binding)
+        for observer in self._observers:
+            observer.on_press_dropped(binding)
 
     def on_bridge_reachability(self, reachable: bool, message: str | None) -> None:
-        self._status.on_bridge_reachability(reachable, message)
+        for observer in self._observers:
+            observer.on_bridge_reachability(reachable, message)
 
     def on_key_rejected(self) -> None:
-        self._status.on_key_rejected()
+        for observer in self._observers:
+            observer.on_key_rejected()
         self._key_rejected()
 
 
 async def _wait_for_change() -> NoReturn:
-    """``Task.Delay(Timeout.Infinite, cancellationToken)``: waits until the supervisor is cancelled, which a reload of
-    the config entry does for every change."""
+    """``Task.Delay(Timeout.Infinite, cancellationToken)``: waits until the supervisor is cancelled, which the runtime
+    does for every change of the configuration."""
     while True:
         await asyncio.get_running_loop().create_future()
 

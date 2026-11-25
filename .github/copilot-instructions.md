@@ -1080,6 +1080,11 @@ documentation:
     matching tests: the subentries sent back, the bridge's checks without the bridge's settings, `PAIR_AGAIN` left in a
     message, the file's bridge id kept, a note for another letter case or for a missing id, a switch's unique id as
     written, and the text suggested again after an error.
+- 2026-11-25: the runtime (decision 23).
+  - The supervisor takes an `observer`, which its forwarder gives each of the runner's reports after the status
+    tracker: the forwarder test checks both, in that order, with an observer and without, and a press through a running
+    supervisor reaches the observer once the tracker has it. The engine names the two messages that the runtime uses,
+    `CERTIFICATE_MISMATCH` and `PRESS_DROPPED`, and its other tests pass unchanged.
 
 ## Status
 
