@@ -59,6 +59,8 @@ ask which eWeLink devices are on the LAN.
 - Nothing else that toggles the same lights when the switches are pressed, such as sonoff2hue in a second Home
   Assistant. With both running, every press would toggle the lights twice, and they would end up as they were.
 
+<!-- ha-marketplace:exclude-start -->
+
 ## Installation
 
 ### From the Marketplace
@@ -83,6 +85,8 @@ The Marketplace offers each new release as an update, with its release notes.
 3. Restart Home Assistant.
 
 To update, replace the folder with the one of the new release, and restart Home Assistant again.
+
+<!-- ha-marketplace:exclude-end -->
 
 ## Setup
 
