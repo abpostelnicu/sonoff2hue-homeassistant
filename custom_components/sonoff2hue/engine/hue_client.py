@@ -59,29 +59,29 @@ class HueTarget:
     """Something that can be switched on and off: a light, or the grouped_light of a room or zone."""
 
     kind: HueTargetKind
-    id: str | None
-    name: str | None
+    id: str
+    name: str
 
     def __str__(self) -> str:
-        name = self.name or ""
-        return f"light '{name}'" if self.kind == HueTargetKind.LIGHT else f"group '{name}'"
+        return f"light '{self.name}'" if self.kind == HueTargetKind.LIGHT else f"group '{self.name}'"
 
 
 @dataclass(frozen=True, slots=True)
 class HueLight:
     """A light; its name is its id when the bridge gives it none."""
 
-    id: str | None
-    name: str | None
+    id: str
+    name: str
     on: bool
 
 
 @dataclass(frozen=True, slots=True)
 class HueGroup:
-    """A room or zone. ``grouped_light_id`` is the resource that switches all its lights."""
+    """A room or zone; its name is its id when the bridge gives it none. ``grouped_light_id`` is the resource that
+    switches all its lights, ``None`` for a room or zone without lights."""
 
-    id: str | None
-    name: str | None
+    id: str
+    name: str
     kind: str
     grouped_light_id: str | None
 
@@ -89,7 +89,7 @@ class HueGroup:
 @dataclass(frozen=True, slots=True)
 class HueBridgeInfo:
     ip: str
-    bridge_id: str | None
+    bridge_id: str
     name: str | None
     model_id: str | None
     software_version: str | None

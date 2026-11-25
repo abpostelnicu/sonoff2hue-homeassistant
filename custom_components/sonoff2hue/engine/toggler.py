@@ -41,7 +41,7 @@ class HueToggler:
 
         def state_of(target: HueTarget) -> bool | None:
             states = light_states if target.kind == HueTargetKind.LIGHT else group_states
-            return None if target.id is None else states.get(target.id)
+            return states.get(target.id)
 
         turn_on = not any(state_of(target) is True for target in targets)
         changed = unchanged = failed = 0

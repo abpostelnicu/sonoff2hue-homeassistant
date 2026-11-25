@@ -97,8 +97,8 @@ def test_without_lights_on_the_bridge_none_are_known() -> None:
     ]
 
 
-def test_a_light_without_a_name_resolves_by_its_id() -> None:
-    nameless = HueLight("l9", None, False)
+def test_a_light_with_an_empty_name_resolves_by_its_id() -> None:
+    nameless = HueLight("l9", "", False)
 
     assert run(["L9"], bridge_lights=[nameless]) == ([light(nameless)], [])
     assert run(["Porch"], bridge_lights=[nameless, CEILING])[1] == [
@@ -136,8 +136,8 @@ def test_a_room_without_lights_cannot_be_switched() -> None:
     assert run(groups=["room:attic"]) == ([], [f"{HALL}: room 'Attic' has no lights."])
 
 
-def test_a_room_without_a_name_resolves_by_its_id() -> None:
-    nameless = HueGroup("r9", None, "room", "g9")
+def test_a_room_with_an_empty_name_resolves_by_its_id() -> None:
+    nameless = HueGroup("r9", "", "room", "g9")
 
     assert run(groups=["R9"], bridge_groups=[nameless]) == ([HueTarget(HueTargetKind.GROUPED_LIGHT, "g9", "")], [])
     assert run(groups=["Garden"], bridge_groups=[nameless])[1] == [
@@ -220,14 +220,13 @@ def test_split_kind_takes_a_room_or_zone_prefix_in_any_case(
         ("\tceiling ", "l1", " CEILING", True),
         ("L1", "l1", "Ceiling", True),
         ("Desk", "l1", "Ceiling", False),
-        ("l1", "l1", None, True),
-        ("Ceiling", None, "Ceiling", True),
+        ("l1", "l1", "", True),
         ("", "", "", False),
         (" ", "l1", " ", False),
-        (None, None, None, False),
+        (None, "l1", "", False),
     ],
 )
 def test_an_entry_refers_to_a_resource_by_its_id_or_its_name(
-    entry: str | None, resource_id: str | None, name: str | None, expected: bool
+    entry: str | None, resource_id: str, name: str, expected: bool
 ) -> None:
     assert refers_to(entry, resource_id, name) is expected

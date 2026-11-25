@@ -321,7 +321,7 @@ def test_hue_resources_are_sorted_by_name_without_regard_to_case() -> None:
         HueLight("a", "lamp", True),
         HueLight("b", "Desk", False),
         HueLight("c", "LAMP", True),
-        HueLight(None, None, False),
+        HueLight("d", "", False),
     ]
     groups = [
         HueGroup("z1", "Upstairs", "zone", "g1"),
@@ -333,7 +333,7 @@ def test_hue_resources_are_sorted_by_name_without_regard_to_case() -> None:
 
     resources = switch_rules.hue_resources(lights, groups)
 
-    assert [light.id for light in resources.lights] == [None, "b", "a", "c"]
+    assert [light.id for light in resources.lights] == ["d", "b", "a", "c"]
     assert [room.id for room in resources.rooms] == ["r2", "r1"]
     assert [zone.id for zone in resources.zones] == ["z2", "z1"]
 

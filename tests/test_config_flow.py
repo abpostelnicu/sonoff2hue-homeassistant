@@ -272,7 +272,6 @@ class Pairings:
         self.cancelled: list[str] = []
 
     async def __call__(self, info: HueBridgeInfo, device_type: str, **_: Any) -> str:
-        assert info.bridge_id is not None
         future: asyncio.Future[str] = asyncio.get_running_loop().create_future()
         self.waiting[info.bridge_id] = future
         try:

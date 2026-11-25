@@ -121,7 +121,7 @@ class _BridgeError(Exception):
         self.error = error
 
 
-def _bridge_name(info: HueBridgeInfo) -> str | None:
+def _bridge_name(info: HueBridgeInfo) -> str:
     """How the log lines name the bridge: by its name, else by its id."""
     return info.name if info.name is not None else info.bridge_id
 
@@ -342,7 +342,7 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
                 reason="wrong_bridge",
                 description_placeholders={
                     "address": info.ip,
-                    "bridge_id": info.bridge_id or "",
+                    "bridge_id": info.bridge_id,
                     "expected": self._get_reauth_entry().unique_id or "",
                 },
             )
@@ -376,7 +376,7 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
         return {
             "name": info.name or "",
             "model": info.model_id or "",
-            "bridge_id": info.bridge_id or "",
+            "bridge_id": info.bridge_id,
             "firmware": info.software_version or "",
             "address": info.ip,
             "certificate": info.certificate_sha256,
@@ -567,7 +567,7 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
             return _Failed("import_failed", str(err))
         finally:
             await client.close()
-        return info.bridge_id or ""
+        return info.bridge_id
 
     async def async_step_import_failed(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """The file's bridge can't be used: try again, pair the bridge instead and keep the switches, or paste the file

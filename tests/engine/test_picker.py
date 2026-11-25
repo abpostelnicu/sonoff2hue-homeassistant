@@ -13,8 +13,8 @@ from custom_components.sonoff2hue.engine.picker import Resolution, Resources, Se
 class Item:
     """A light, room or zone; equal items are still different resources."""
 
-    id: str | None
-    name: str | None
+    id: str
+    name: str
 
 
 HALLWAY = Item("l1", "Hallway")
@@ -26,8 +26,8 @@ UPSTAIRS = Item("z2", "Upstairs")
 RESOURCES = Resources([HALLWAY, DESK], [KITCHEN_ROOM, STUDY], [KITCHEN_ZONE, UPSTAIRS])
 
 
-def _config(selection: Selection, resources: Resources = RESOURCES) -> tuple[list[str | None], list[str | None]]:
-    targets = picker.selection_to_config(selection, resources)
+def _config(selection: Selection) -> tuple[list[str], list[str]]:
+    targets = picker.selection_to_config(selection, RESOURCES)
     return targets.lights, targets.groups
 
 
@@ -69,11 +69,10 @@ def test_a_name_that_is_another_lights_id_is_ambiguous() -> None:
     assert picker.encode_light(lights[0], lights) == "b2"
 
 
-def test_a_light_without_a_name_resolves_by_its_id() -> None:
-    nameless = Item("l9", None)
+def test_a_light_with_an_empty_name_resolves_by_its_id() -> None:
+    nameless = Item("l9", "")
 
     assert picker.resolve_light("L9", [nameless]).item is nameless
-    assert picker.resolve_light("None", [nameless]).status == "missing"
 
 
 def test_a_room_and_a_zone_that_share_a_name_need_a_prefix() -> None:
@@ -111,7 +110,7 @@ def test_a_light_is_saved_by_its_name_unless_another_light_has_it() -> None:
     assert picker.encode_light(desk, lights) == "Desk"
 
 
-@pytest.mark.parametrize("item", [Item("a", ""), Item("b", " \u2028"), Item("c", None), Item(None, None)])
+@pytest.mark.parametrize("item", [Item("a", ""), Item("b", " \u2028")])
 def test_a_light_without_a_usable_name_is_saved_by_its_id(item: Item) -> None:
     assert picker.encode_light(item, [item]) == item.id
 
@@ -122,7 +121,7 @@ def test_a_group_is_saved_by_its_name_if_it_is_unique_among_its_kind() -> None:
     assert picker.encode_group("room", Item("r3", " Porch "), [Item("r3", " Porch ")]) == "room:Porch"
     twins = [Item("r1", "Office"), Item("r2", "OFFICE")]
     assert [picker.encode_group("room", twin, twins) for twin in twins] == ["r1", "r2"]
-    assert picker.encode_group("zone", Item("z9", None), [Item("z9", None)]) == "z9"
+    assert picker.encode_group("zone", Item("z9", ""), [Item("z9", "")]) == "z9"
 
 
 # The selection
@@ -197,15 +196,6 @@ def test_an_entry_that_resolves_again_once_chosen_keeps_its_spelling() -> None:
     selection.zone.add("z2")
 
     assert _config(selection) == (["l2"], ["upstairs"])
-
-
-def test_resources_without_an_id_are_saved_as_none_and_apart_from_the_id_null() -> None:
-    nameless, null_id, unnamed = Item(None, None), Item("null", "Null id"), Item("l5", None)
-    resources = Resources([nameless, null_id, unnamed], [], [])
-    selection = picker.create_selection(resources)
-    selection.light.update({None, "null", "l5"})
-
-    assert _config(selection, resources) == ([None, "Null id", "l5"], [])
 
 
 def test_new_choices_follow_the_order_of_the_resources() -> None:

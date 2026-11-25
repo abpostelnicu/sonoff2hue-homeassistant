@@ -207,7 +207,7 @@ def hue_resources(lights: Sequence[HueLight], groups: Sequence[HueGroup]) -> Res
     name stay in the bridge's order."""
 
     def by_name[T: (HueLight, HueGroup)](items: Sequence[T]) -> list[T]:
-        return sorted(items, key=lambda item: (item.name or "").casefold())
+        return sorted(items, key=lambda item: item.name.casefold())
 
     return Resources(
         by_name(lights),

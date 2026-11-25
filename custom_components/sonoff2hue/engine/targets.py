@@ -22,7 +22,7 @@ def name_key(value: str | None) -> str:
     return "" if value is None else value.strip().casefold()
 
 
-def refers_to(entry: str | None, resource_id: str | None, name: str | None) -> bool:
+def refers_to(entry: str | None, resource_id: str, name: str) -> bool:
     """Whether an entry names the resource with this id or name. An empty entry names nothing."""
     key = name_key(entry)
     return key != "" and key in (name_key(resource_id), name_key(name))
@@ -74,21 +74,21 @@ def resolve(
             names = _quoted(_group_name(group) for group in found)
             errors.append(f"{name}: '{raw}' matches {names}; prefix it with 'room:' or 'zone:'.")
         elif (group := found[0]).grouped_light_id is None:
-            errors.append(f"{name}: {group.kind} '{group.name or ''}' has no lights.")
+            errors.append(f"{name}: {group.kind} '{group.name}' has no lights.")
         else:
-            targets.append(HueTarget(HueTargetKind.GROUPED_LIGHT, group.grouped_light_id, group.name or ""))
+            targets.append(HueTarget(HueTargetKind.GROUPED_LIGHT, group.grouped_light_id, group.name))
 
-    distinct: dict[tuple[HueTargetKind, str | None], HueTarget] = {}
+    distinct: dict[tuple[HueTargetKind, str], HueTarget] = {}
     for target in targets:
         distinct.setdefault((target.kind, target.id), target)
     return list(distinct.values())
 
 
 def _group_name(group: HueGroup) -> str:
-    return f"{group.kind}:{group.name or ''}"
+    return f"{group.kind}:{group.name}"
 
 
-def _quoted(values: Iterable[str | None]) -> str:
+def _quoted(values: Iterable[str]) -> str:
     """The distinct values, ordered without regard to case and quoted; ``(none)`` for none."""
-    distinct = dict.fromkeys(value or "" for value in values)
+    distinct = dict.fromkeys(values)
     return ", ".join(f"'{value}'" for value in sorted(distinct, key=str.casefold)) or "(none)"

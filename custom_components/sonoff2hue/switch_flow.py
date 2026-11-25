@@ -202,13 +202,13 @@ def device_label(device: LanDevice, online: bool, owner: str | None, now: dateti
 def resource_options(items: Sequence[Resource]) -> list[SelectOptionDict]:
     """The picker's lights, rooms or zones: the name, else the id; the id too when another of the list has the same
     name; and a light's state, or "no lights" for a room or zone without a grouped light. Their values are their
-    positions, as a resource's id may be missing."""
+    positions in the list."""
     names = Counter(name_key(item.name) for item in items)
     options: list[SelectOptionDict] = []
     for index, item in enumerate(items):
-        label = item.name or item.id or ""
+        label = item.name or item.id
         if names[name_key(item.name)] > 1:
-            label += f" ({item.id or ''})"
+            label += f" ({item.id})"
         if isinstance(item, HueLight):
             label += " — on" if item.on else " — off"
         elif isinstance(item, HueGroup) and item.grouped_light_id is None:
@@ -264,8 +264,8 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
         self._load_error = ""
         """Why the bridge's lights, rooms and zones couldn't be listed."""
         self._selection = Selection()
-        self._lights: list[str | None] = []
-        self._groups: list[str | None] = []
+        self._lights: Sequence[str | None] = []
+        self._groups: Sequence[str | None] = []
         self._values: dict[str, Any] = {}
         """What the form was given, which it suggests when it is shown again."""
         self._body: SwitchInput | None = None

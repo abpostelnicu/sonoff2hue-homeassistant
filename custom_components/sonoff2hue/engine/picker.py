@@ -24,14 +24,13 @@ type Status = Literal["ok", "missing", "ambiguous"]
 
 
 class Resource(Protocol):
-    """A light, room or zone as the picker sees it. The id and name are ``None`` only where a malformed answer from the
-    bridge has a null id."""
+    """A light, room or zone as the picker sees it."""
 
     @property
-    def id(self) -> str | None: ...
+    def id(self) -> str: ...
 
     @property
-    def name(self) -> str | None: ...
+    def name(self) -> str: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,12 +71,12 @@ class Entry:
 class Selection:
     """The ids chosen in the picker, by kind, and the switch's current entries."""
 
-    light: set[str | None] = field(default_factory=set)
-    room: set[str | None] = field(default_factory=set)
-    zone: set[str | None] = field(default_factory=set)
+    light: set[str] = field(default_factory=set)
+    room: set[str] = field(default_factory=set)
+    zone: set[str] = field(default_factory=set)
     entries: list[Entry] = field(default_factory=list)
 
-    def ids(self, kind: Kind) -> set[str | None]:
+    def ids(self, kind: Kind) -> set[str]:
         """The ids chosen of ``kind``."""
         if kind == "light":
             return self.light
@@ -86,11 +85,10 @@ class Selection:
 
 @dataclass(frozen=True, slots=True)
 class Targets:
-    """A switch's ``lights`` and ``groups`` as the picker saves them. An entry is ``None`` only for a resource with a
-    null id, which the switch rules then refuse."""
+    """A switch's ``lights`` and ``groups`` as the picker saves them."""
 
-    lights: list[str | None]
-    groups: list[str | None]
+    lights: list[str]
+    groups: list[str]
 
 
 def resolve_light(entry: str | None, lights: Sequence[Resource]) -> Resolution:
@@ -119,16 +117,16 @@ def _is_unique_name(item: Resource, items: Sequence[Resource]) -> bool:
     return name != "" and sum(1 for other in items if name_key(other.name) == name) == 1
 
 
-def encode_light(light: Resource, lights: Sequence[Resource]) -> str | None:
+def encode_light(light: Resource, lights: Sequence[Resource]) -> str:
     """The light's name if no other light has the same name, else its id."""
-    if light.name is not None and _is_unique_name(light, lights):
+    if _is_unique_name(light, lights):
         return light.name.strip()
     return light.id
 
 
-def encode_group(kind: GroupKind, group: Resource, groups: Sequence[Resource]) -> str | None:
+def encode_group(kind: GroupKind, group: Resource, groups: Sequence[Resource]) -> str:
     """``room:<name>`` or ``zone:<name>`` if the name is unique among its kind, else the id."""
-    if group.name is not None and _is_unique_name(group, groups):
+    if _is_unique_name(group, groups):
         return f"{kind}:{group.name.strip()}"
     return group.id
 
@@ -165,7 +163,7 @@ def selection_to_config(selection: Selection, resources: Resources) -> Targets:
     resource keep their spelling, new selections are encoded, and unresolved entries are kept unless removed."""
     result = Targets([], [])
     lists = {"lights": result.lights, "groups": result.groups}
-    saved: set[tuple[Kind, str | None]] = set()
+    saved: set[tuple[Kind, str]] = set()
     for entry in selection.entries:
         if entry.status != "ok":
             if not entry.removed:
@@ -174,7 +172,7 @@ def selection_to_config(selection: Selection, resources: Resources) -> Targets:
             lists[entry.list_name].append(entry.value.strip())
             saved.add((entry.kind, entry.id))
 
-    def add(kind: Kind, items: Sequence[Resource], encode: Callable[[Resource], str | None]) -> None:
+    def add(kind: Kind, items: Sequence[Resource], encode: Callable[[Resource], str]) -> None:
         for item in items:
             if item.id in selection.ids(kind) and (kind, item.id) not in saved:
                 (result.lights if kind == "light" else result.groups).append(encode(item))

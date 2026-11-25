@@ -281,12 +281,11 @@ async def test_switching_sends_the_application_key_and_the_state() -> None:
     assert request.headers == {"hue-application-key": "the-key"}
 
 
-@pytest.mark.parametrize("resource_id", [None, ""])
-async def test_a_target_without_an_id_is_refused_before_any_request(resource_id: str | None) -> None:
+async def test_a_target_without_an_id_is_refused_before_any_request() -> None:
     bridge = answering(200, '{"errors":[],"data":[]}')
 
     with pytest.raises(ValueError, match="has no id"):
-        await bridge.client().set_on(HueTarget(HueTargetKind.LIGHT, resource_id, "Lamp"), True)
+        await bridge.client().set_on(HueTarget(HueTargetKind.LIGHT, "", "Lamp"), True)
 
     assert bridge.requests == []
 

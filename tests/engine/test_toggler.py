@@ -37,7 +37,7 @@ class StubHue:
     def __init__(self, lights: dict[str, bool] | None = None, groups: dict[str, bool] | None = None) -> None:
         self.lights = lights or {}
         self.groups = groups or {}
-        self.sets: list[tuple[str | None, bool]] = []
+        self.sets: list[tuple[str, bool]] = []
         self.failures_before_success: dict[str, int] = {}
         self.reads: list[str] = []
 
@@ -50,9 +50,9 @@ class StubHue:
         return dict(self.groups)
 
     async def set_on(self, target: HueTarget, on: bool) -> None:
-        failures = self.failures_before_success.get(target.id or "", 0)
+        failures = self.failures_before_success.get(target.id, 0)
         if failures > 0:
-            self.failures_before_success[target.id or ""] = failures - 1
+            self.failures_before_success[target.id] = failures - 1
             raise HueApiError("bridge busy", 503)
         self.sets.append((target.id, on))
 
