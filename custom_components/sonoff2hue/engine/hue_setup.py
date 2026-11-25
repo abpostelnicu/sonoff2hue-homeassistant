@@ -9,6 +9,7 @@ import asyncio
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from enum import Enum
+import ipaddress
 import json
 import logging
 import socket
@@ -18,8 +19,7 @@ import aiohttp
 
 from . import jsonnode, text
 from .dns import DnsRecordType, ends_with_ignoring_case, equals_ignoring_case
-from .errors import UnexpectedError
-from .hue_address import create_base_url, is_ip_address
+from .hue_address import create_base_url
 from .hue_client import HttpAnswer, HueApiError, HueBridgeInfo, TransportError, TransportFactory, aiohttp_transport
 from .mdns import MdnsListener, MdnsPacket
 
@@ -72,9 +72,10 @@ async def discover(
     duration: float = DISCOVERY_TIMEOUT,
     listener_factory: Callable[[], MdnsListener] = MdnsListener,
 ) -> list[DiscoveredBridge]:
-    """Bridges found with mDNS and with Signify's discovery endpoint within ``duration`` seconds, sorted by address."""
+    """Bridges found with mDNS and with Signify's discovery endpoint within ``duration`` seconds: the first answer for
+    each address, sorted by address."""
     found: dict[str, DiscoveredBridge] = {}
-    # Like Task.WhenAll: both run to the end, then the first failure, if any, is raised.
+    # Both run to the end; then the first failure, if any, is raised.
     outcomes = await asyncio.gather(
         _discover_mdns(found, duration, listener_factory),
         _discover_cloud(found, duration, session),
@@ -83,12 +84,7 @@ async def discover(
     for outcome in outcomes:
         if isinstance(outcome, BaseException):
             raise outcome
-    return sorted(found.values(), key=lambda bridge: _utf16(bridge.ip))
-
-
-def _utf16(value: str) -> bytes:
-    """A key that sorts as ``StringComparer.Ordinal``, by UTF-16 code units."""
-    return value.encode("utf-16-be", "surrogatepass")
+    return sorted(found.values(), key=lambda bridge: bridge.ip)
 
 
 async def _discover_mdns(
@@ -156,48 +152,40 @@ async def _discover_mdns(
 
 
 async def _discover_cloud(found: dict[str, DiscoveredBridge], duration: float, session: aiohttp.ClientSession) -> None:
-    """``GetFromJsonAsync<JsonArray>`` of Signify's endpoint. .NET catches HttpRequestException, TaskCanceledException,
-    JsonException and InvalidOperationException here; anything else fails the discovery."""
+    """Asks Signify's discovery endpoint, which lists the bridges that reach the internet from this network. It is rate
+    limited and needs the internet, and mDNS usually suffices, so a failure is only logged at debug level."""
     try:
         async with session.get(CLOUD_DISCOVERY_URL, timeout=aiohttp.ClientTimeout(total=duration)) as response:
             response.raise_for_status()
-            answer = HttpAnswer(response.status, response.reason or None, await response.read(), response.charset)
-        _add_cloud_bridges(found, jsonnode.parse(answer.read_json_text(), case_insensitive=True))
-    except (aiohttp.ClientError, TimeoutError, jsonnode.JsonError) as err:
-        # The endpoint is rate limited and needs the internet; mDNS usually suffices.
-        _LOGGER.debug("Cloud bridge discovery failed: %s", err)
-    except UnexpectedError as err:
-        if err.dotnet_type != "InvalidOperationException":
-            raise
-        _LOGGER.debug("Cloud bridge discovery failed: %s", err)
-
-
-def _add_cloud_bridges(found: dict[str, DiscoveredBridge], bridges: jsonnode.JsonValue) -> None:
-    if bridges is None:
+            answer = await response.json(content_type=None)
+    except (aiohttp.ClientError, TimeoutError, ValueError, RecursionError) as err:  # RecursionError: nested too deeply
+        _LOGGER.debug("Cloud bridge discovery failed: %s", str(err) or type(err).__name__)
         return
-    if not isinstance(bridges, list):
-        raise jsonnode.JsonError("The JSON value could not be converted to System.Text.Json.Nodes.JsonArray.")
+    if not isinstance(answer, list) or not all(isinstance(bridge, dict) for bridge in answer):
+        _LOGGER.debug("Cloud bridge discovery failed: the answer isn't a list of bridges.")
+        return
+    _add_cloud_bridges(found, answer)
+
+
+def _add_cloud_bridges(found: dict[str, DiscoveredBridge], bridges: list[dict[str, object]]) -> None:
+    """Adds each bridge whose ``internalipaddress`` is an IP address, with its ``id`` if it is a text, unless an earlier
+    answer named that address."""
     for bridge in bridges:
-        if bridge is None:
-            continue
-        if not isinstance(bridge, (dict, jsonnode.BrokenObject)):
-            raise UnexpectedError("InvalidOperationException", "The node must be of type 'JsonObject'.")
-        ip = _get_value_string(bridge.get("internalipaddress"))
-        if ip is not None and is_ip_address(ip):
-            bridge_id = _get_value_string(bridge.get("id"))
-            found.setdefault(ip, DiscoveredBridge(ip, bridge_id, "discovery.meethue.com"))
+        if (ip := _ip_address(bridge.get("internalipaddress"))) is not None:
+            bridge_id = bridge.get("id")
+            found.setdefault(
+                ip, DiscoveredBridge(ip, bridge_id if isinstance(bridge_id, str) else None, "discovery.meethue.com")
+            )
 
 
-def _get_value_string(value: jsonnode.JsonValue) -> str | None:
-    """``node?.GetValue<string>()``: ``None`` for a missing or null value, and an InvalidOperationException for
-    anything but a string."""
-    if value is None:
+def _ip_address(value: object) -> str | None:
+    """``value`` as ``ipaddress`` writes the address, or ``None`` when it isn't an IP address."""
+    if not isinstance(value, str):
         return None
-    if isinstance(value, str):
-        return value
-    if isinstance(value, jsonnode.BrokenString):
-        raise value.error()
-    raise UnexpectedError("InvalidOperationException", "The value can't be converted to System.String.")
+    try:
+        return str(ipaddress.ip_address(value))
+    except ValueError:
+        return None
 
 
 # The bridge's identity and certificate.

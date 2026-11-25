@@ -4,6 +4,8 @@ discovery, over real sockets on 127.0.0.1 where they matter."""
 import asyncio
 from collections.abc import AsyncIterator, Callable
 import json
+import logging
+import socket
 from typing import Any
 
 import aiohttp
@@ -322,9 +324,8 @@ async def test_discovery_finds_bridges_by_mdns_and_in_the_cloud(cloud: list[web.
         web.json_response(
             [
                 {"id": "001788fffe000003", "internalipaddress": "192.0.2.30", "port": 443},
-                {"ID": "001788fffe000004", "InternalIpAddress": "192.0.2.4"},
+                {"id": "001788fffe000004", "internalipaddress": "192.0.2.4"},
                 {"id": "001788fffe000005", "internalipaddress": "bridge.local"},
-                None,
             ]
         )
     )
@@ -371,7 +372,7 @@ async def test_discovery_asks_for_bridges_as_the_socket_opens(cloud: list[web.Re
         task = asyncio.create_task(hue_setup.discover(session, 0.2, lambda: MdnsListener(network.open, network.watch)))
         transport = await network.next_open()
 
-        # As .NET's Task.Delay(0) doesn't wait, the first query went out before the started callback first waited.
+        # A delay of 0 isn't awaited, so the first query went out before the started callback first waited.
         assert transport.sent == [(build_query("_hue._tcp.local", DnsRecordType.PTR), "192.0.2.1")]
         assert await task == []
 
@@ -381,30 +382,71 @@ async def test_discovery_asks_for_bridges_as_the_socket_opens(cloud: list[web.Re
     [
         web.Response(status=429, text="Too many requests"),
         web.Response(text="<html>"),
+        web.Response(text=""),
+        web.Response(body=b'[{"internalipaddress":"192.0.2.30","id":"\xff"}]', content_type="application/json"),
+        web.Response(text="[" * 100_000, content_type="application/json"),
         web.json_response({"error": "not a list"}),
         web.json_response([1, {"internalipaddress": "192.0.2.30"}]),
-        web.json_response([{"internalipaddress": 42}]),
-        web.Response(text="[]", content_type="application/json", charset="windows-1252"),
+        web.json_response([None, {"internalipaddress": "192.0.2.30"}]),
     ],
+    ids=["status", "html", "empty", "utf8", "nested", "object", "number", "null"],
 )
-async def test_discovery_ignores_what_dotnet_ignores_from_the_cloud(
-    cloud: list[web.Response], answer: web.Response
+async def test_discovery_ignores_cloud_answers_it_cant_use(
+    cloud: list[web.Response], answer: web.Response, caplog: pytest.LogCaptureFixture
 ) -> None:
+    caplog.set_level(logging.DEBUG, logger=hue_setup.__name__)
     cloud.append(answer)
 
     assert await discover(FakeNetwork(), []) == []
+    assert "Cloud bridge discovery failed: " in caplog.text
 
 
-async def test_discovery_keeps_the_bridges_before_an_unreadable_one(cloud: list[web.Response]) -> None:
-    cloud.append(web.json_response([{"internalipaddress": "192.0.2.30"}, {"internalipaddress": {"a": 1}}]))
+@pytest.mark.usefixtures("socket_enabled")
+async def test_discovery_gives_up_on_a_cloud_that_doesnt_answer(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.DEBUG, logger=hue_setup.__name__)
+    with socket.socket() as silent:  # takes the connection, and never answers
+        silent.bind(("127.0.0.1", 0))
+        silent.listen()
+        host, port = silent.getsockname()
+        monkeypatch.setattr(hue_setup, "CLOUD_DISCOVERY_URL", f"http://{host}:{port}/")
+
+        assert await discover(FakeNetwork(), []) == []
+
+    assert "Cloud bridge discovery failed: " in caplog.text
+
+
+async def test_discovery_skips_cloud_entries_without_an_ip_address(cloud: list[web.Response]) -> None:
+    cloud.append(
+        web.json_response(
+            [
+                {"internalipaddress": "192.0.2.30"},
+                {"internalipaddress": {"a": 1}},
+                {"internalipaddress": 42},
+                {"internalipaddress": "192.168.1"},
+                {"internalipaddress": " 192.0.2.31"},
+                {"id": "001788fffe000004"},
+            ]
+        )
+    )
 
     assert await discover(FakeNetwork(), []) == [DiscoveredBridge("192.0.2.30", None, "discovery.meethue.com")]
 
 
-async def test_discovery_fails_where_dotnet_fails(cloud: list[web.Response]) -> None:
-    cloud.append(web.Response(text='[{"internalipaddress":"192.0.2.30","INTERNALIPADDRESS":"192.0.2.31"}]'))
+async def test_discovery_reads_the_clouds_answer_as_json(cloud: list[web.Response]) -> None:
+    # Keys are as written, the last of duplicate keys counts, and an id that isn't a text is left out. Addresses are
+    # written as ipaddress writes them, and the first entry for an address is kept.
+    cloud.append(
+        web.Response(
+            text='[{"InternalIpAddress":"192.0.2.4"},'
+            '{"internalipaddress":"192.0.2.30","internalipaddress":"192.0.2.31","id":42},'
+            '{"internalipaddress":"2001:DB8::1","id":"001788fffe000001"},'
+            '{"internalipaddress":"2001:db8::1","id":"001788fffe000002"}]'
+        )
+    )
 
-    with pytest.raises(UnexpectedError) as failure:
-        await discover(FakeNetwork(), [])
-
-    assert failure.value.dotnet_type == "ArgumentException"
+    assert await discover(FakeNetwork(), []) == [
+        DiscoveredBridge("192.0.2.31", None, "discovery.meethue.com"),
+        DiscoveredBridge("2001:db8::1", "001788fffe000001", "discovery.meethue.com"),
+    ]
