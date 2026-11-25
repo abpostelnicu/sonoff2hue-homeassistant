@@ -1,8 +1,9 @@
-"""Tests of the server's switch rules (engine/switch_rules.py), the port of the switch endpoints in the .NET app's
-Web/Management/ConfigEndpoints.cs. The first tests are WebConfigTests' cases for switches."""
+"""The rules a switch meets before it is saved (engine/switch_rules.py): validating the input, adding and changing a
+switch, and checking its lights, rooms and zones against the bridge."""
 
 from collections.abc import AsyncIterator, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from typing import Any
 
 import pytest
 
@@ -86,7 +87,7 @@ async def update(
     return write
 
 
-# WebConfigTests
+# Adding and changing a switch
 
 
 async def test_create_switch_saves_it_with_its_device_key() -> None:
@@ -355,67 +356,204 @@ async def test_load_resources() -> None:
     assert (unusable.value.status, str(unusable.value)) == (409, "Bad settings.")
 
 
-# Validation with .NET's string rules
+# Validating the input
+
+TOO_LONG_NAME = {"name": ["Use at most 64 characters."]}
+CONTROL_NAME = {"name": ["The name contains control characters."]}
+NO_DEVICE = {"deviceId": ["Choose a device or enter its device id."]}
+BAD_DEVICE = {"deviceId": ["A device id has 4 to 40 letters and digits, e.g. 1000abcdef."]}
+BAD_KEY = {"deviceKey": ["A device key has at most 128 characters and no spaces."]}
+BAD_ENTRY = ["Each entry needs 1 to 200 characters."]
+NO_TARGET = {"targets": ["Choose at least one light, room or zone."]}
+EMOJI = "\U0001f600"
+
+
+def validate(**fields: Any) -> tuple[switch_rules.Errors, SwitchSettings]:
+    """``fields`` of a valid switch input, unless given."""
+    return switch_rules.validate(SwitchInput(**({"device_id": _DEVICE, "lights": ["Ceiling"]} | fields)))
 
 
 @pytest.mark.parametrize(
-    ("device_id", "normalized", "valid"),
+    ("name", "saved", "errors"),
     [
-        (" 1000ABCDEF\u3000", "1000abcdef", True),
-        ("1000\u212aabc", "1000kabc", True),  # the Kelvin sign lowercases to an ASCII k
-        ("1000\u0130abc", "1000\u0130abc", False),
-        ("\ufeff1000abcdef", "\ufeff1000abcdef", False),  # .NET doesn't trim U+FEFF
-        ("1000abcdef\x85", "1000abcdef", True),  # but trims U+0085
-        ("\uff11000abc", "\uff11000abc", False),
-        ("abc", "abc", False),
-        ("x" * 40, "x" * 40, True),
+        ("x" * 64, "x" * 64, {}),
+        ("\u3000" + "x" * 64 + "\n", "x" * 64, {}),
+        ("x" * 63 + EMOJI, "x" * 63 + EMOJI, {}),
+        ("x" * 65, "x" * 65, TOO_LONG_NAME),
+        ("x" * 64 + EMOJI, "x" * 64 + EMOJI, TOO_LONG_NAME),
+        ("x" * 65 + "\x07", "x" * 65 + "\x07", TOO_LONG_NAME),
+        ("Hall\x07", "Hall\x07", CONTROL_NAME),
+        ("Hall\x7f", "Hall\x7f", CONTROL_NAME),
+        ("Ha\x85ll", "Ha\x85ll", CONTROL_NAME),
+        ("Ha\tll", "Ha\tll", CONTROL_NAME),
+        ("Hall\x85", "Hall", {}),
+        ("Hall\u200b", "Hall\u200b", {}),
+        (" \x1c", None, {}),
+        ("", None, {}),
+        (None, None, {}),
     ],
 )
-def test_device_ids_are_trimmed_lowercased_and_ascii(device_id: str, normalized: str, valid: bool) -> None:
-    errors, settings = switch_rules.validate(SwitchInput(device_id=device_id, lights=["Ceiling"]))
-
-    assert settings.device_id == normalized
-    assert ("deviceId" not in errors) is valid
-
-
-def test_lengths_count_utf16_code_units() -> None:
-    emoji = "\U0001f600"
-
-    assert "name" not in switch_rules.validate(SwitchInput("x" * 62 + emoji, _DEVICE, lights=["a"]))[0]
-    assert "name" in switch_rules.validate(SwitchInput("x" * 63 + emoji, _DEVICE, lights=["a"]))[0]
-    assert "lights" in switch_rules.validate(SwitchInput(device_id=_DEVICE, lights=["x" * 199 + emoji]))[0]
+def test_a_name_has_at_most_64_characters_without_control_characters(
+    name: str | None, saved: str | None, errors: switch_rules.Errors
+) -> None:
+    assert validate(name=name) == (errors, SwitchSettings(_DEVICE, saved, lights=["Ceiling"]))
 
 
-def test_duplicates_are_removed_with_dotnets_case_rules() -> None:
+@pytest.mark.parametrize(
+    ("device_id", "normalized", "errors"),
+    [
+        ("1000abcdef", "1000abcdef", {}),
+        (" 1000ABCDEF\u3000", "1000abcdef", {}),
+        ("\x1c1000abcdef\x85", "1000abcdef", {}),
+        ("abcd", "abcd", {}),
+        ("x" * 40, "x" * 40, {}),
+        ("1000\u212aabc", "1000kabc", {}),
+        ("abc", "abc", BAD_DEVICE),
+        ("x" * 41, "x" * 41, BAD_DEVICE),
+        ("1000-abcde", "1000-abcde", BAD_DEVICE),
+        ("1000 abcde", "1000 abcde", BAD_DEVICE),
+        ("1000abcde\x00", "1000abcde\x00", BAD_DEVICE),
+        ("\uff11000abc", "\uff11000abc", BAD_DEVICE),
+        ("1000\u0130abc", "1000i\u0307abc", BAD_DEVICE),
+        ("\ufeff1000abcdef", "\ufeff1000abcdef", BAD_DEVICE),
+        ("", "", NO_DEVICE),
+        (" \t", "", NO_DEVICE),
+        (None, "", NO_DEVICE),
+    ],
+)
+def test_a_device_id_has_4_to_40_ascii_letters_and_digits_once_stripped_and_lowercased(
+    device_id: str | None, normalized: str, errors: switch_rules.Errors
+) -> None:
+    found, settings = validate(device_id=device_id)
+
+    assert (found, settings.device_id) == (errors, normalized)
+
+
+@pytest.mark.parametrize(
+    ("key", "saved", "errors"),
+    [
+        ("k" * 128, "k" * 128, {}),
+        (" " + "k" * 128 + "\t", "k" * 128, {}),
+        ("k" * 127 + EMOJI, "k" * 127 + EMOJI, {}),
+        ("key\u200b", "key\u200b", {}),
+        ("k" * 129, "k" * 129, BAD_KEY),
+        ("two words", "two words", BAD_KEY),
+        ("two\u3000words", "two\u3000words", BAD_KEY),
+        ("two\x1cwords", "two\x1cwords", BAD_KEY),
+        ("key\x00", "key\x00", BAD_KEY),
+        ("", None, {}),
+        (" \u3000", None, {}),
+        (None, None, {}),
+    ],
+)
+def test_a_device_key_has_at_most_128_characters_without_white_space_or_control_characters(
+    key: str | None, saved: str | None, errors: switch_rules.Errors
+) -> None:
+    found, settings = validate(device_key=key)
+
+    assert (found, settings.device_key) == (errors, saved)
+
+
+@pytest.mark.parametrize(
+    ("entry", "valid"),
+    [
+        ("x", True),
+        ("x" * 200, True),
+        (" " + "x" * 200 + "\u3000", True),
+        ("x" * 199 + EMOJI, True),
+        ("Ceiling\x85", True),
+        ("Ceil\u200bing", True),
+        ("x" * 201, False),
+        ("x" * 200 + EMOJI, False),
+        ("Ceil\x07ing", False),
+        ("Ceil\x85ing", False),
+        ("", False),
+        (" \u2028", False),
+        (None, False),
+    ],
+)
+def test_an_entry_has_1_to_200_characters_without_control_characters(entry: str | None, valid: bool) -> None:
+    assert validate(lights=["Desk", entry])[0] == ({} if valid else {"lights": BAD_ENTRY})
+    assert validate(lights=[], groups=[entry])[0] == ({} if valid else {"groups": BAD_ENTRY})
+
+
+def test_a_list_has_at_most_50_entries_counted_before_duplicates_are_removed() -> None:
+    assert validate(lights=[f"Light {i}" for i in range(50)])[0] == {}
+    assert validate(groups=[f"Room {i}" for i in range(51)])[0] == {"groups": ["Use at most 50 entries."]}
+
+    errors, settings = validate(lights=["Ceiling"] * 51)
+
+    assert errors == {"lights": ["Use at most 50 entries."]}
+    assert settings.lights == ["Ceiling"]
+    assert validate(lights=["", *["Ceiling"] * 50])[0] == {"lights": ["Use at most 50 entries."]}
+
+
+def test_a_switch_needs_at_least_one_light_room_or_zone() -> None:
+    assert validate(lights=[], groups=[])[0] == NO_TARGET
+    assert validate(lights=None, groups=None)[0] == NO_TARGET
+    assert validate(lights=[], groups=["room:Hallway"])[0] == {}
+    assert validate(lights=[None], groups=[" "])[0] == {"lights": BAD_ENTRY, "groups": BAD_ENTRY}
+
+
+def test_the_errors_come_in_the_order_of_the_fields() -> None:
+    errors, _ = switch_rules.validate(SwitchInput("x" * 65, "abc", "a key", ["x" * 201], [None]))
+    assert list(errors) == ["name", "deviceId", "deviceKey", "lights", "groups"]
+
+    errors, _ = switch_rules.validate(SwitchInput("Hall\x07", "", "a key", [], []))
+    assert list(errors) == ["name", "deviceId", "deviceKey", "targets"]
+
+
+def test_duplicates_are_removed_without_regard_to_case() -> None:
     lights = [
         "Ceiling",
         " ceiling ",
-        "Stra\u00dfe",
-        "STRA\u1e9eE",
+        "Straße",
+        "STRASSE",
         "\u03c3",
         "\u03c2",
         "\u00b5",
         "\u039c",
         "\u212a",
         "k",
+        "Desk",
     ]
 
-    _, settings = switch_rules.validate(SwitchInput(device_id=_DEVICE, lights=lights))
+    errors, settings = validate(lights=lights, groups=["room:Hall", " ROOM:hall", "Hall"])
 
-    assert settings.lights == ["Ceiling", "Stra\u00dfe", "STRA\u1e9eE", "\u03c3", "\u00b5", "\u212a", "k"]
-
-
-def test_more_than_fifty_entries_are_refused_before_duplicates_are_removed() -> None:
-    errors, settings = switch_rules.validate(SwitchInput(device_id=_DEVICE, lights=["Ceiling"] * 51))
-
-    assert errors == {"lights": ["Use at most 50 entries."]}
-    assert settings.lights == ["Ceiling"]
+    assert errors == {}
+    assert settings.lights == ["Ceiling", "Straße", "\u03c3", "\u00b5", "\u212a", "Desk"]
+    assert settings.groups == ["room:Hall", "Hall"]
 
 
-def test_null_and_empty_entries_need_one_character() -> None:
-    errors, _ = switch_rules.validate(SwitchInput(device_id=_DEVICE, lights=["Ceiling", None], groups=[" "]))
+def test_the_switch_to_save_is_stripped_and_normalized() -> None:
+    errors, settings = switch_rules.validate(
+        SwitchInput(" Hall ", " 1000ABCDEF ", " key ", [" Ceiling\u3000"], ["\troom:Hallway "])
+    )
 
-    assert errors == {
-        "lights": ["Each entry needs 1 to 200 characters."],
-        "groups": ["Each entry needs 1 to 200 characters."],
-    }
+    assert errors == {}
+    assert settings == SwitchSettings(_DEVICE, "Hall", "key", ["Ceiling"], ["room:Hallway"])
+
+
+# Saving a changed switch
+
+
+async def test_a_new_key_replaces_the_current_one_also_with_another_device() -> None:
+    switches = [SwitchSettings(_DEVICE, device_key="k1", lights=["Ceiling"])]
+
+    await update(switches, _DEVICE, SwitchInput(device_id=_DEVICE, device_key=" k2 ", lights=["Ceiling"]))
+    assert switches[0].device_key == "k2"
+
+    await update(switches, _DEVICE, SwitchInput(device_id="1000aaaaaa", device_key="k3", lights=["Ceiling"]))
+    assert switches[0] == SwitchSettings("1000aaaaaa", device_key="k3", lights=["Ceiling"])
+
+
+async def test_a_switch_is_changed_in_its_place_found_without_regard_to_case() -> None:
+    switches = [
+        SwitchSettings(_OTHER, lights=["Ceiling"]),
+        SwitchSettings(" 1000AbCdEf ", "Hall", "k1", ["Ceiling"]),
+    ]
+
+    write = await update(switches, "1000ABCDEF", SwitchInput("Hall", "1000ABCDEF", None, ["Floor lamp"]))
+
+    assert write.index == 1
+    assert switches[1] == SwitchSettings(_DEVICE, "Hall", "k1", ["Floor lamp"])

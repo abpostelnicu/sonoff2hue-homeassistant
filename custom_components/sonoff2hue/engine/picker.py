@@ -1,30 +1,24 @@
-"""The switch editor's picker of Hue lights, rooms and zones: a port of the .NET app's web UI module ``targets.js``.
+"""The switch form's picker of Hue lights, rooms and zones.
 
-The web UI resolved a switch's ``lights`` and ``groups`` entries against the bridge's resources, and turned the picker's
-selection back into entries:
+It resolves a switch's ``lights`` and ``groups`` entries against the bridge's resources, by the rules that
+``targets.resolve`` follows, and turns the picker's selection back into entries:
 
 - A light is saved by its name if no other light has that name, else by its id. A room or zone is saved as
   ``room:<name>`` or ``zone:<name>`` if no other room, or zone, has that name, else by its id.
 - An entry that still resolves to a selected resource keeps its own spelling, and a resource is saved once.
 - An entry that doesn't resolve (no match, or several) is kept unless it was removed.
 
-It runs JavaScript's string rules (``jstext.py``), as the browser did: names match after ``trim()`` and
-``toLowerCase()``, where the server's check (``TargetResolver``) uses .NET's ``Trim()`` and ``OrdinalIgnoreCase``. So the
-picker can resolve an entry that the server then rejects, or the reverse, as in the .NET app.
-
-Entries and selections are mutable and compared by identity, as JavaScript's objects are: the dialog removed an
-unresolved entry by setting ``removed`` on the entry that :func:`unresolved_entries` returned, and chose resources by
-adding their ids to the selection's sets.
+Entries are compared by identity: the switch flow removes an unresolved entry by setting ``removed`` on the entry that
+:func:`unresolved_entries` returned, and chooses resources by adding their ids to the selection's sets.
 """
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
-from . import jstext
+from .targets import GroupKind, name_key, refers_to, split_kind
 
 type Kind = Literal["light", "room", "zone"]
-type GroupKind = Literal["room", "zone"]
 type ListName = Literal["lights", "groups"]
 type Status = Literal["ok", "missing", "ambiguous"]
 
@@ -42,7 +36,7 @@ class Resource(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class Resources:
-    """The bridge's lights, rooms and zones (``GET /api/hue/resources``), in the order the picker lists them."""
+    """The bridge's lights, rooms and zones, in the order the picker lists them."""
 
     lights: Sequence[Resource]
     rooms: Sequence[Resource]
@@ -51,7 +45,8 @@ class Resources:
 
 @dataclass(frozen=True, slots=True)
 class Resolution:
-    """``{ status: 'ok', item }`` (with ``kind`` for a room or zone), or ``{ status: 'missing'|'ambiguous', count }``."""
+    """An entry resolved: ``ok`` with the resource it names (and its kind, for a room or zone), or ``missing`` or
+    ``ambiguous`` with the number of resources it matches."""
 
     status: Status
     item: Resource | None = None
@@ -83,7 +78,7 @@ class Selection:
     entries: list[Entry] = field(default_factory=list)
 
     def ids(self, kind: Kind) -> set[str | None]:
-        """``selection[kind]``."""
+        """The ids chosen of ``kind``."""
         if kind == "light":
             return self.light
         return self.room if kind == "room" else self.zone
@@ -92,76 +87,56 @@ class Selection:
 @dataclass(frozen=True, slots=True)
 class Targets:
     """A switch's ``lights`` and ``groups`` as the picker saves them. An entry is ``None`` only for a resource with a
-    null id, which the server then rejects."""
+    null id, which the switch rules then refuse."""
 
     lights: list[str | None]
     groups: list[str | None]
 
 
-def _norm(value: str | None) -> str:
-    return jstext.lower(jstext.trim(jstext.string(value)))
-
-
-def _matches(reference: str | None, item: Resource) -> bool:
-    ref = _norm(reference)
-    return ref != "" and (ref == _norm(item.id) or ref == _norm(item.name))
-
-
-def split_kind(entry: str | None) -> tuple[GroupKind | None, str]:
-    """``splitKind``: splits an optional ``room:`` or ``zone:`` prefix, in any case, off a ``groups`` entry."""
-    value = jstext.trim(jstext.string(entry))
-    kinds: tuple[GroupKind, ...] = ("room", "zone")
-    for kind in kinds:
-        if jstext.lower(value).startswith(f"{kind}:"):
-            return kind, jstext.trim(value[len(kind) + 1 :])
-    return None, value
-
-
 def resolve_light(entry: str | None, lights: Sequence[Resource]) -> Resolution:
-    """``resolveLight``: a ``lights`` entry, by name or id, against the bridge's lights."""
-    found = [light for light in lights if _matches(entry, light)]
+    """A ``lights`` entry, by name or id, against the bridge's lights."""
+    found = [light for light in lights if refers_to(entry, light.id, light.name)]
     if len(found) == 1:
         return Resolution("ok", item=found[0])
     return Resolution("ambiguous" if found else "missing", count=len(found))
 
 
 def resolve_group(entry: str | None, rooms: Sequence[Resource], zones: Sequence[Resource]) -> Resolution:
-    """``resolveGroup``: a ``groups`` entry (``room:<name>``, ``zone:<name>``, a name or an id) against the rooms and
-    zones."""
+    """A ``groups`` entry (``room:<name>``, ``zone:<name>``, a name or an id) against the rooms and zones."""
     kind, reference = split_kind(entry)
     candidates: list[tuple[GroupKind, Resource]] = [
         *(("room", item) for item in (rooms if kind != "zone" else [])),
         *(("zone", item) for item in (zones if kind != "room" else [])),
     ]
-    found = [candidate for candidate in candidates if _matches(reference, candidate[1])]
+    found = [(found_kind, item) for found_kind, item in candidates if refers_to(reference, item.id, item.name)]
     if len(found) == 1:
         return Resolution("ok", item=found[0][1], kind=found[0][0])
     return Resolution("ambiguous" if found else "missing", count=len(found))
 
 
 def _is_unique_name(item: Resource, items: Sequence[Resource]) -> bool:
-    name = _norm(item.name)
-    return name != "" and sum(1 for other in items if _norm(other.name) == name) == 1
+    name = name_key(item.name)
+    return name != "" and sum(1 for other in items if name_key(other.name) == name) == 1
 
 
 def encode_light(light: Resource, lights: Sequence[Resource]) -> str | None:
-    """``encodeLight``: the light's name if no other light has the same name, else its id."""
+    """The light's name if no other light has the same name, else its id."""
     if light.name is not None and _is_unique_name(light, lights):
-        return jstext.trim(light.name)
+        return light.name.strip()
     return light.id
 
 
 def encode_group(kind: GroupKind, group: Resource, groups: Sequence[Resource]) -> str | None:
-    """``encodeGroup``: ``room:<name>`` or ``zone:<name>`` if the name is unique among its kind, else the id."""
+    """``room:<name>`` or ``zone:<name>`` if the name is unique among its kind, else the id."""
     if group.name is not None and _is_unique_name(group, groups):
-        return f"{kind}:{jstext.trim(group.name)}"
+        return f"{kind}:{group.name.strip()}"
     return group.id
 
 
 def create_selection(
     resources: Resources, lights: Sequence[str] | None = None, groups: Sequence[str] | None = None
 ) -> Selection:
-    """``createSelection``: the picker's selection for a switch's current ``lights`` and ``groups``."""
+    """The picker's selection for a switch's current ``lights`` and ``groups``."""
     selection = Selection()
     for value in lights or []:
         resolved = resolve_light(value, resources.lights)
@@ -181,37 +156,29 @@ def create_selection(
 
 
 def unresolved_entries(selection: Selection) -> list[Entry]:
-    """``unresolvedEntries``: the entries that don't resolve (missing or ambiguous) and weren't removed."""
+    """The entries that don't resolve (missing or ambiguous) and weren't removed."""
     return [entry for entry in selection.entries if entry.status != "ok" and not entry.removed]
 
 
-def _key(kind: Kind | None, resource_id: str | None) -> str:
-    # The template literal `${kind}:${id}`, which writes a null id as "null".
-    return f"{kind}:{'null' if resource_id is None else resource_id}"
-
-
 def selection_to_config(selection: Selection, resources: Resources) -> Targets:
-    """``selectionToConfig``: the switch's ``lights`` and ``groups`` for the selection, in order. Entries that still
-    resolve to a selected resource keep their spelling, new selections are encoded, and unresolved entries are kept
-    unless removed."""
+    """The switch's ``lights`` and ``groups`` for the selection, in order. Entries that still resolve to a selected
+    resource keep their spelling, new selections are encoded, and unresolved entries are kept unless removed."""
     result = Targets([], [])
     lists = {"lights": result.lights, "groups": result.groups}
-    emitted: set[str] = set()
+    saved: set[tuple[Kind, str | None]] = set()
     for entry in selection.entries:
-        if entry.status == "ok":
-            key = _key(entry.kind, entry.id)
-            if entry.kind is not None and entry.id in selection.ids(entry.kind) and key not in emitted:
-                lists[entry.list_name].append(jstext.trim(entry.value))
-                emitted.add(key)
-        elif not entry.removed:
-            lists[entry.list_name].append(jstext.trim(entry.value))
+        if entry.status != "ok":
+            if not entry.removed:
+                lists[entry.list_name].append(entry.value.strip())
+        elif entry.kind is not None and entry.id in selection.ids(entry.kind) and (entry.kind, entry.id) not in saved:
+            lists[entry.list_name].append(entry.value.strip())
+            saved.add((entry.kind, entry.id))
 
     def add(kind: Kind, items: Sequence[Resource], encode: Callable[[Resource], str | None]) -> None:
         for item in items:
-            key = _key(kind, item.id)
-            if item.id in selection.ids(kind) and key not in emitted:
+            if item.id in selection.ids(kind) and (kind, item.id) not in saved:
                 (result.lights if kind == "light" else result.groups).append(encode(item))
-                emitted.add(key)
+                saved.add((kind, item.id))
 
     add("light", resources.lights, lambda item: encode_light(item, resources.lights))
     add("room", resources.rooms, lambda item: encode_group("room", item, resources.rooms))
@@ -220,5 +187,5 @@ def selection_to_config(selection: Selection, resources: Resources) -> Targets:
 
 
 def split_list(text: str | None) -> list[str]:
-    """``splitList``: a comma-separated manual entry as trimmed, non-empty values."""
-    return [value for value in (jstext.trim(part) for part in jstext.string(text).split(",")) if value]
+    """Typed entries separated by commas, stripped, without empty ones."""
+    return [value for value in (part.strip() for part in (text or "").split(",")) if value]

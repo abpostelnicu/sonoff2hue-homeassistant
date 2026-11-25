@@ -1,5 +1,4 @@
-"""Tests of the switch editor's own checks (engine/switch_form.py), the pure logic of the .NET app's web UI dialog
-views/switcheditor.js."""
+"""The switch form's own checks (engine/switch_form.py), before the switch rules check a switch again."""
 
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
@@ -38,6 +37,42 @@ def test_a_used_device_is_named_by_its_switch() -> None:
     assert switch_form.used_by(SWITCHES, _DEVICE, _DEVICE) is None
     assert switch_form.used_by(SWITCHES, "1000aaaaaa", None) is None
     assert switch_form.used_by([], _DEVICE, None) is None
+
+
+@pytest.mark.parametrize(
+    ("a", "b", "same"),
+    [
+        ("1000abcdef", "1000abcdef", True),
+        ("1000ABCDEF", "1000abcdef", True),
+        ("1000STRASSE", "1000straße", True),
+        (None, "", True),
+        (None, None, True),
+        (" 1000abcdef", "1000abcdef", False),
+        ("1000abcdef", "1000abcdee", False),
+        (None, "1000abcdef", False),
+    ],
+)
+def test_device_ids_are_the_same_without_regard_to_case(a: str | None, b: str | None, same: bool) -> None:
+    assert switch_form.same_id(a, b) is same
+    assert switch_form.same_id(b, a) is same
+
+
+@pytest.mark.parametrize(
+    ("name", "device_id", "label"),
+    [
+        ("Hall", _DEVICE, "Hall"),
+        ("\u3000 Hall lights\n", _DEVICE, "Hall lights"),
+        (" \x1c", _DEVICE, _DEVICE),
+        ("", _DEVICE, _DEVICE),
+        (None, _DEVICE, _DEVICE),
+        (None, "", "Switch"),
+        (None, None, "Switch"),
+    ],
+)
+def test_a_switch_is_labelled_by_its_name_else_its_device_id(
+    name: str | None, device_id: str | None, label: str
+) -> None:
+    assert switch_form.switch_label(name, device_id) == label
 
 
 @pytest.mark.parametrize(
@@ -84,16 +119,16 @@ def test_identify_by_press_skips_devices_of_other_switches() -> None:
 # The name, the targets and the key
 
 
-def test_the_name_is_trimmed_and_counted_in_utf16_code_units() -> None:
+def test_the_name_is_stripped_and_counted_in_characters() -> None:
     emoji = "\U0001f600"
-    fits = switch_form.form_input("\ufeff" + "x" * 62 + emoji + " ", _FREE, "set", "", ["Ceiling"], [])
-    too_long = switch_form.form_input("x" * 63 + emoji, _FREE, "set", "", ["Ceiling"], [])
+    fits = switch_form.form_input("\u3000" + "x" * 63 + emoji + "\x85", _FREE, "set", "", ["Ceiling"], [])
+    too_long = switch_form.form_input("x" * 64 + emoji, _FREE, "set", "", ["Ceiling"], [])
 
-    assert fits.name == "x" * 62 + emoji
+    assert fits.name == "x" * 63 + emoji
     assert _problems(fits) == []
     assert _problems(too_long) == [Problem("name", "Use at most 64 characters.")]
-    assert switch_form.form_input(" \u3000", _FREE, "set", "", ["Ceiling"], []).name is None
-    assert switch_form.form_input("Hall\x85", _FREE, "set", "", ["Ceiling"], []).name == "Hall\x85"
+    assert switch_form.form_input(" \u3000\x1c", _FREE, "set", "", ["Ceiling"], []).name is None
+    assert switch_form.form_input("\ufeffHall", _FREE, "set", "", ["Ceiling"], []).name == "\ufeffHall"
 
 
 def test_at_least_one_target() -> None:
@@ -128,7 +163,7 @@ def test_the_key_warning_shows_when_a_kept_key_meets_another_device() -> None:
     assert switch_form.key_warning("set", False, "1000aaaaaa", _DEVICE) is None
 
 
-def test_all_problems_in_the_dialogs_order() -> None:
+def test_all_problems_in_the_forms_order() -> None:
     body = switch_form.form_input("x" * 65, "", "replace", "", [], [])
 
     assert [problem.field for problem in _problems(body, key_mode="replace")] == [
@@ -147,7 +182,7 @@ def test_typed_entries_round_trip() -> None:
     assert switch_form.join_list(None) == ""
 
 
-# The server's errors on the dialog's fields
+# The switch rules' errors on the form's fields
 
 
 def test_field_errors_in_the_picker_join_the_target_lists() -> None:
@@ -173,7 +208,7 @@ def test_field_errors_in_the_picker_join_the_target_lists() -> None:
     assert switch_form.field_errors({"DEVICEKEY": ["x"]}, manual_targets=False) == ({"deviceKey": "x"}, [])
 
 
-# The whole dialog
+# The whole form
 
 
 @dataclass
@@ -195,7 +230,7 @@ class Bridge:
         return opened()
 
 
-async def test_a_switch_added_with_the_picker_is_saved_as_the_web_ui_saved_it() -> None:
+async def test_a_switch_added_with_the_picker_is_saved_with_the_encoded_entries() -> None:
     bridge = Bridge(
         [HueLight("l1", "Ceiling", True), HueLight("l2", "Lamp", False), HueLight("l3", "lamp", False)],
         [HueGroup("r1", "Kitchen", "room", "g1"), HueGroup("z1", "Kitchen", "zone", "g2")],

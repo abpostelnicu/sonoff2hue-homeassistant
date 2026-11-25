@@ -1,16 +1,17 @@
-"""Tests of the switch editor's picker (engine/picker.py), the port of the .NET app's web UI module targets.js."""
+"""The switch form's picker of Hue lights, rooms and zones (engine/picker.py): resolving a switch's entries, encoding
+the resources chosen, and the entries it saves."""
 
 from dataclasses import dataclass
 
 import pytest
 
 from custom_components.sonoff2hue.engine import picker
-from custom_components.sonoff2hue.engine.picker import Resources, Selection
+from custom_components.sonoff2hue.engine.picker import Resolution, Resources, Selection
 
 
 @dataclass(frozen=True, slots=True)
 class Item:
-    """A light, room or zone; equal items are still different objects, as in JavaScript."""
+    """A light, room or zone; equal items are still different resources."""
 
     id: str | None
     name: str | None
@@ -30,103 +31,98 @@ def _config(selection: Selection, resources: Resources = RESOURCES) -> tuple[lis
     return targets.lights, targets.groups
 
 
-# splitKind and resolving entries
+# Resolving entries
 
 
 @pytest.mark.parametrize(
-    ("entry", "expected"),
-    [
-        ("room:Kitchen", ("room", "Kitchen")),
-        ("ROOM:Kitchen", ("room", "Kitchen")),
-        ("Zone: Upstairs\u3000", ("zone", "Upstairs")),
-        ("zone:", ("zone", "")),
-        ("\ufeffroom:x", ("room", "x")),
-        ("\x85room:x", (None, "\x85room:x")),
-        ("room :x", (None, "room :x")),
-        ("light:x", (None, "light:x")),
-        ("Kitchen", (None, "Kitchen")),
-        ("", (None, "")),
-        (None, (None, "")),
-    ],
+    ("entry", "item"), [("Hallway", HALLWAY), (" HALLWAY\u3000", HALLWAY), ("l2", DESK), ("\tL2 ", DESK)]
 )
-def test_split_kind_takes_room_and_zone_prefixes_in_any_case(
-    entry: str | None, expected: tuple[str | None, str]
-) -> None:
-    assert picker.split_kind(entry) == expected
+def test_a_light_resolves_by_name_or_id_without_regard_to_case(entry: str, item: Item) -> None:
+    resolved = picker.resolve_light(entry, [HALLWAY, DESK])
+
+    assert resolved.status == "ok"
+    assert resolved.item is item
 
 
-def test_resolve_light_by_name_or_id_without_regard_to_case() -> None:
-    assert picker.resolve_light(" HALLWAY\u3000", [HALLWAY, DESK]).item is HALLWAY
-    assert picker.resolve_light("L2", [HALLWAY, DESK]).item is DESK
-    assert picker.resolve_light("Garage", [HALLWAY, DESK]) == picker.Resolution("missing", count=0)
-    assert picker.resolve_light("", [HALLWAY, Item("l3", "")]) == picker.Resolution("missing", count=0)
-    assert picker.resolve_light(None, [HALLWAY]) == picker.Resolution("missing", count=0)
+@pytest.mark.parametrize("entry", ["Garage", "Hall", "", " ", None])
+def test_an_entry_that_names_no_light_is_missing(entry: str | None) -> None:
+    assert picker.resolve_light(entry, [HALLWAY, DESK, Item("l3", "")]) == Resolution("missing", count=0)
 
 
-def test_resolve_light_with_javascripts_case_mappings() -> None:
-    iris, strasse, odos = Item("a", "\u0130ris"), Item("b", "Stra\u00dfe"), Item("c", "\u039f\u0394\u039f\u03a3")
-    lights = [iris, strasse, odos]
+def test_names_are_casefolded() -> None:
+    strasse = Item("a", "Straße")
 
-    # 'İ' lowers to 'i' and a combining dot above; 'ẞ' to 'ß'; a final 'Σ' to 'ς'.
-    assert picker.resolve_light("i\u0307ris", lights).item is iris
-    assert picker.resolve_light("iris", lights).status == "missing"
-    assert picker.resolve_light("STRA\u1e9eE", lights).item is strasse
-    assert picker.resolve_light("strasse", lights).status == "missing"
-    assert picker.resolve_light("\u03bf\u03b4\u03bf\u03c2", lights).item is odos
-    assert picker.resolve_light("\u03bf\u03b4\u03bf\u03c3", lights).status == "missing"
+    assert picker.resolve_light("STRASSE", [strasse]).item is strasse
 
 
-def test_resolve_light_trims_as_javascript_does() -> None:
-    porch, nel = Item("a", "\ufeffPorch"), Item("b", "Desk\x85")
+def test_a_name_that_two_lights_have_is_ambiguous() -> None:
+    lights = [Item("a", "Lamp"), Item("b", " lamp "), DESK]
 
-    assert picker.resolve_light("porch", [porch, nel]).item is porch
-    assert picker.resolve_light("desk", [porch, nel]).status == "missing"
-    assert picker.resolve_light("desk\x85", [porch, nel]).item is nel
+    assert picker.resolve_light("LAMP", lights) == Resolution("ambiguous", count=2)
+    assert picker.resolve_light("b", lights).item is lights[1]
 
 
 def test_a_name_that_is_another_lights_id_is_ambiguous() -> None:
     lights = [Item("a1", "b2"), Item("b2", "Porch")]
 
-    assert picker.resolve_light("b2", lights) == picker.Resolution("ambiguous", count=2)
+    assert picker.resolve_light("b2", lights) == Resolution("ambiguous", count=2)
     assert picker.encode_light(lights[0], lights) == "b2"
 
 
-def test_resolve_group_with_room_and_zone_name_clashes() -> None:
-    assert picker.resolve_group("Kitchen", RESOURCES.rooms, RESOURCES.zones) == picker.Resolution("ambiguous", count=2)
-    room = picker.resolve_group("room:kitchen", RESOURCES.rooms, RESOURCES.zones)
-    zone = picker.resolve_group("ZONE:Kitchen", RESOURCES.rooms, RESOURCES.zones)
-    assert (room.status, room.kind, room.item) == ("ok", "room", KITCHEN_ROOM)
+def test_a_light_without_a_name_resolves_by_its_id() -> None:
+    nameless = Item("l9", None)
+
+    assert picker.resolve_light("L9", [nameless]).item is nameless
+    assert picker.resolve_light("None", [nameless]).status == "missing"
+
+
+def test_a_room_and_a_zone_that_share_a_name_need_a_prefix() -> None:
+    def resolve(entry: str) -> Resolution:
+        return picker.resolve_group(entry, RESOURCES.rooms, RESOURCES.zones)
+
+    assert resolve("Kitchen") == Resolution("ambiguous", count=2)
+    room, zone = resolve(" room: kitchen"), resolve("ZONE:Kitchen")
+    assert (room.status, room.kind, zone.status, zone.kind) == ("ok", "room", "ok", "zone")
     assert room.item is KITCHEN_ROOM
-    assert (zone.status, zone.kind) == ("ok", "zone")
     assert zone.item is KITCHEN_ZONE
-    assert picker.resolve_group("zone:Study", RESOURCES.rooms, RESOURCES.zones).status == "missing"
-    assert picker.resolve_group("z2", RESOURCES.rooms, RESOURCES.zones).item is UPSTAIRS
-    assert picker.resolve_group("room:", RESOURCES.rooms, RESOURCES.zones).status == "missing"
 
 
-# Encoding
+def test_a_group_resolves_by_name_or_id_within_its_prefix() -> None:
+    def resolve(entry: str | None) -> Resolution:
+        return picker.resolve_group(entry, RESOURCES.rooms, RESOURCES.zones)
+
+    assert (resolve("study").item, resolve("study").kind) == (STUDY, "room")
+    assert (resolve("Z2").item, resolve("Z2").kind) == (UPSTAIRS, "zone")
+    assert resolve("room:z2").item is None
+    assert resolve("zone:Study") == Resolution("missing", count=0)
+    assert resolve("room:") == Resolution("missing", count=0)
+    assert resolve(None) == Resolution("missing", count=0)
 
 
-def test_encode_light_uses_the_name_unless_another_light_has_it() -> None:
-    lamp, other_lamp, desk = Item("a", "Lamp"), Item("b", " lamp\u3000"), Item("c", "  Desk\ufeff")
+# Encoding the resources chosen
+
+
+def test_a_light_is_saved_by_its_name_unless_another_light_has_it() -> None:
+    lamp, other_lamp, desk = Item("a", "Lamp"), Item("b", " lamp\u3000"), Item("c", "  Desk\u2028")
     lights = [lamp, other_lamp, desk]
 
     assert picker.encode_light(lamp, lights) == "a"
     assert picker.encode_light(other_lamp, lights) == "b"
     assert picker.encode_light(desk, lights) == "Desk"
-    assert picker.encode_light(Item("d", "Desk\x85"), [Item("d", "Desk\x85")]) == "Desk\x85"
 
 
-def test_encode_light_without_a_usable_name_uses_the_id() -> None:
-    for item in (Item("a", ""), Item("b", " \u2028"), Item("c", None), Item(None, None)):
-        assert picker.encode_light(item, [item]) == item.id
+@pytest.mark.parametrize("item", [Item("a", ""), Item("b", " \u2028"), Item("c", None), Item(None, None)])
+def test_a_light_without_a_usable_name_is_saved_by_its_id(item: Item) -> None:
+    assert picker.encode_light(item, [item]) == item.id
 
 
-def test_encode_group_needs_a_unique_name_among_its_kind_only() -> None:
+def test_a_group_is_saved_by_its_name_if_it_is_unique_among_its_kind() -> None:
     assert picker.encode_group("room", KITCHEN_ROOM, RESOURCES.rooms) == "room:Kitchen"
     assert picker.encode_group("zone", KITCHEN_ZONE, RESOURCES.zones) == "zone:Kitchen"
+    assert picker.encode_group("room", Item("r3", " Porch "), [Item("r3", " Porch ")]) == "room:Porch"
     twins = [Item("r1", "Office"), Item("r2", "OFFICE")]
     assert [picker.encode_group("room", twin, twins) for twin in twins] == ["r1", "r2"]
+    assert picker.encode_group("zone", Item("z9", None), [Item("z9", None)]) == "z9"
 
 
 # The selection
@@ -152,7 +148,7 @@ def test_create_selection_without_entries() -> None:
     assert picker.create_selection(RESOURCES, [], None).light == set()
 
 
-def test_entries_keep_their_spelling_and_new_selections_are_encoded() -> None:
+def test_entries_keep_their_spelling_and_new_choices_are_encoded() -> None:
     selection = picker.create_selection(RESOURCES, [" hallway "], ["z2"])
     selection.light.add("l2")
     selection.room.add("r2")
@@ -176,10 +172,10 @@ def test_deselected_entries_are_dropped() -> None:
 
 
 def test_unresolved_entries_are_kept_unless_removed() -> None:
-    selection = picker.create_selection(RESOURCES, ["Garage", "Hallway"], ["Kitchen"])
+    selection = picker.create_selection(RESOURCES, ["Garage", "Hallway"], [" Kitchen "])
     unresolved = picker.unresolved_entries(selection)
 
-    assert [entry.value for entry in unresolved] == ["Garage", "Kitchen"]
+    assert [entry.value for entry in unresolved] == ["Garage", " Kitchen "]
     assert unresolved[0] is selection.entries[0]
     assert _config(selection) == (["Garage", "Hallway"], ["Kitchen"])
 
@@ -187,20 +183,54 @@ def test_unresolved_entries_are_kept_unless_removed() -> None:
 
     assert picker.unresolved_entries(selection) == [selection.entries[2]]
     assert _config(selection) == (["Hallway"], ["Kitchen"])
+    selection.entries[2].removed = True
+    assert _config(selection) == (["Hallway"], [])
 
 
-def test_a_null_id_is_saved_as_none_and_collides_with_the_id_null() -> None:
-    nameless, null_id = Item(None, None), Item("null", "Null id")
-    resources = Resources([nameless, null_id], [], [])
+def test_an_entry_that_resolves_again_once_chosen_keeps_its_spelling() -> None:
+    selection = picker.create_selection(RESOURCES, ["l2"], ["upstairs"])
+    selection.light.clear()
+    selection.zone.clear()
+    assert _config(selection) == ([], [])
+
+    selection.light.add("l2")
+    selection.zone.add("z2")
+
+    assert _config(selection) == (["l2"], ["upstairs"])
+
+
+def test_resources_without_an_id_are_saved_as_none_and_apart_from_the_id_null() -> None:
+    nameless, null_id, unnamed = Item(None, None), Item("null", "Null id"), Item("l5", None)
+    resources = Resources([nameless, null_id, unnamed], [], [])
     selection = picker.create_selection(resources)
-    selection.light.update({None, "null"})
+    selection.light.update({None, "null", "l5"})
 
-    # The key `${kind}:${id}` is "light:null" for both, so only the first is saved.
-    assert _config(selection, resources) == ([None], [])
+    assert _config(selection, resources) == ([None, "Null id", "l5"], [])
 
 
-def test_split_list() -> None:
-    assert picker.split_list(" Hallway ,Desk lamp,, \ufeff") == ["Hallway", "Desk lamp"]
-    assert picker.split_list("a\x85, b") == ["a\x85", "b"]
-    assert picker.split_list(None) == []
-    assert picker.split_list("") == []
+def test_new_choices_follow_the_order_of_the_resources() -> None:
+    selection = picker.create_selection(RESOURCES)
+    selection.zone.update({"z2", "z1"})
+    selection.light.update({"l2", "l1"})
+    selection.room.add("r2")
+
+    assert _config(selection) == (["Hallway", "Desk"], ["room:Study", "zone:Kitchen", "zone:Upstairs"])
+
+
+# Typed entries
+
+
+@pytest.mark.parametrize(
+    ("text", "values"),
+    [
+        (" Hallway ,Desk lamp,, ", ["Hallway", "Desk lamp"]),
+        ("\u3000Hallway\u2028, room:Kitchen", ["Hallway", "room:Kitchen"]),
+        ("a\x85,\x1cb", ["a", "b"]),
+        ("\ufeff", ["\ufeff"]),
+        (",, ,", []),
+        ("", []),
+        (None, []),
+    ],
+)
+def test_split_list(text: str | None, values: list[str]) -> None:
+    assert picker.split_list(text) == values

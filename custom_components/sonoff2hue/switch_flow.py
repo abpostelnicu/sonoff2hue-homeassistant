@@ -49,7 +49,7 @@ from .const import (
     CONF_NAME,
     SUBENTRY_SWITCH,
 )
-from .engine import jstext, picker, switch_form, switch_rules
+from .engine import picker, switch_form, switch_rules
 from .engine.config import HueSettings, SwitchSettings
 from .engine.errors import UnexpectedError
 from .engine.hue_client import HueGroup, HueLight
@@ -67,6 +67,7 @@ from .engine.switch_rules import (
     SwitchValidationError,
     SwitchWrite,
 )
+from .engine.targets import name_key
 from .runtime import Sonoff2HueConfigEntry, config_from_entry
 
 _LOGGER = logging.getLogger(__name__)
@@ -199,20 +200,16 @@ def device_label(device: LanDevice, online: bool, owner: str | None, now: dateti
     return " · ".join(parts)
 
 
-def _name_key(item: Resource) -> str:
-    return jstext.lower(jstext.trim(jstext.string(item.name)))
-
-
 def resource_options(items: Sequence[Resource]) -> list[SelectOptionDict]:
     """The picker's lights, rooms or zones, as the web UI listed them: the name, else the id; the id too when another of
     the list has the same name; and a light's state, or "no lights" for a room or zone without a grouped light. Their
     values are their positions, as a resource's id may be missing."""
-    names = Counter(_name_key(item) for item in items)
+    names = Counter(name_key(item.name) for item in items)
     options: list[SelectOptionDict] = []
     for index, item in enumerate(items):
         label = item.name or item.id or ""
-        if names[_name_key(item)] > 1:
-            label += f" ({jstext.string(item.id)})"
+        if names[name_key(item.name)] > 1:
+            label += f" ({item.id or ''})"
         if isinstance(item, HueLight):
             label += " — on" if item.on else " — off"
         elif isinstance(item, HueGroup) and item.grouped_light_id is None:
@@ -403,7 +400,7 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
         unwatch: Callable[[], None] | None = None
 
         def on_device(device: LanDevice) -> None:
-            key = jstext.lower(device.device_id)
+            key = device.device_id.casefold()
             previous = last_presses.get(key)
             last_presses[key] = device.last_press_at
             if (
@@ -431,7 +428,7 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
             watched, unwatch = registry, None
             if registry is not None:
                 last_presses.update(
-                    (jstext.lower(device.device_id), device.last_press_at) for device in registry.snapshot()
+                    (device.device_id.casefold(), device.last_press_at) for device in registry.snapshot()
                 )
                 unwatch = registry.add_changed_callback(on_device)
 
