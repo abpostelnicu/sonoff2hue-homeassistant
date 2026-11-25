@@ -958,6 +958,9 @@ documentation:
   nothing) list every merged pull request, the new contributors, and a link to the commits up to the tag.
 - `GET /repos/{owner}/{repo}/immutable-releases` answers `{"enabled": …, "enforced_by_owner": …}`, and `PUT` turns
   immutable releases on.
+- An immutable Release locks only its tag and assets: its title and notes can still be edited, and whether it is a
+  pre-release or Latest. Publishing one makes a release attestation of its tag, commit and assets, which
+  `gh release verify` checks (GitHub's documentation, *Immutable releases*, read on 2026-11-25).
 - A concurrency group keeps at most one run waiting by default, so a third run cancels the waiting one. GitHub Actions
   now has `queue: max` for up to 100 waiting runs, but actionlint 1.7.12, its newest release, rejects the key, so the
   workflow keeps the default.
@@ -1234,8 +1237,8 @@ documentation:
     `gh api repos/abpostelnicu/sonoff2hue-homeassistant/immutable-releases` gave
     `{"enabled":false,"enforced_by_owner":false}`, with no Release and no tag. `gh api -X PUT` on it answered 204 at
     22:58:44 UTC, and from 22:58:50 UTC on, six reads gave `{"enabled":true,"enforced_by_owner":false}`.
-  - **Not checked yet:** a real Release. The first is 1.0.0's: its `immutable` field, "Immutable" on its page, its
-    notes and Latest, and `gh release verify v1.0.0`, which needs a gh newer than this machine's 2.46.0.
+  - **A real Release:** 1.0.0's, checked on 2026-11-25 (below): its `immutable` field, "Immutable" on its page, its
+    notes and Latest, and `gh release verify v1.0.0`, which needed a gh newer than this machine's 2.46.0.
 - 2026-11-25: the import of a `sonoff2hue.yaml` in the setup flow (decision 22). 31 new tests in
   `tests/test_config_flow.py`, 70 in all, cover all 304 statements and 68 branches of `config_flow.py`. With the fake
   bridge and a key it issued: a file with its bridge adds the entry and two switches (unique ids, titles and data); the
@@ -1700,6 +1703,18 @@ documentation:
     fired once with it, and the toggle turned all 10 lights off in 549 ms, none failed. Online's `last_press_at` took
     the press's time, and the log had no warning or error. Exactly one toggle ran: Press kept that one event, and the
     lights stayed off.
+- 2026-11-25: release 1.0.0 (decision 29), after the live test. The manifest's `version` on `main` was already 1.0.0,
+  and *CI* and *Validate* had passed on `main` at 7ba561f. `release.sh` passed `v1.0.0` on that commit locally, step by
+  step as *Check the tag* runs it: the tag, the manifest's version and the commit on `main`; with no released version,
+  Latest and no start for the notes. `git tag -a v1.0.0 -m "sonoff2hue 1.0.0"` on 7ba561f was pushed at 20:34:58 UTC.
+  - **The workflow:** *Release* (run 45696334492) passed *Check the tag*, and *GitHub Release* published the GitHub
+    Release "sonoff2hue 1.0.0" at 20:35:16 UTC.
+  - **The Release:** the tag `v1.0.0` on 7ba561f; neither a draft nor a pre-release; no assets; `immutable` true, and
+    Immutable on its page; Latest, as `releases/latest` gives `v1.0.0`. Its notes list the 39 merged pull requests by
+    their titles, six of which, from before decision 30, name the other implementation; then the new contributor and a
+    link to the commits up to the tag. `gh release verify v1.0.0`, with gh 2.105.0, verified its attestation.
+  - **What the Marketplace installs:** the tag's source archive, `archive/refs/tags/v1.0.0.zip`, holds the 38 files of
+    `custom_components/sonoff2hue` that the live test ran, the same by SHA-256.
 
 ## Status
 
@@ -1724,4 +1739,5 @@ documentation:
   slices, A `lan` (#31), B `hue` (#33), C `yaml` (#30), D `switches` (#32), E `engine-core` (#29) and F `ha-layer`
   (#28); the cleanup (#34); and the README, `en.json` and this file rewritten
 - [x] Live test on the user's Home Assistant OS: `main` at 2bec130, with a real press (Verification log)
-- [ ] Release 1.0.0
+- [x] Release 1.0.0: the tag `v1.0.0` on 7ba561f and its immutable GitHub Release "sonoff2hue 1.0.0", Latest
+  (Verification log)
