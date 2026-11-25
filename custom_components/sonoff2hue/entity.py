@@ -8,14 +8,16 @@ identifier, an underscore and its translation key.
 The entities show what the dashboard showed, from the same state: the status tracker's snapshots, which come on
 ``SIGNAL_STATUS``, and the LAN registry. A platform adds the entities of the switches that exist when it is set up, and
 those of a switch added later when ``SIGNAL_SUBENTRY_ADDED`` brings it; Home Assistant removes a removed switch's device
-and entities itself.
+and entities itself. :func:`async_track_devices` keeps the devices and the unique ids in step with the bridge id and the
+switches' device ids and titles, which reconfiguring can change.
 """
 
 from collections.abc import Callable, Iterable
-from typing import Final
+from typing import Any, Final
 
 from homeassistant.config_entries import ConfigSubentry
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity
@@ -25,6 +27,7 @@ from .const import CONF_BRIDGE_ID, CONF_DEVICE_ID, CONF_DEVICE_KEY, CONF_NAME, D
 from .engine.config import SwitchSettings
 from .engine.status import StatusSnapshot
 from .runtime import (
+    SIGNAL_CONFIG_CHANGED,
     SIGNAL_STATUS,
     SIGNAL_SUBENTRY_ADDED,
     SIGNAL_SUBENTRY_UPDATED,
@@ -150,3 +153,61 @@ def async_add_switch_entities(
         if subentry.subentry_type == SUBENTRY_SWITCH:
             add(subentry)
     entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_SUBENTRY_ADDED.format(entry.entry_id), add))
+
+
+@callback
+def async_track_devices(hass: HomeAssistant, entry: Sonoff2HueConfigEntry) -> CALLBACK_TYPE:
+    """Keeps the devices in step with the entry: a new bridge id, or a switch's new device id, becomes its device's
+    identifier and the start of its entities' unique ids, and a switch's new title its device's name. It looks now,
+    for the changes made while the entry wasn't loaded, then after each change of the entry; returns a function that
+    stops it. Without it, a switch added with a device id that another switch had before would take that switch's
+    device."""
+
+    @callback
+    def update(*_: Any) -> None:
+        _async_update_devices(hass, entry)
+
+    update()
+    entry_id = entry.entry_id
+    stops = [
+        async_dispatcher_connect(hass, SIGNAL_CONFIG_CHANGED.format(entry_id), update),
+        async_dispatcher_connect(hass, SIGNAL_SUBENTRY_UPDATED.format(entry_id), update),
+    ]
+
+    @callback
+    def stop() -> None:
+        for stop_one in stops:
+            stop_one()
+
+    return stop
+
+
+@callback
+def _async_update_devices(hass: HomeAssistant, entry: Sonoff2HueConfigEntry) -> None:
+    # The identifier and the name of each device, by its subentry: the bridge's device has none, and keeps its name.
+    wanted: dict[str | None, tuple[str, str | None]] = {None: (bridge_identifier(entry), None)}
+    for subentry in entry.subentries.values():
+        if subentry.subentry_type == SUBENTRY_SWITCH:
+            wanted[subentry.subentry_id] = (switch_of(subentry).normalized_device_id, subentry.title)
+
+    devices = dr.async_get(hass)
+    entities = er.async_get(hass)
+    for device in dr.async_entries_for_config_entry(devices, entry.entry_id):
+        target = wanted.get(device.config_subentry_id)
+        old = next((value for domain, value in device.identifiers if domain == DOMAIN), None)
+        if target is None or old is None:
+            continue  # not a device that the platforms made
+        identifier, name = target
+        if name is not None and device.name != name:
+            devices.async_update_device(device.id, name=name)
+        if old == identifier:
+            continue
+        if name is None:
+            devices.async_update_device(device.id, new_identifiers={(DOMAIN, identifier)})
+        else:
+            devices.async_update_device(device.id, new_identifiers={(DOMAIN, identifier)}, serial_number=identifier)
+        # The device's own entities are "<identifier>_<key>"; a helper linked to the device belongs to another entry.
+        for entity in er.async_entries_for_device(entities, device.id, include_disabled_entities=True):
+            if entity.config_entry_id == entry.entry_id:
+                key = entity.unique_id.removeprefix(f"{old}_")
+                entities.async_update_entity(entity.entity_id, new_unique_id=f"{identifier}_{key}")

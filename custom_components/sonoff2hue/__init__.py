@@ -3,6 +3,7 @@
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
+from .entity import async_track_devices
 from .runtime import Sonoff2HueConfigEntry, Sonoff2HueData
 
 __all__ = ["Sonoff2HueConfigEntry", "Sonoff2HueData"]
@@ -19,6 +20,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: Sonoff2HueConfigEntry) -
     entry.async_on_unload(runtime.async_stop)
     runtime.async_start()
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+    entry.async_on_unload(async_track_devices(hass, entry))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
