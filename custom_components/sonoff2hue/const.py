@@ -8,14 +8,17 @@ ENTRY_TITLE: Final = "sonoff2hue"
 """The title of the config entry, whichever bridge it is paired with (decision 22)."""
 
 # The config entry's data: the paired Hue bridge, under the field names of the engine's HueSettings, with the values
-# that pairing gave.
+# that pairing gave, or those of an imported sonoff2hue.yaml.
 CONF_BRIDGE_IP: Final = "bridge_ip"
-"""The bridge's address as it was entered or found, trimmed: a host name or IP address with an optional port."""
+"""The bridge's address: a host name or IP address with an optional port. It is stored trimmed when it was entered, as
+the search wrote it when it was found, and as written when it came from an imported ``sonoff2hue.yaml``;
+reauthentication keeps it as stored. ``hue_address.create_base_url`` strips it either way."""
 CONF_BRIDGE_ID: Final = "bridge_id"
 """The bridge id from the bridge's public config; also the config entry's unique id."""
 CONF_APP_KEY: Final = "app_key"
 CONF_CERTIFICATE_SHA256: Final = "certificate_sha256"
-"""The SHA-256 of the bridge's certificate, pinned when pairing."""
+"""The SHA-256 of the bridge's certificate, pinned when pairing, or as an imported ``sonoff2hue.yaml`` wrote it, which
+may have none."""
 
 SUBENTRY_SWITCH: Final = "switch"
 """The type of a switch's config subentry, one per MINIR4M. Its unique id is the normalized device id
