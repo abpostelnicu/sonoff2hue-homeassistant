@@ -1,26 +1,32 @@
-"""Finding Hue bridges and pairing with one: a port of the .NET app's ``Hue/HueBridgeSetup.cs``, with the pairing loop of
-``Web/Management/HuePairing.cs``.
+"""Finding Hue bridges and pairing with one.
 
 Pairing pins the certificate the bridge presents when it is asked for its public config (trust on first use), then asks
 it for an application key every 2 seconds for 60 seconds, while the user presses its link button.
 """
 
 import asyncio
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import Enum
 import ipaddress
 import json
 import logging
 import socket
-import unicodedata
+from typing import Any
 
 import aiohttp
 
-from . import jsonnode, text
 from .dns import DnsRecordType, ends_with_ignoring_case, equals_ignoring_case
 from .hue_address import create_base_url
-from .hue_client import HttpAnswer, HueApiError, HueBridgeInfo, TransportError, TransportFactory, aiohttp_transport
+from .hue_client import (
+    HttpAnswer,
+    HueApiError,
+    HueBridgeInfo,
+    TransportError,
+    TransportFactory,
+    aiohttp_transport,
+    load_json,
+)
 from .mdns import MdnsListener, MdnsPacket
 
 _LOGGER = logging.getLogger(__name__)
@@ -30,6 +36,8 @@ CLOUD_DISCOVERY_URL = "https://discovery.meethue.com/"
 DISCOVERY_TIMEOUT = 5.0
 PAIRING_WINDOW = 60.0
 PAIRING_INTERVAL = 2.0
+LINK_BUTTON_NOT_PRESSED = 101
+"""The error type of the bridge's answer to a pairing request while its link button isn't pressed."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,7 +200,7 @@ def _ip_address(value: object) -> str | None:
 
 
 async def get_bridge_info(ip: str, transport_factory: TransportFactory = aiohttp_transport) -> HueBridgeInfo:
-    """The bridge's public config and the SHA-256 of the certificate it presents (``GetBridgeInfoAsync``). Raises
+    """The bridge's public config and the SHA-256 of the certificate it presents, read over the same connection. Raises
     :class:`HueApiError` when no Hue bridge answers, and ``ConfigError`` for a malformed address, before any request."""
     url = create_base_url(ip)
     fingerprints: list[str] = []
@@ -200,48 +208,36 @@ async def get_bridge_info(ip: str, transport_factory: TransportFactory = aiohttp
     try:
         answer = await transport.send("GET", "api/0/config", None)
     except TransportError as err:
-        detail = (
-            "The request was canceled due to the configured HttpClient.Timeout of 5 seconds elapsing."
-            if err.kind == "timeout"
-            else err.detail
-        )
-        raise HueApiError(f"No Hue bridge answered at {ip}: {detail}") from err
+        raise HueApiError(f"No Hue bridge answered at {ip}: {err.detail}") from err
     finally:
         await transport.close()
 
     if not answer.is_success:
         raise HueApiError(f"No Hue bridge answered at {ip}: {not_success_message(answer)}")
     try:
-        config = jsonnode.parse(answer.read_json_text(), case_insensitive=True)
-    except jsonnode.JsonError as err:
+        config = answer.json()
+    except ValueError as err:
         raise HueApiError(f"No Hue bridge answered at {ip}: {err}") from err
-    if config is not None and not isinstance(config, (dict, jsonnode.BrokenObject)):
-        raise HueApiError(
-            f"No Hue bridge answered at {ip}: The JSON value could not be converted to System.Text.Json.Nodes.JsonObject."
-        )
-
-    bridge_id = None if config is None else _text(config, "bridgeid")
-    if config is None or bridge_id is None or not fingerprints:
+    if not isinstance(config, dict) or not isinstance(bridge_id := config.get("bridgeid"), str) or not fingerprints:
         raise HueApiError(f"The device at {ip} does not look like a Hue bridge.")
     return HueBridgeInfo(
-        ip, bridge_id, _text(config, "name"), _text(config, "modelid"), _text(config, "swversion"), fingerprints[-1]
+        ip,
+        bridge_id,
+        _optional_text(config, "name"),
+        _optional_text(config, "modelid"),
+        _optional_text(config, "swversion"),
+        fingerprints[-1],
     )
 
 
 def not_success_message(answer: HttpAnswer) -> str:
-    """``EnsureSuccessStatusCode``'s message."""
-    reason = answer.reason_phrase
-    if text.is_null_or_white_space(reason):
-        return f"Response status code does not indicate success: {answer.status}."
-    return f"Response status code does not indicate success: {answer.status} ({reason})."
+    """What an answer with a failure status says, such as "HTTP 404 Not Found"."""
+    phrase = answer.reason_phrase
+    return f"HTTP {answer.status} {phrase}" if phrase else f"HTTP {answer.status}"
 
 
-def _text(obj: Mapping[str, jsonnode.JsonValue], key: str) -> str | None:
-    """``json[key] is JsonValue value && value.TryGetValue<string>(out var text) ? text : null``; reading a duplicate
-    key or a lone surrogate throws, as in .NET."""
-    value = obj.get(key)
-    if isinstance(value, jsonnode.BrokenString):
-        raise value.error()
+def _optional_text(config: dict[str, Any], key: str) -> str | None:
+    value = config.get(key)
     return value if isinstance(value, str) else None
 
 
@@ -270,87 +266,55 @@ async def try_create_app_key(
         return PairingResult(PairingStatus.REQUEST_FAILED, None, f"bridge not reachable: {err.detail}")
     finally:
         await transport.close()
-    return parse_pairing_response(answer.status, answer.read_as_string())
+    return parse_pairing_response(answer.status, answer.text())
 
 
 def parse_pairing_response(status: int, body: str) -> PairingResult:
-    """Reads the answer to ``POST /api``, e.g. ``[{"success":{"username":"..."}}]``."""
-    first: jsonnode.JsonValue = None
+    """Reads the answer to ``POST /api``, such as ``[{"success":{"username":"…","clientkey":"…"}}]``, whose username is
+    the application key; the client key isn't used. An error of type 101 means that the link button wasn't pressed, and
+    any other error is a refusal, raised as :class:`HueApiError`. Anything else is worth another attempt."""
     try:
-        parsed = jsonnode.parse(body)
-        if isinstance(parsed, list) and parsed:
-            first = parsed[0]
-    except jsonnode.JsonError:
-        pass
+        answer = load_json(body)
+    except ValueError:
+        answer = None
+    first = answer[0] if isinstance(answer, list) and answer else None
 
-    if isinstance(first, (dict, jsonnode.BrokenObject)):
+    if isinstance(first, dict):
         success = first.get("success")
-        if isinstance(success, (dict, jsonnode.BrokenObject)):
-            app_key = _text(success, "username")
-            if app_key:
-                return PairingResult(PairingStatus.PAIRED, app_key)
+        if isinstance(success, dict) and isinstance(app_key := success.get("username"), str) and app_key:
+            return PairingResult(PairingStatus.PAIRED, app_key)
 
         error = first.get("error")
-        if isinstance(error, (dict, jsonnode.BrokenObject)):
-            error_type = jsonnode.try_get_int32(error.get("type"))
-            if error_type == 101:
+        if isinstance(error, dict):
+            error_type = error.get("type")
+            if not isinstance(error_type, int) or isinstance(error_type, bool):
+                error_type = None
+            if error_type == LINK_BUTTON_NOT_PRESSED:
                 return PairingResult(PairingStatus.LINK_BUTTON_NOT_PRESSED, None)
-            description = _text(error, "description")
-            raise HueApiError(
-                f"The Hue bridge refused pairing: {'no description' if description is None else description} "
-                f"(error {'unknown' if error_type is None else error_type}).",
-                status,
-            )
+            description = error.get("description")
+            if not isinstance(description, str) or not description or description.isspace():
+                description = "no description"
+            number = "unknown" if error_type is None else error_type
+            raise HueApiError(f"The Hue bridge refused pairing: {description} (error {number}).", status)
 
     # Not the documented shape, e.g. an HTML error page from a busy bridge: worth another attempt.
     return PairingResult(PairingStatus.REQUEST_FAILED, None, f"unexpected response (HTTP {status}): {_shorten(body)}")
 
 
-def _shorten(value: str) -> str:
-    """The body on one line, cut after 120 UTF-16 code units; a character cut in half shows as U+FFFD, as .NET's lone
-    surrogate does when it is written out."""
-    single_line = " ".join(part for part in _split_white_space(value) if part)
-    if not single_line:
+def _shorten(body: str, limit: int = 120) -> str:
+    """The body on one line, cut after ``limit`` characters."""
+    line = " ".join(body.split())
+    if not line:
         return "(empty body)"
-    if text.utf16_length(single_line) <= 120:
-        return single_line
-    kept: list[str] = []
-    length = 0
-    for char in single_line:
-        width = 2 if ord(char) > 0xFFFF else 1
-        if length + width > 120:
-            if length < 120:
-                kept.append("\ufffd")
-            break
-        kept.append(char)
-        length += width
-    return "".join(kept) + "..."
-
-
-def _split_white_space(value: str) -> list[str]:
-    parts: list[str] = []
-    current: list[str] = []
-    for char in value:
-        if text.is_white_space(char):
-            parts.append("".join(current))
-            current = []
-        else:
-            current.append(char)
-    parts.append("".join(current))
-    return parts
+    return line if len(line) <= limit else f"{line[:limit]}..."
 
 
 def build_device_type(host_name: str | None = None) -> str:
-    """The ``devicetype`` to pair with, ``sonoff2hue#`` and the letters and digits of the host name: Hue limits it to
-    ``<app, max 20>#<device, max 19>``. Like ``Environment.MachineName``, the host name ends at its first dot, and like
-    ``char.IsLetterOrDigit``, characters outside the Basic Multilingual Plane don't count."""
-    machine = (host_name if host_name is not None else socket.gethostname()).split(".", 1)[0]
-    host = "".join(
-        char
-        for char in machine
-        if ord(char) <= 0xFFFF and unicodedata.category(char) in ("Lu", "Ll", "Lt", "Lm", "Lo", "Nd")
-    )
-    return "sonoff2hue#" + (host or "host")[:19]
+    """The ``devicetype`` to pair with: ``sonoff2hue#`` and the letters and digits of the host name up to its first dot,
+    at most 19 of them, as Hue limits it to ``<app, at most 20>#<device, at most 19>``."""
+    name = (socket.gethostname() if host_name is None else host_name).split(".", 1)[0]
+    letters_and_digits = "".join(char for char in name if char.isalnum())
+    return f"sonoff2hue#{(letters_and_digits or 'host')[:19]}"
 
 
 async def pair(
@@ -362,7 +326,7 @@ async def pair(
     window: float = PAIRING_WINDOW,
     interval: float = PAIRING_INTERVAL,
 ) -> str:
-    """Asks the bridge for an application key until its link button is pressed, as ``HuePairing`` does; returns the
+    """Asks the bridge for an application key every ``interval`` seconds until its link button is pressed; returns the
     key. ``on_attempt`` hears of each attempt that didn't pair. Raises :class:`PairingTimeoutError` once ``window``
     seconds have passed, and :class:`HueApiError` when the bridge refuses."""
     loop = asyncio.get_running_loop()

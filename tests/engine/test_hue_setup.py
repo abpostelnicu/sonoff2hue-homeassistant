@@ -15,7 +15,6 @@ import pytest
 from custom_components.sonoff2hue.engine import hue_client, hue_setup
 from custom_components.sonoff2hue.engine.config import ConfigError
 from custom_components.sonoff2hue.engine.dns import DnsMessage, DnsRecordType, build_query
-from custom_components.sonoff2hue.engine.errors import UnexpectedError
 from custom_components.sonoff2hue.engine.hue_address import BridgeUrl
 from custom_components.sonoff2hue.engine.hue_client import HttpAnswer, HueApiError, HueBridgeInfo, request_url
 from custom_components.sonoff2hue.engine.hue_setup import (
@@ -48,15 +47,15 @@ async def test_bridge_info_names_the_bridge_and_its_certificate(fake_hue: FakeHu
 @pytest.mark.parametrize(
     ("status", "body", "message"),
     [
-        (404, "", "No Hue bridge answered at {}: Response status code does not indicate success: 404 (Not Found)."),
+        (404, "", "No Hue bridge answered at {}: HTTP 404 Not Found"),
+        (503, "busy", "No Hue bridge answered at {}: HTTP 503 Service Unavailable"),
+        (599, "", "No Hue bridge answered at {}: HTTP 599"),
+        (200, "<html>busy</html>", "No Hue bridge answered at {}: Expecting value: line 1 column 1 (char 0)"),
         (200, '{"name":"Not a bridge"}', "The device at {} does not look like a Hue bridge."),
         (200, '{"bridgeid":42}', "The device at {} does not look like a Hue bridge."),
+        (200, '{"BridgeID":"001788FFFE000001"}', "The device at {} does not look like a Hue bridge."),
         (200, "null", "The device at {} does not look like a Hue bridge."),
-        (
-            200,
-            "[]",
-            "No Hue bridge answered at {}: The JSON value could not be converted to System.Text.Json.Nodes.JsonObject.",
-        ),
+        (200, "[]", "The device at {} does not look like a Hue bridge."),
     ],
 )
 async def test_bridge_info_fails_for_a_device_that_is_not_a_bridge(
@@ -70,26 +69,18 @@ async def test_bridge_info_fails_for_a_device_that_is_not_a_bridge(
     assert str(failure.value) == message.format(fake_hue.address)
 
 
-async def test_bridge_info_fails_for_an_answer_that_is_not_json(fake_hue: FakeHueHost) -> None:
-    fake_hue.fail(Fault("/api/0/config", status=200, body="<html>busy</html>", content_type="text/html"))
-
-    with pytest.raises(HueApiError) as failure:
-        await hue_setup.get_bridge_info(fake_hue.address)
-
-    # .NET's JsonException names the position differently; the start is the app's.
-    assert str(failure.value).startswith(f"No Hue bridge answered at {fake_hue.address}: ")
-
-
-async def test_bridge_info_reads_the_config_without_regard_to_case(fake_hue: FakeHueHost) -> None:
-    fake_hue.fail(Fault("/api/0/config", status=200, body='{"BridgeID":"001788FFFE000001","NAME":"Hue"}'))
-    fake_hue.fail(Fault("/api/0/config", status=200, body='{"bridgeid":"a","BRIDGEID":"b"}'))
+async def test_bridge_info_takes_only_texts_for_the_bridges_name_model_and_firmware(fake_hue: FakeHueHost) -> None:
+    fake_hue.fail(
+        Fault(
+            "/api/0/config",
+            status=200,
+            body='{"bridgeid":"001788FFFE000001","name":"Hue","modelid":7,"swversion":null}',
+        )
+    )
 
     info = await hue_setup.get_bridge_info(fake_hue.address)
-    with pytest.raises(UnexpectedError) as duplicate:
-        await hue_setup.get_bridge_info(fake_hue.address)
 
-    assert (info.bridge_id, info.name) == ("001788FFFE000001", "Hue")
-    assert duplicate.value.dotnet_type == "ArgumentException"
+    assert info == HueBridgeInfo(fake_hue.address, "001788FFFE000001", "Hue", None, None, fake_hue.fingerprint)
 
 
 @pytest.mark.usefixtures("socket_enabled")
@@ -102,17 +93,34 @@ async def test_bridge_info_fails_when_nothing_answers() -> None:
     assert str(failure.value) == f"No Hue bridge answered at 127.0.0.1:{port}: Connection refused (127.0.0.1:{port})"
 
 
-async def test_bridge_info_times_out_as_dotnet_does(fake_hue: FakeHueHost, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_bridge_info_times_out(fake_hue: FakeHueHost, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(hue_client, "REQUEST_TIMEOUT", 0.1)
     fake_hue.fail(Fault("/api/0/config", status=200, body="{}", delay=0.5))
 
     with pytest.raises(HueApiError) as failure:
         await hue_setup.get_bridge_info(fake_hue.address)
 
-    assert str(failure.value) == (
-        f"No Hue bridge answered at {fake_hue.address}: The request was canceled due to the configured "
-        "HttpClient.Timeout of 5 seconds elapsing."
-    )
+    assert str(failure.value) == f"No Hue bridge answered at {fake_hue.address}: The request timed out."
+
+
+@pytest.mark.usefixtures("socket_enabled")
+async def test_bridge_info_fails_for_a_device_without_tls() -> None:
+    async def answer_in_plain_http(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        await reader.read(1)
+        writer.write(b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+        await writer.drain()
+        writer.close()
+
+    server = await asyncio.start_server(answer_in_plain_http, "127.0.0.1", 0)
+    address = f"127.0.0.1:{server.sockets[0].getsockname()[1]}"
+    try:
+        with pytest.raises(HueApiError) as failure:
+            await hue_setup.get_bridge_info(address)
+    finally:
+        server.close()
+        await server.wait_closed()
+
+    assert str(failure.value) == f"No Hue bridge answered at {address}: The TLS handshake failed ({address})"
 
 
 async def test_a_malformed_address_fails_before_any_request() -> None:
@@ -198,6 +206,59 @@ async def test_pairing_posts_the_device_type_to_the_normalized_address() -> None
     assert json.loads(sent[0][2] or b"") == {"devicetype": "sonoff2hue#test", "generateclientkey": True}
 
 
+@pytest.mark.parametrize(
+    ("status", "body", "result"),
+    [
+        (200, '[{"success":{"username":"new-app-key","clientkey":"0123ABCD"}}]', PAIRED),
+        (200, '[{"success":{"username":"new-app-key"}},{"error":{"type":101}}]', PAIRED),
+        (200, '[{"error":{"type":101,"address":"","description":"link button not pressed"}}]', NOT_PRESSED),
+        (200, '[{"success":{"username":""}}]', 'unexpected response (HTTP 200): [{"success":{"username":""}}]'),
+        (200, "[]", "unexpected response (HTTP 200): []"),
+        (
+            200,
+            '{"success":{"username":"new-app-key"}}',
+            'unexpected response (HTTP 200): {"success":{"username":"new-app-key"}}',
+        ),
+        (
+            503,
+            "<html>\n  <body>busy</body>\n</html>\n",
+            "unexpected response (HTTP 503): <html> <body>busy</body> </html>",
+        ),
+        (502, "", "unexpected response (HTTP 502): (empty body)"),
+        (200, "x" * 121, f"unexpected response (HTTP 200): {'x' * 120}..."),
+    ],
+)
+def test_a_pairing_answer_pairs_waits_or_is_worth_another_attempt(
+    status: int, body: str, result: PairingResult | str
+) -> None:
+    expected = (
+        result if isinstance(result, PairingResult) else PairingResult(PairingStatus.REQUEST_FAILED, None, result)
+    )
+
+    assert hue_setup.parse_pairing_response(status, body) == expected
+
+
+@pytest.mark.parametrize(
+    ("body", "message"),
+    [
+        (
+            '[{"error":{"type":7,"address":"/devicetype","description":"invalid value, x, for parameter devicetype"}}]',
+            "invalid value, x, for parameter devicetype (error 7).",
+        ),
+        ('[{"error":{"type":1}}]', "no description (error 1)."),
+        ('[{"error":{"description":" "}}]', "no description (error unknown)."),
+        ('[{"error":{"type":"101","description":"busy"}}]', "busy (error unknown)."),
+        ('[{"error":{"type":true}}]', "no description (error unknown)."),
+    ],
+)
+def test_any_other_pairing_error_is_a_refusal(body: str, message: str) -> None:
+    with pytest.raises(HueApiError) as failure:
+        hue_setup.parse_pairing_response(200, body)
+
+    assert str(failure.value) == f"The Hue bridge refused pairing: {message}"
+    assert failure.value.status == 200
+
+
 # The pairing loop.
 
 INFO = HueBridgeInfo("192.0.2.10", BRIDGE_ID, NAME, "BSB002", "1972004020", "00" * 32)
@@ -261,8 +322,9 @@ async def test_pairing_stops_when_the_bridge_refuses() -> None:
         ("---", "sonoff2hue#host"),
         ("a" * 30, "sonoff2hue#" + "a" * 19),
         ("K\u00fcche-Pi", "sonoff2hue#K\u00fcchePi"),
-        ("host\U00010400x", "sonoff2hue#hostx"),
+        ("host\U00010400x", "sonoff2hue#host\U00010400x"),
         ("\u0661\u0662", "sonoff2hue#\u0661\u0662"),
+        ("my_host 1", "sonoff2hue#myhost1"),
     ],
 )
 def test_device_type_takes_the_letters_and_digits_of_the_host_name(host_name: str, device_type: str) -> None:
