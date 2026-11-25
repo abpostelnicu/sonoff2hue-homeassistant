@@ -86,9 +86,9 @@ class FakeHueBridge:
 
 
 class SimulatedSwitch:
-    """The simulated MINIR4M: ``tools/send-ewelink-announcements.py``, the .NET app's script, which sends the eWeLink
-    announcements of a device in DIY mode, 1.5 seconds apart. As ``scripts/develop press`` does, it sends them on the
-    interface of the default route (``0.0.0.0``) with a multicast TTL of 0, so they loop back to this machine only."""
+    """The simulated MINIR4M: ``tools/send-ewelink-announcements.py``, which sends the eWeLink announcements of a
+    device in DIY mode, 1.5 seconds apart. As ``scripts/develop press`` does, it sends them on the interface of the
+    default route (``0.0.0.0``) with a multicast TTL of 0, so they loop back to this machine only."""
 
     def __init__(self, root: Path, device_id: str) -> None:
         self.root = root

@@ -7,6 +7,7 @@ import importlib.util
 from ipaddress import IPv4Address
 import math
 from pathlib import Path
+from types import ModuleType
 
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -104,20 +105,32 @@ def test_announcements_take_no_address_from_a_copy_that_this_host_relays() -> No
     assert direct.address == IPv4Address("192.0.2.7")
 
 
-def test_the_simulated_switch_on_this_host_keeps_its_a_records_address() -> None:
-    # tools/send-ewelink-announcements.py, the simulated switch, sends from this host with TTL 0, with SRV and A
-    # records.
+def _simulator() -> ModuleType:
+    """tools/send-ewelink-announcements.py, the simulated switch."""
     path = Path(__file__).parents[2] / "tools" / "send-ewelink-announcements.py"
     spec = importlib.util.spec_from_file_location("send_ewelink_announcements", path)
     assert spec is not None
     assert spec.loader is not None
     simulator = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(simulator)
-    packet = to_packet(simulator.announcement(DEVICE, 5, "192.0.2.10"), "192.0.2.1", from_this_host=True)
+    return simulator
+
+
+def test_the_simulated_switch_on_this_host_keeps_its_a_records_address() -> None:
+    # The simulated switch sends from this host with TTL 0, with SRV and A records.
+    packet = to_packet(_simulator().announcement(DEVICE, 5, "192.0.2.10"), "192.0.2.1", from_this_host=True)
 
     (parsed,) = ewelink.announcements(packet)
 
     assert (parsed.seq, parsed.address) == (5, IPv4Address("192.0.2.10"))
+
+
+def test_the_simulated_switch_writes_its_txt_strings_with_their_lengths_in_bytes() -> None:
+    simulator = _simulator()
+
+    (parsed,) = ewelink.announcements(to_packet(simulator.announcement("1000\u00e9abcd", 7, "192.0.2.10")))
+
+    assert (parsed.device_id, parsed.seq, parsed.encrypted, parsed.data) == ("1000\u00e9abcd", 7, False, simulator.DATA)
 
 
 def test_announcements_skips_instances_without_an_id() -> None:
