@@ -130,6 +130,9 @@ On 2026-11-25 the user chose:
   is `X.Y.Z` releases for real. A tag pushed for a test must fail one of the checks before the Release (another
   version, a commit that isn't on `main`, a suffix) and is deleted right afterwards. `.github/scripts/release-test.sh`
   tests the checks and the workflow; `scripts/check` and CI's *Test* job run it.
+- The Marketplace's catalog (decision 31): hacs/default#14951 adds sonoff2hue to it. While it waits, don't comment on
+  it, push to it or open another one, as `hacs-bot` asks. If a reviewer sets it to draft, fix what they ask in this
+  repository, and mark it ready for review again.
 
 ## Layout
 
@@ -974,6 +977,49 @@ documentation:
 - A tag push runs the workflow files of the tagged commit. A `push` trigger that names only branches doesn't run for
   tags, so *CI* and *Validate* don't run for a release tag.
 
+The Marketplace's catalog (decision 31), checked on 2026-11-25 in `hacs/default` (its `checks.yml`, `lint.yml` and
+scripts), the guide *Get into the catalog* on contributors.home-assistant.io, and HACS's *Include default repositories*:
+
+- **The catalog** is the repository `hacs/default`, which the Marketplace and HACS read. A repository gets in through a
+  pull request that adds `owner/repository` to the list of its type, `integration` here. The pull request comes from
+  the owner's account, or from a major contributor's (at least a third of the top contributor's commits), and not from
+  an organization's. Each list is a JSON array kept sorted by `str.casefold` (`scripts/is_sorted.py`). The template
+  has six checkboxes and three links: the latest Release, and passing runs of the HACS action, without `ignore`, and of
+  hassfest. `hacs-bot` closes a pull request without the links. One with a false statement or a review requested is
+  closed without notice.
+- **Checks.**
+  - *Lint* (`lint.yml`): the lists are valid JSON (`jq`), match the schema (every entry `^[\w.-]+/[\w.-]+$`), and are
+    sorted.
+  - *Check* (`checks.yml`) runs *Preflight* and *Editable PR* (maintainer edits allowed) on every pull request. The
+    others run only once it has the label *New default repository*, which `hacs-bot` or a maintainer adds, and whose
+    `labeled` event runs *Check* again:
+    - *Owner*;
+    - *Releases*: at least one GitHub Release;
+    - *Removed repository* and *Existing repository*: the lists at `data-v2.hacs.xyz`;
+    - *Core domain conflict*: the domains of `next.home-assistant.io/integrations.json`, the upcoming release's;
+    - *Hassfest*: the image `ghcr.io/home-assistant/hassfest:latest` on a shallow clone of the default branch, which
+      fails on any `[WARNING] [BRAND_IMAGES]`;
+    - the *HACS action*.
+  - A first-time contributor's runs started without a maintainer's approval.
+- **hassfest 2026.12** (2026.12.0b0; home-assistant/core#187957, `packages/hassfest/hassfest/brand_images.py`) checks a
+  custom integration's `brand/`:
+  - only the eight images that Home Assistant uses, each a PNG;
+  - the icons 256×256 and 512×512;
+  - an `@2x` image only with its normal one;
+  - no image identical to the one that it falls back to.
+
+  For a custom integration it only warns, but the catalog's *Hassfest* fails on those warnings. `latest` was built on
+  2026-11-25 at 18:31 UTC, the day 2026.12.0b0 came out.
+- **Review.** The HACS documentation says that additions take months. The 200 latest merged ones took a median of 1.6
+  days, and 6 at most, while 332 others were open, the oldest since 2026-06-07, so a submission may wait far longer
+  than that median. Of the last 60 closed, 6 weren't merged. Of the four of those read:
+  - one lacked the links;
+  - a maintainer declined three: a second catalog, and two integrations that overlap core's, for devices and
+    protocols that core integrations support.
+
+  `hacs-bot`'s comment on a new submission asks not to comment, open another pull request or merge the default branch
+  while it waits.
+
 ## Decisions
 
 | # | Decision | Why |
@@ -1008,6 +1054,7 @@ documentation:
 | 28 | `README.md` is the documentation for the integration's users: the Marketplace shows it on the integration's page, GitHub on the repository's, and the manifest's `documentation` leads to it (decision 16). **Structure:** what the integration does, with a diagram, and that it lives in Home Assistant's own UI and needs neither Home Assistant's Hue integration nor SonoffLAN; *How it works*, with its own mDNS socket; *Requirements*: Home Assistant 2026.11 or later (OS, Container or Core) on the switches' subnet, Container on the host's network and a virtual machine with a bridged adapter, **Detach relay**, a Hue bridge with CLIP v2, and nothing else that toggles the same lights; *Installation* from the Marketplace, by the My link `marketplace_repository` or *Add from link*, which need a GitHub connection, or by hand from a release's source; *Setup*: pairing; the import, with the format of a `sonoff2hue.yaml` (its keys, an example with made-up values), what the import checks and how it reports problems, and what it keeps; *Reconfigure* and reauthentication; *Switches*: the three ways to the MINIR4M, *Switch settings*, names matched without regard to case, the device key and where to get it (the eWeLink cloud API), changing and deleting; *Devices and entities*, each entity with its states and attributes as `en.json` names them (decision 25); *Presses in automations*: *Press* with the trigger *Event received*, and the bus events with their data (decision 23), in YAML for the tests' switch Hall, `1000abcdef`; *Repairs*, each with what it means and what to do; *Activity, log and diagnostics*: the logbook as the user decided on 2026-11-25, Home Assistant's own entries only, the entities' changes such as *Press* and *Last action* (decision 26), with the details in *Last action*'s attributes, Home Assistant's log and the diagnostics, and the coordinator's rule for the log levels: *Enable debug logging*, or `logger:` for the info lines; *Troubleshooting*, with the entities and messages that show each problem, such as the bridge's transport messages; *Limitations*; then *Development* (decision 18, the tests, the mDNS layer's recorded cases and the guard test of decision 30, and the end-to-end test of decision 27), *Releases* (decision 29) and the license. The UI's labels are in italics, word for word as `en.json` or Home Assistant's frontend shows them, and the eWeLink app's **Detach relay** in bold. Sections name each other in the text, without links. **Markers:** *Installation* is between `<!-- ha-marketplace:exclude-start -->` and `<!-- ha-marketplace:exclude-end -->` (the user's choice of 2026-11-25), which the Marketplace leaves out from Home Assistant 2026.12, as its page has an install button of its own; 2026.11 shows the whole README, so the installation is still written for both readers. **No status line:** the README describes the integration as released, without "in development" or "no release yet", as the Marketplace shows the README at the tag of the release on offer, and 1.0.0 is a tag only (decision 29). **Left out:** the design choices that users can't notice (one socket, the socket bound to the group on Linux, the order of the lists), which this file keeps; Home Assistant OS's multicast plugin, whose copies users never see (decision 19); the trace-level lines, which the `logger` integration can't select; the brand icon, which the Marketplace shows above the README, and whose `align` its sanitizer drops; the import's limits that a `sonoff2hue.yaml` never reaches, such as tags and nesting; a table of contents and in-page links | The Marketplace has no documentation page of its own, and Home Assistant's UI links a custom integration to its `documentation`, so the README is the users' only manual. A label written as the UI shows it can be found on the screen. Home Assistant 2026.11.3's `components/marketplace` downloads `README.md` raw at the version and only disables `<svg`; its frontend 20261028.8 renders it with marked 18.1.1 (GFM, no breaks) and js-xss 1.0.17, which removes HTML comments, so there a comment hides a text on both sites alike; from 2026.12 its frontend first leaves out the text between the markers, so they hide it in the Marketplace only (Research findings). There, headings get no ids, so an in-page link points at nothing, which GitHub's own outline of a README doesn't need; relative links lead to GitHub for `.md` files and to the raw file otherwise, at the version; a `#12` outside a link becomes a link to the repository's issue 12; and GitHub's alerts become `ha-alert`s. A status line would still be there in the Marketplace at the tag of 1.0.0. The logbook lists an entity's change only when its state changes, so the README says that two presses with the same outcome show *Last action* once. Details that users can't notice would only lengthen it |
 | 29 | Each version is a GitHub Release, made by `.github/workflows/release.yml` (*Release*) when a tag `vX.Y.Z` is pushed. Its job *Check the tag* may only read the contents. It checks out `github.sha`, the tagged commit, with main's history, and `.github/scripts/release.sh` stops it with an `::error::` unless the tag is exactly `vX.Y.Z` (three numbers, without leading zeros and without a suffix), `X.Y.Z` is exactly the `version` in that commit's `custom_components/sonoff2hue/manifest.json`, and the commit is on `main`. Then it lists the published GitHub Releases, neither drafts nor pre-releases, with `gh api --paginate`; their tags `vX.Y.Z` are the released versions, and git tags alone don't count. It hands on X.Y.Z, whether that is the highest released version (Latest), and the highest released version below it, where the notes start. The job *GitHub Release* needs it, has the workflow's only `contents: write`, checks nothing out and runs no action. It checks that the outputs fit the tag and that the tag still names `github.sha`, leaves a Release that exists already as it is, and takes Latest away if a higher version has a Release by now: when only the failed jobs of a run are run again, GitHub reuses the check job's old outputs. Then it runs `gh release create vX.Y.Z --verify-tag --target <github.sha> --title "sonoff2hue X.Y.Z" --generate-notes --latest=<true or false> [--notes-start-tag v<previous>]`, shows the Release, and fails if the tag was moved meanwhile. The workflow's token may only read by default, and releases run one at a time (concurrency group `release`, which never cancels a running release). The Releases have no assets and `hacs.json` sets no `zip_release`: the Marketplace installs a Release from its tag's source archive (Research findings, Releases). `.github/scripts/release-test.sh` tests the checks, and runs both jobs' steps from `release.yml` as GitHub runs them, against a stand-in `gh`; CI's *Test* job and `scripts/check` run it. Immutable releases are on since 2026-11-24 at 22:58 UTC, turned on once the refusals were tested on GitHub with throwaway tags, which created no Release. Release 1.0.0 is a tag `v1.0.0` on `main` after the live test, nothing more | The plan ends with release 1.0.0, and the Marketplace installs integrations from GitHub Releases: a tag alone isn't a version, and without a Release users get the default branch's newest commit. Checking before anything is created means that a refused tag leaves nothing behind, which matters with immutable releases, where a Release locks its tag's name for good. The version check keeps the Marketplace's version, the tag, and the one Home Assistant shows, the manifest's, the same, as the Marketplace's guides ask. Only commits of `main` are released, since they have passed CI and the ruleset's checks. Write access in one job without a checkout means that none of the repository's code runs with it; the tag is checked again there because no ruleset protects tags. Latest and the notes come from the Releases, so a stray or refused tag can't hold them back: a lower patch released later doesn't take Latest, and its notes start at the version below it, for that version's users. The Marketplace itself offers the newest Release in GitHub's list, which is neither Latest nor the highest version (Research findings), hence the rule to release in rising versions. A Release can't be made for a test without locking its version, so the tests run the workflow offline, and the throwaway tags on GitHub test only the refusals. Immutability ties each version to one commit for good, as the user chose |
 | 30 | **The integration stands alone** (the user's choice of 2026-11-25). Python's standard library and the libraries Home Assistant ships decide edge cases: `str` methods such as `strip()` and `casefold()`; `json` and `base64`; `ipaddress` and yarl for the bridge address; aiohttp's own handling of answers; PyYAML with a probatio schema for the import. **The product rules stay:** how presses are detected and lights toggled; the timings (5 s, 10 s, 30 s, 45 s, 60 s, 500 ms, 5 min); pairing and discovery; the switches' limits and their messages; the flows, entities, repairs, bus events and diagnostics. **Tests are pytest cases of the integration's own behavior.** The generators of recorded cases and their fixtures are gone. **The mDNS layer is the exception:** `dns.py`, `mdns.py`, the record part of `ewelink.py` and the mDNS part of Hue discovery (`_discover_mdns` in `hue_setup.py`). It stays the integration's own and never relies on Home Assistant's mDNS: no python-zeroconf, no `zeroconf` or `network` integration, no manifest matcher, and no shared HTTP session for `.local` names. It keeps exactly its behavior for every input, with its own string rules for names, white space, device ids and `seq`. `tests/engine/mdns_packets.json` and `tests/engine/mdns_text.json` pin it, and `tests/test_own_mdns.py` guards the rule. **The work** runs as Phase 1, which retires the generators and keeps the mDNS layer's recorded cases, then six slices in parallel (A `lan`, B `hue`, C `yaml`, D `switches`, E `engine-core`, F `ha-layer`), then a cleanup and a rewrite of the README, `en.json` and this file, each step in a worktree and pull request of its own (decision 13). **Supersedes** decision 3's parity clause, decisions 7, 9, 10 and 15, the parts of decision 20 about the recorded cases and the picker's own string rules (`jstext.py`), and the parity rule of "How to work in this repository", except for the mDNS layer. **Done** (Verification log): the mDNS layer's string rules moved into `dns.py` and `ewelink.py`, and payloads are read with `base64` and `json` (A); the bridge address with `ipaddress` and yarl, the bridge's answers with Python's codecs and `json`, a malformed answer as a transient `HueApiError`, on a connector with the system's resolver (B); the import with PyYAML and probatio (C); names and ids by one rule, `strip()` and `casefold()`, in the resolver, the picker and the switch rules, and a device id configured twice refused by `validate_for_run` (D); a device id mapped twice a `ValueError`, and the activity buffer a `deque` (E); the flows catch `Exception` where they showed their `unexpected` text (F); the cleanup (#34) deleted `text.py`, `jsonnode.py` and `errors.py` and what nothing used, made `create_base_url` raise `ConfigError` in place of `try_create_base_url`'s tuple, typed the bridge's ids and names as text, refused null entries of `lights` and `groups` in the import at their line and column, so that `SwitchSettings.lights` and `groups` hold text only, and logs a missing value as `None`; and the README, `en.json` and this file describe the integration on its own | The user asked to retire the other implementation and every mention of it, to use Python's libraries as much as possible and to make the code more Pythonic; the same day, the user also asked not to rely on the mDNS that Home Assistant OS provides, and to keep the mDNS behavior as it is. Matching another platform's edge cases took about 5,000 lines of emulation, plus tools that CI couldn't run. The mDNS layer is where the integration meets the network directly, and decision 19's measurements were made on it |
+| 31 | **sonoff2hue in the Marketplace's catalog** (the user's choice of 2026-11-25), so that users find it by searching the Marketplace, without its link. **The pull request,** hacs/default#14951, comes from the owner's account, through the fork `abpostelnicu/default` and its branch `add-sonoff2hue-homeassistant`, made from `hacs/default`'s `master`. It adds one line to `integration`, at its place by `str.casefold`, between `ABovsh/ukraine-alarm-pro` and `abroeders/smart-shutter-control`. It allows maintainer edits and requests no review. Its body is the template, filled in: the user's statement that they read the publishing documentation; links to Release 1.0.0 and to the *HACS* and *hassfest* jobs of *Validate* run 45696084499 on the released commit, which passed before the Release was published; and an *About* section on what sonoff2hue does, which says that it overrides and replaces no core integration and adds no light entities. **Before it:** the notes of Release 1.0.0 became a summary of what it does and needs, in place of GitHub's list of the pull requests, some of whose titles named the other implementation (the user's choice). The README's *Installation* is marked for the Marketplace to leave out (decision 28). **While it waits,** nobody comments on it or pushes to it, as `hacs-bot` asks. **Once it is merged,** the user's Home Assistant moves from the copy installed by hand to the Marketplace's install, which tracks the updates, and the README's *Installation* names searching the Marketplace | The catalog is the only way into the Marketplace's search and list; without it, a user adds the repository from its link, which needs a GitHub connection. The catalog's checks are the HACS action and hassfest that *Validate* already runs (decision 16), and the Release that decision 29 publishes. *Validate* also passed on the final `main` with hassfest's 2026.12 image, whose brand-image warnings the catalog treats as failures. A reviewer follows the release link, and the Marketplace shows a Release's notes before an update. The review declines integrations that overlap core's, so the *About* says that sonoff2hue replaces none. The user installed sonoff2hue by hand for the live test, and a Marketplace install also tests the path that users take |
 
 ## Record keeping
 
@@ -1021,12 +1068,20 @@ documentation:
 - The plan of decision 30 was approved on 2026-11-25, in session 1e9ba998: Phase 1, which kept the mDNS layer's recorded
   cases and added the guard, the six slices A to F side by side, then `cleanup-leftovers`, `docs-and-memory` and the
   coordinator's `final-verification`.
+- The plan of decision 31 was approved on 2026-11-25, in session 88500144: rewrite the notes of Release 1.0.0, mark the
+  README's installation, check again, submit to the catalog, watch the checks and record it all. Once it is merged:
+  verify the listing, move the user's Home Assistant to the Marketplace's install, and record the inclusion.
 
 ## Environment observations
 
 - 2026-11-24: development machine: WSL 2 on aarch64, Debian 13, with Python 3.14.6 and 3.13.5 and uv 0.13.7. gh is
   Debian's 2.46.0, which has no `gh release verify`. There is no Docker. `scripts/setup` installed Home Assistant
   2026.11.3 and the tools in 15 s.
+- 2026-11-25: a second development machine, macOS on arm64, with uv 0.13.9, gh 2.105.0 and Node 26.13.1.
+  `scripts/setup` took 18 s. There `scripts/check` stops at mypy, with 2 errors in `engine/mdns.py`: mypy checks for
+  the host's platform, and the netlink code is Linux-only (`socket.NETLINK_ROUTE`, and a statement it deems
+  unreachable). `.venv/bin/python -m mypy --platform linux` checks as CI does, and passes. The rest of the checks pass
+  there too; pytest skips the 2 tests of the socket bound to the group, which runs on Linux only.
 
 ## Verification log
 
@@ -1730,6 +1785,22 @@ documentation:
     the install badge. *Requirements*, *Setup* and its badge stayed.
   - The Marketplace shows the README at the tag of the release on offer, so the markers reach it with the release
     after 1.0.0.
+- 2026-11-25: the submission to the Marketplace's catalog (decision 31).
+  - **The notes of Release 1.0.0:** GitHub's generated notes, kept outside the repository, were replaced through the
+    REST API with a summary of what sonoff2hue does and needs; only `body` changed. The Release stayed immutable and
+    Latest, with its time of publication and its tag on 7ba561f, and `gh release verify v1.0.0` still verified its
+    attestation.
+  - **Before submitting:** *Validate* on `main` at 4765618 (run 45700352910), with hassfest's image of that day: one
+    integration, none invalid, no warnings; the HACS action passed its 10 checks. hassfest 2026.12.0b0's
+    `brand_images.py`, run by itself on `brand/`, reported nothing. sonoff2hue was in none of `data-v2.hacs.xyz`'s
+    lists, the removed one included, and `sonoff2hue` wasn't a domain of the upcoming core release. The repository has
+    a description, 15 topics, issues, the Apache-2.0 license and a Release.
+  - **The pull request:** hacs/default#14951, opened at 21:02:38 UTC from `abpostelnicu`, with maintainer edits
+    allowed, no review requested, `integration` +1/-0, and the body as drafted. After the edit, the list was valid
+    JSON, sorted by `str.casefold`, and every entry matched the schema.
+  - **Its checks:** *Lint* (*JQ*, *JSON schema*, *Sorted*) and *Check*'s *Preflight* and *Editable PR* passed, without
+    a maintainer's approval. The checks of a new repository skip until it has the label *New default repository*,
+    which `hacs-bot` hadn't added after 8 minutes; it was then 334th of 334 in the open, non-draft queue.
 
 ## Status
 
@@ -1756,3 +1827,4 @@ documentation:
 - [x] Live test on the user's Home Assistant OS: `main` at 2bec130, with a real press (Verification log)
 - [x] Release 1.0.0: the tag `v1.0.0` on 7ba561f and its immutable GitHub Release "sonoff2hue 1.0.0", Latest
   (Verification log)
+- [ ] In the Marketplace's catalog: submitted on 2026-11-25 as hacs/default#14951, waiting for its review (decision 31)
