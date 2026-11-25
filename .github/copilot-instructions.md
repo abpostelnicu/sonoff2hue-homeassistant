@@ -1663,7 +1663,32 @@ documentation:
   - **D `switches`:**
     - Pending.
   - **E `engine-core`:**
-    - Pending.
+    - **What changed:** on `py/engine-core`, from `main` at cc3b702 and rebased onto 72b6372 after slice F, in two
+      commits and this entry's. `runner.py`, `supervisor.py`, `status.py` and `activity.py` import neither `text` nor
+      `errors`. Device ids are keys in their casefolded form, from each switch's normalized id, and blank is
+      `not s or s.isspace()`. A device id mapped twice, in the runner's bindings or in the status tracker's
+      `set_running`, raises a `ValueError`, "More than one switch has the device id 1000abcdef.", from one helper,
+      `runner.bindings_by_device_id`; `validate_for_run` refuses such a configuration before anything runs. The status
+      tracker tells bridges apart by a tuple of the address, the key and the pin, where a missing pin is an empty one.
+      The activity buffer names an exception by `type(err).__name__`, keeps its deque of the newest 1,000 entries, takes
+      its ids from `itertools.count`, and answers `get` with a deque bounded by the limit, so a limit of 0 still gives
+      none. The docstrings and comments describe decisions 14, 21 and 23 in asyncio's terms. The states, messages,
+      problems, timings, log lines and their levels, eager starts, cancellation, observer reports and `on_key_rejected`
+      stay as they were, and so do the public names that the other modules use.
+    - **User-visible:** an activity entry, in the diagnostics, names an exception by its Python class, where an
+      `UnexpectedError` showed the type it stood for; U+001C-U+001F alone now count as a missing bridge address,
+      application key, pin or device key; and settings whose address and key differ only where the old joined text ran
+      together (`a|b` and `c`, against `a` and `b|c`) are another bridge. Valid settings see no difference.
+    - **Tests:** 103 in the four files, one more than before. The duplicate ids expect the `ValueError`. The unexpected
+      failures are injected, a toggler or a keep-alive that raises and a first resolving that fails, so the tests don't
+      depend on how the Hue client reads a malformed answer. The activity's exception cases name a class of the test's
+      own, `PermissionError` and `KeyError`, and the bridge's identity and U+001F are new cases. Coverage of the four
+      modules is as before: every statement but the default clocks. Six mutations each failed a test: duplicates not
+      refused, a type name with its module, the joined identity, a limit of 0 giving everything, and blank as only None
+      or empty, in the tracker and in the supervisor.
+    - **Checks:** `scripts/check` passed with 750 tests, where cc3b702 and 72b6372 have 749. `check-commits.sh` and
+      `test-each-commit.sh` passed for all three commits, before and after the rebase, and `scripts/e2e` passed all 45
+      checks, in 21.5 s before the rebase and in 14.6 s after it. No other slice's files changed.
   - **F `ha-layer`:**
     - **Changed:** four commits on `py/ha-layer`, from `main` at cc3b702, the last of them this entry, in the Home
       Assistant code (`__init__.py`, `runtime.py`, `config_flow.py`, `entity.py`, the four platforms,
