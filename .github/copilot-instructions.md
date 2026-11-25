@@ -1696,7 +1696,10 @@ documentation:
     action stayed as they were, as the test reaches neither.
   - **Log levels:** the log had the integration's info lines before the restart and only its warnings afterwards:
     `configuration.yaml` has no `logger:` section, and the level set while it ran didn't outlast the restart.
-  - **Not checked yet:** a real press on this build.
+  - **Real press:** the user pressed a switch with 10 lights. Its `seq` was one above the one before the restart; Press
+    fired once with it, and the toggle turned all 10 lights off in 549 ms, none failed. Online's `last_press_at` took
+    the press's time, and the log had no warning or error. Exactly one toggle ran: Press kept that one event, and the
+    lights stayed off.
 
 ## Status
 
@@ -1720,6 +1723,5 @@ documentation:
 - [x] The integration stands alone (decision 30): Phase 1, the recorded cases kept and the guard added (#27); the six
   slices, A `lan` (#31), B `hue` (#33), C `yaml` (#30), D `switches` (#32), E `engine-core` (#29) and F `ha-layer`
   (#28); the cleanup (#34); and the README, `en.json` and this file rewritten
-- [ ] Live test on the user's Home Assistant OS: `main` at 2bec130 runs there and passed every check but a real press
-  (Verification log)
+- [x] Live test on the user's Home Assistant OS: `main` at 2bec130, with a real press (Verification log)
 - [ ] Release 1.0.0
