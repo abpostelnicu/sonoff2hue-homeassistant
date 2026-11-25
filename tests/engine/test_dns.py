@@ -1,4 +1,4 @@
-"""Tests of the DNS parser and query builder; ports of the .NET app's DnsMessageTests."""
+"""Tests of the DNS parser and query builder."""
 
 from ipaddress import IPv4Address
 

@@ -1,7 +1,4 @@
-"""Raw DNS packets for the tests, built the way the devices send them.
-
-A port of the .NET tests' ``TestPackets.cs``: names are written uncompressed.
-"""
+"""Raw DNS packets for the tests, built the way the devices send them, with names written uncompressed."""
 
 from datetime import UTC, datetime
 from ipaddress import IPv4Address

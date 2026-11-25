@@ -1,4 +1,4 @@
-"""Tests of the LAN monitor: what the .NET app tested only end to end, with fake sockets and virtual time."""
+"""Tests of the LAN monitor, with fake sockets and virtual time."""
 
 import asyncio
 from collections.abc import AsyncIterator, Callable
@@ -79,7 +79,7 @@ async def test_queries_at_once_after_one_and_three_seconds_then_every_two_minute
     lan = Lan(time)
     task = asyncio.create_task(lan.monitor.run())
     transport = await lan.network.next_open()
-    # As .NET's Task.Delay(0) doesn't wait, the first query went out before the started callback first waited.
+    # A delay of 0 isn't awaited, so the first query went out before the started callback first waited.
     assert transport.sent == [(QUERY, "192.0.2.1")]
     sent = query_times(transport, time)
 
@@ -104,7 +104,7 @@ async def test_each_new_socket_rebaselines_and_queries_again(time: VirtualTime) 
     await asyncio.sleep(10)
     lan.broadcast(7)
 
-    # A new seq after the socket's restart is a baseline, not a press, as for the .NET LAN monitor's listener.
+    # A new seq after the socket's restart is a baseline, not a press.
     assert restarted == pytest.approx(4)  # the listener lets the network settle for 3 s
     assert sent == pytest.approx([4, 5, 7])
     assert lan.events == [Kind.BASELINE, Kind.PRESS, Kind.BASELINE]

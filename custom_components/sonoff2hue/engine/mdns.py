@@ -1,11 +1,11 @@
 """Passive mDNS: an IPv4 listener on 224.0.0.251:5353 that shares the port with the host's own responder.
 
-A port of the .NET app's ``Mdns/MdnsListener.cs`` and of the parts of .NET's ``NetworkInterface`` and ``NetworkChange``
-it relies on. It shares UDP 5353 through SO_REUSEADDR and SO_REUSEPORT, so it sees every multicast announcement on the
-LAN, including the unsolicited TXT updates of eWeLink devices. On Linux it is bound to the group, so that it receives
-multicast only (decision 19). The only packets it sends are the queries its users ask for. One listener can serve
-several users: each adds a packet handler and a callback that runs whenever the socket was (re)created, as each had a
-listener of its own in the .NET app.
+It shares UDP 5353 through SO_REUSEADDR and SO_REUSEPORT, so it sees every multicast announcement on the LAN, including
+the unsolicited TXT updates of eWeLink devices. On Linux it is bound to the group, so that it receives multicast only
+(decision 19). It joins the group on the interfaces that are up, multicast-capable and not loopback, as their flags,
+hardware types and links show them, and rejoins after their IPv4 addresses change. The only packets it sends are the
+queries its users ask for. One listener serves several users: each adds a packet handler and a callback that runs
+whenever the socket was (re)created, as if each had a listener of its own.
 """
 
 import array
@@ -27,7 +27,7 @@ from .dns import DnsMessage, build_query
 _LOGGER = logging.getLogger(__name__)
 
 TRACE = 5
-"""The level of the .NET app's trace lines, below DEBUG."""
+"""The level of trace lines, below DEBUG: repeated broadcasts and malformed packets."""
 
 MULTICAST_ADDRESS = "224.0.0.251"
 PORT = 5353
@@ -38,7 +38,7 @@ BIND_ADDRESS = MULTICAST_ADDRESS if sys.platform == "linux" else "0.0.0.0"  # no
 """The socket's own address. On Linux, the group: the socket then receives multicast only, so it never takes a unicast
 reply meant for another responder that shares the port, such as Home Assistant's zeroconf, and its queries still go out
 from the address of the interface they are sent on. macOS refuses to send from a socket bound to a multicast address
-(EADDRNOTAVAIL), so elsewhere it is every address, as in the .NET app (decision 19)."""
+(EADDRNOTAVAIL), so elsewhere it is every address (decision 19)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,9 +106,9 @@ class MdnsListener:
 
     def add_started(self, callback: StartedCallback) -> Callable[[], Awaitable[None]]:
         """Runs ``callback`` every time the socket was (re)created and joined the multicast group, and right away if it
-        is open. Users reset what they derived from earlier packets and send their queries again there. It runs at once
-        until it first waits, as .NET raises ``Started`` right after it opens the socket, so the reset comes before the
-        socket's first packet. The callback is cancelled when its socket closes. Returns a coroutine function that
+        is open. Users reset what they derived from earlier packets and send their queries again there. It starts
+        eagerly, running at once until it first waits, so the reset comes before the socket's first packet. The
+        callback is cancelled when its socket closes. Returns a coroutine function that
         removes it, cancels it if it is running, and waits for that to end, so that a user can stop while the listener
         goes on."""
         self._started.append(callback)
@@ -290,9 +290,9 @@ async def open_multicast_transport(on_datagram: DatagramHandler, on_error: Error
 
 
 def open_multicast_socket(interfaces: list[str], port: int = PORT) -> tuple[socket.socket, list[str]]:
-    """A non-blocking UDP socket on ``port`` that shares it (SO_REUSEADDR and SO_REUSEPORT, which .NET's ReuseAddress
-    sets on Unix), bound to :data:`BIND_ADDRESS`, and joined 224.0.0.251 on as many of ``interfaces`` as possible, with
-    the ones it joined. Raises ``OSError`` "Network is down" when it joined none."""
+    """A non-blocking UDP socket on ``port`` that shares it (SO_REUSEADDR and SO_REUSEPORT), bound to
+    :data:`BIND_ADDRESS`, and joined 224.0.0.251 on as many of ``interfaces`` as possible, with the ones it joined.
+    Raises ``OSError`` "Network is down" when it joined none."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     try:
         joined = _configure(sock, interfaces, port)
@@ -326,7 +326,7 @@ def _configure(sock: socket.socket, interfaces: list[str], port: int) -> list[st
     return joined
 
 
-# The interfaces, as .NET's NetworkInterface sees them on Linux (pal_interfaceaddresses.c, pal_maphardwaretype.c).
+# The interfaces: their flags, hardware types and links, from Linux's ioctls, and their IPv4 addresses from ifaddr.
 
 _IFF_UP = 0x1
 _IFF_LOOPBACK = 0x8
@@ -338,8 +338,8 @@ _SIOCGIFHWADDR = 0x8927
 _SIOCETHTOOL = 0x8946
 _ETHTOOL_GLINK = 0x0000000A
 _ARPHRD_LOOPBACK = 772
-# ARPHRD types that .NET maps to an interface type other than Unknown, Tunnel and Loopback. Only those get the ethtool
-# link check.
+# The hardware types whose link ethtool is asked about: Ethernet (1, 2), ProNET (4), ATM (19), SLIP and CSLIP (256 to
+# 259), PPP (512), FDDI (774) and Wi-Fi (801 to 803). Loopback, tunnels and every other type are up without it.
 _ARPHRD_CHECKED = frozenset({1, 2, 4, 19, 256, 257, 258, 259, 512, 774, 801, 802, 803})
 
 
@@ -347,7 +347,7 @@ _ARPHRD_CHECKED = frozenset({1, 2, 4, 19, 256, 257, 258, 259, 512, 774, 801, 802
 class InterfaceState:
     name: str
     up: bool
-    """.NET's ``OperationalStatus.Up``: IFF_UP and IFF_RUNNING, and a link where ethtool can tell."""
+    """IFF_UP and IFF_RUNNING, and a link where ethtool can tell."""
     multicast: bool
     """IFF_MULTICAST or IFF_ALLMULTI."""
     loopback: bool
@@ -355,8 +355,8 @@ class InterfaceState:
 
 
 def multicast_interfaces(states: list[InterfaceState] | None = None) -> list[str]:
-    """The IPv4 addresses of the interfaces that are up, multicast-capable and not loopback, in interface order
-    (``GetMulticastInterfaces``). Blocking: run it in an executor."""
+    """The IPv4 addresses of the interfaces that are up, multicast-capable and not loopback, in interface order, without
+    ``127.`` addresses and repeats. Blocking: run it in an executor."""
     addresses: list[str] = []
     for state in interface_states() if states is None else states:
         if state.up and state.multicast and not state.loopback:
@@ -436,8 +436,8 @@ def _ifreq(name: str, payload: bytes = b"") -> bytes:
     return struct.pack("16s", name.encode()[:15]) + payload.ljust(24, b"\0")
 
 
-# Network changes, as .NET's NetworkChange.NetworkAddressChanged reports them on Linux (pal_networkchange.c): an
-# RTM_NEWADDR or RTM_DELADDR message from the IPv4 address group of a netlink route socket.
+# Network changes on Linux: each RTM_NEWADDR or RTM_DELADDR message from the IPv4 address group of a netlink route
+# socket. Elsewhere, or when netlink can't be used, the addresses are polled every 5 s.
 
 _RTMGRP_IPV4_IFADDR = 0x10
 _NLMSG_ERROR = 2
@@ -448,7 +448,7 @@ _POLL_INTERVAL = 5.0
 
 
 def address_changes(data: bytes) -> int:
-    """How many address changes a netlink datagram reports. Like .NET, it stops at NLMSG_DONE and NLMSG_ERROR."""
+    """How many address changes a netlink datagram reports. It reads up to NLMSG_DONE or NLMSG_ERROR."""
     changes = 0
     offset = 0
     while offset + 16 <= len(data):

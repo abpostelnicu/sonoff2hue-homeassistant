@@ -1,4 +1,5 @@
-"""Tests of the mDNS listener; the parts that the .NET app tested only on real networks are tested here with fakes."""
+"""Tests of the mDNS listener: its packets, queries, socket, interfaces and network changes, with fakes, and with real
+sockets where they matter."""
 
 import asyncio
 from collections.abc import Awaitable, Callable
@@ -171,7 +172,7 @@ async def test_started_callbacks_run_before_the_first_packet_of_their_socket(net
     await network.next_open()
     network.deliver(QUERY, ("192.0.2.7", 5353))
 
-    # As .NET raises Started right after it opens the socket, before it receives anything.
+    # The started callbacks run as their socket opens, before it receives anything.
     assert seen == ["started", "packet", "added while open", "started", "added while open", "packet"]
     await _stop(task)
 
@@ -251,7 +252,7 @@ async def test_packets_from_this_hosts_own_addresses_are_marked(network: FakeNet
     await _stop(task)
 
 
-def test_multicast_interfaces_follow_dotnets_filter() -> None:
+def test_multicast_interfaces_are_up_multicast_and_not_loopback() -> None:
     states = [
         InterfaceState("lo", up=True, multicast=False, loopback=True, ipv4=("127.0.0.1",)),
         InterfaceState("eth0", up=True, multicast=True, loopback=False, ipv4=("10.0.0.2", "10.0.0.3", "10.0.0.2")),

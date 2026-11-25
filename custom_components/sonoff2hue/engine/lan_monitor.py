@@ -1,8 +1,7 @@
 """The always-on, passive view of the eWeLink devices on the LAN, independent of the bridge.
 
-A port of the .NET app's ``Web/Monitoring/LanMonitor.cs``. It also runs before any switch is mapped, so the user can
-find and identify switches, and feeds the :class:`DeviceRegistry`. The .NET LAN monitor ran an mDNS listener of its
-own; this one runs the config entry's listener, which the runner shares (decision 8 of this repository): each adds a
+It also runs before any switch is mapped, so the user can find and identify switches, and feeds the
+:class:`DeviceRegistry`. It runs the config entry's mDNS listener, which the runner shares (decision 8): each adds a
 packet handler and a started callback, and the runner comes and goes while the LAN monitor and the listener go on.
 """
 
@@ -64,7 +63,7 @@ class LanMonitor:
         self._tracker.reset_all()
 
         # A few quick queries make every device answer with its current state; later ones keep "last seen" fresh. A
-        # delay of 0 isn't awaited, as .NET's Task.Delay(0) doesn't wait: the first query goes out at once.
+        # delay of 0 isn't awaited: the first query goes out at once, before this callback first waits.
         for delay in QUERY_DELAYS:
             if delay > 0:
                 await asyncio.sleep(delay)
