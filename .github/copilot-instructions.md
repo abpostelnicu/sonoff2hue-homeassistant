@@ -1655,7 +1655,37 @@ documentation:
       deletions and 749 at the end. `check-commits.sh` and `test-each-commit.sh` passed for all five commits.
       `scripts/e2e` passed all 45 checks in 28.7 s, its setup taking 8.2 s for a new `.dev/venv`.
   - **A `lan`:**
-    - Pending.
+    - **The mDNS layer keeps every result.** Its string rules left `text.py`: `dns.py` compares names and TXT keys by
+      each character's simple uppercase form (`case_key`, with equals, starts-with and ends-with helpers) and counts a
+      name's length in UTF-16 code units; the record part of `ewelink.py` keeps its 25-character white space, its
+      one-to-one lowercase for device ids and its signed 64-bit `seq`; `_discover_mdns` uses `dns.py`'s helpers.
+      `test_text.py` became `test_mdns_text.py`: it replays `mdns_text.json` for every code point against them, and
+      checks that no non-ASCII character gets an ASCII key. `mdns_packets.json` is unchanged. A differential fuzz of
+      `main`'s modules against these, in the git-ignored `.dev`, gave the same results for 180,000 random strings,
+      180,000 random packets (153,588 parsed, with 15,032 announcements and 13,357 probes) and 600 runs of Hue
+      discovery's mDNS part with the same random packets on the fake network (374 bridges). `mdns.py` and
+      `lan_monitor.py` changed in words only: without docstrings, their syntax trees are `main`'s.
+    - **Python's rules outside it.** Payloads: `base64.b64decode(validate=True)` and `json.loads` into plain values
+      (`ewelink.Json`), the key MD5 of the device key stripped with `str.strip()`, the same error strings, and
+      nothing raised, also for a payload nested too deeply. Presses: settings compare with `==`, `relaySeparation` and
+      outlets are read with `int()`, relay states compare with `casefold()`, the tracker keys devices by `casefold()`,
+      and summaries and relay changes write values as `json.dumps` does. The LAN registry keys and orders devices by
+      `casefold()`. Cloud discovery reads `response.json(content_type=None)`, logs any failure at debug level, and
+      takes the `internalipaddress` values that `ipaddress` reads, written as it writes them, with an `id` that is a
+      text. None of the six modules imports `text`, `jsonnode` or `errors`, and none names another platform.
+    - **The simulated switch** has type hints and docstrings, and ruff and mypy (strict) check it, with only N999
+      ignored for its name. Its packets are the same for ASCII ids; a TXT string now counts its length in bytes,
+      where a non-ASCII id made a record that overran itself.
+    - **What users may notice, for unusual input only:** base64 with white space isn't valid; `NaN` and duplicate
+      keys parse; `1`, `1.0` and `true` compare equal; other digits count in numbers; summaries escape as Python's
+      `json` does (`\u00e4` and `<` where they had `\u00E4` and `\u003C`, and `-7.5` for `-7.50`); in the LAN registry
+      'ß' and 'ss', or the Kelvin sign and 'k', are one device, and '_' sorts before the letters; the cloud's keys are
+      case-sensitive, and an answer with an entry that isn't an object gives no bridges.
+    - **Checks:** seven commits on `py/lan`, rebased onto `main` at cead38d. `scripts/check` passed with 1,021 tests,
+      `main`'s 980 and 41 more: the slice's files went from 182 tests to 223, with 23 more for presses, 14 for
+      payloads and the simulated switch, 3 for cloud discovery and 1 for the string rules. Changing the simulated
+      switch back failed its new test. `scripts/e2e` passed all 45 checks, in 19.9 s. `check-commits.sh` and
+      `test-each-commit.sh` passed for all seven commits.
   - **B `hue`:**
     - Pending.
   - **C `yaml`:**
