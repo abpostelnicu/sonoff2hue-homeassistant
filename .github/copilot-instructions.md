@@ -1659,7 +1659,49 @@ documentation:
   - **B `hue`:**
     - Pending.
   - **C `yaml`:**
-    - Pending.
+    - **Changed:** three commits on `py/yaml`, from `main` at 2a958f9, the last of them this entry. `yaml_import.py`
+      reads the pasted text with PyYAML, through a subclass of `getattr(yaml, "CSafeLoader", yaml.SafeLoader)` whose
+      only implicit resolver is null's, so any other plain value stays the text written. A pass over the parser's
+      events refuses a second document, a tag other than `!!str` on a value and nesting deeper than 32 levels; a walk
+      of the composed node tree, in the order of the text, refuses a key that isn't a single value and a repeated
+      key; then a probatio schema checks the shape. Each of its errors gets the line and column of its node, the
+      key's for an unknown key, and the first in the text is reported. probatio carries the messages without an
+      explicit validator: `Maybe(X)` reports X's own error class, `DictInvalid`, `SequenceTypeInvalid` or
+      `TypeInvalid`, which names the kind expected, where `Any(X, None)` reports `AnyInvalid`, and it collects every
+      error with its path. `yaml_parser.py` and `yaml_uri.py` are deleted, and `yaml_import.py` went from 1,010 lines
+      to 251 and imports neither `errors` nor `text`. Code and tests: 4,041 lines removed and 668 added.
+    - **User-visible:** word for word as before: an unknown key, which names its section and the valid keys; the
+      three messages for a value of the wrong kind; `duplicate key '…'.`; the empty switch entry; and the form
+      `Config, line L, column C: …`. New: a syntax error gives PyYAML's problem, such as "did not find expected key";
+      a tag "the tag !!int isn't supported here. Write the value without the tag.", unsafe tags such as
+      `!!python/object/apply:…` included; a second document "only one document is allowed, but another one starts
+      here."; nesting "the text nests more than 32 levels deep here."; a character that YAML refuses "unacceptable
+      character #x0007: control characters are not allowed", with PyYAML's reason. Edge cases: columns count
+      characters, not UTF-16 code units; a byte order mark at the start is skipped; and a document of a single value,
+      such as `a`, is refused with "expected 'key: value' lines here.", where it was read again as a whole file and
+      the setup flow showed `unreadable_config` for `a`.
+    - **Tests:** `tests/engine/test_yaml_import.py`, rewritten by hand: 133 cases, each run with the C loader and
+      again with PyYAML's own, for which a fixture reloads the module with `yaml.CSafeLoader` hidden, so 266 where
+      there were 37. They cover whole files, values kept as written, 25 plain values that stay text (`yes`, `on`,
+      `0x10`, `010`, `1e3`, dates and times among them), nulls, null sections and switch values, the empty switch
+      entry, unknown and duplicate keys, values of the wrong kind, the first of several problems, documents that
+      aren't "key: value" lines, anchors, aliases and a merge key, several documents, syntax errors, 19 refused tags,
+      tabs, CRLF, a byte order mark, refused characters and the nesting limit, each with its line and column. The
+      test that a null light fails the target resolver left with the old reader; the resolver is slice D's. In
+      `tests/test_config_flow.py`, `test_a_file_that_the_import_refuses` gets a fourth case, `a\n`; F's other
+      assertions there pass unchanged.
+    - **Checks:** `scripts/check` passed on each commit (`test-each-commit.sh`), with 980 tests, where `main` at
+      2a958f9 has 750. The tests cover all 144 statements and 52 branches of `yaml_import.py`. By hand, in scratch
+      scripts in the git-ignored `.dev`: 400,000 random texts, half for each loader, from YAML fragments, mutated
+      files and random code points, raised nothing but `ConfigError`; and 60,000 random settings written with
+      `yaml.safe_dump`, in block and flow style, some with CRLF, read back exactly when they fit the schema and were
+      otherwise refused at a line and column inside the text. Both loaders refuse the same nodes at the same places;
+      they differ in PyYAML's problem texts, and libyaml takes a tab inside a plain value, which the pure-Python
+      reader refuses. A `ReaderError`'s position counts bytes of the UTF-8 text in the C loader and characters in
+      the other, so the character is looked up; the C loader raises `UnicodeEncodeError` for a lone surrogate. With
+      Python 3.14, 1,000 nested lists stop PyYAML's pure-Python composer and 100,000 the C one with a
+      `RecursionError`; the event pass refuses 33 levels before either composes. `check-commits.sh` passed for the
+      three commits.
   - **D `switches`:**
     - Pending.
   - **E `engine-core`:**
