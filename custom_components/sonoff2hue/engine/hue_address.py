@@ -6,7 +6,7 @@ this module reproduces the parts of ``System.Private.Uri`` (release/10.0) that d
 ``IPAddress.TryParse`` for the IPv6 test, the user info, the IPv6, IPv4, DNS (with IRI) and UNC host types tried in that
 order, the port, dot segments in the path, the canonical host, and ``IdnMapping`` as it works with invariant
 globalization, as the app runs: plain Punycode without IDNA mapping or normalization. Like .NET, it works on UTF-16 code
-units. ``tests/engine/fixtures/dotnet_engine.json`` holds .NET's own answers for a few hundred addresses.
+units.
 """
 
 from dataclasses import dataclass

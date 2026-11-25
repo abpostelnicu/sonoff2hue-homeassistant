@@ -10,8 +10,7 @@ The switch editor (``targets.js``, ``views/switcheditor.js`` and ``format.js``) 
   character, without the final-sigma rule, and ``OrdinalIgnoreCase`` compares uppercase forms. So U+1E9E and 'ß', the
   Kelvin sign U+212A and 'k', or U+0130 and 'i' with U+0307 are equal in JavaScript but not in .NET, while the final
   and the other small sigma, or the micro sign U+00B5 and the Greek small mu, are equal in .NET but not in JavaScript.
-  Python's ``lower()`` is the same algorithm as JavaScript's, and Python 3.14 and Node 20.19 both have Unicode 16.0
-  (``tools/js_oracle`` checks every code point).
+  Python's ``lower()`` is the same algorithm as JavaScript's, and Python 3.14 and Node 20.19 both have Unicode 16.0.
 - ``length`` counts UTF-16 code units, as .NET's ``string.Length`` does (``text.utf16_length``).
 """
 

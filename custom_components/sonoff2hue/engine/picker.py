@@ -14,8 +14,7 @@ picker can resolve an entry that the server then rejects, or the reverse, as in 
 
 Entries and selections are mutable and compared by identity, as JavaScript's objects are: the dialog removed an
 unresolved entry by setting ``removed`` on the entry that :func:`unresolved_entries` returned, and chose resources by
-adding their ids to the selection's sets. ``tools/js_oracle`` runs the real ``targets.js`` on the cases that
-``tests/engine/test_picker.py`` replays.
+adding their ids to the selection's sets.
 """
 
 from collections.abc import Callable, Sequence

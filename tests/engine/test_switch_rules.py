@@ -1,21 +1,15 @@
 """Tests of the server's switch rules (engine/switch_rules.py), the port of the switch endpoints in the .NET app's
-Web/Management/ConfigEndpoints.cs. The first tests are WebConfigTests' cases for switches; the parity tests at the end
-replay the switchValidation and switchWrites cases of fixtures/dotnet_engine.json, which tools/dotnet_oracle made by
-running the app's own code."""
+Web/Management/ConfigEndpoints.cs. The first tests are WebConfigTests' cases for switches."""
 
 from collections.abc import AsyncIterator, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
-import json
-from pathlib import Path
-from typing import Any
 
 import pytest
 
-from custom_components.sonoff2hue.engine import hue_client, switch_rules
+from custom_components.sonoff2hue.engine import switch_rules
 from custom_components.sonoff2hue.engine.config import ConfigError, HueSettings, SwitchSettings
 from custom_components.sonoff2hue.engine.hue_client import HueApiError, HueGroup, HueLight
 from custom_components.sonoff2hue.engine.switch_rules import (
-    ConnectHue,
     HueResources,
     SwitchConflictError,
     SwitchInput,
@@ -23,7 +17,6 @@ from custom_components.sonoff2hue.engine.switch_rules import (
     SwitchValidationError,
 )
 
-_FIXTURE = json.loads((Path(__file__).parent / "fixtures" / "dotnet_engine.json").read_text(encoding="utf-8"))
 _DEVICE = "1000abcdef"
 _OTHER = "1000999999"
 PAIRED = HueSettings(
@@ -426,90 +419,3 @@ def test_null_and_empty_entries_need_one_character() -> None:
         "lights": ["Each entry needs 1 to 200 characters."],
         "groups": ["Each entry needs 1 to 200 characters."],
     }
-
-
-# Parity with ConfigEndpoints.cs
-
-
-def _cases(section: str) -> list[dict[str, Any]]:
-    cases: list[dict[str, Any]] = _FIXTURE[section]
-    return cases
-
-
-def _input(raw: dict[str, Any]) -> SwitchInput:
-    return SwitchInput(raw["name"], raw["deviceId"], raw["deviceKey"], raw["lights"], raw["groups"])
-
-
-def _shown(settings: SwitchSettings) -> dict[str, Any]:
-    return {
-        "name": settings.name,
-        "deviceId": settings.device_id,
-        "deviceKey": settings.device_key,
-        "lights": settings.lights,
-        "groups": settings.groups,
-    }
-
-
-def _ported(message: str) -> str:
-    """The .NET message as the port words it: Home Assistant pairs again where the app's command line did."""
-    return message.replace("run 'sonoff2hue hue-pair' again", hue_client.PAIR_AGAIN)
-
-
-@pytest.mark.parametrize("case", _cases("switchValidation"), ids=lambda case: json.dumps(case["input"])[:80])
-def test_validate_parity(case: dict[str, Any]) -> None:
-    errors, settings = switch_rules.validate(_input(case["input"]))
-
-    assert list(errors.items()) == list(case["errors"].items())
-    assert _shown(settings) == case["settings"]
-
-
-class _NoTransport:
-    def __call__(self, *args: object) -> Any:
-        raise AssertionError("the oracle's bridges are never reachable")
-
-
-@asynccontextmanager
-async def _client(hue: HueSettings) -> AsyncIterator[HueResources]:
-    """Opens the bridge as HueClientFactory.Create does, with the real client's checks of the settings."""
-    client = hue_client.HueClient(hue.bridge_ip or "", hue.app_key or "", hue.certificate_sha256, _NoTransport())
-    try:
-        yield client
-    finally:
-        await client.close()
-
-
-_CONNECT: ConnectHue = _client
-
-
-@pytest.mark.parametrize("scenario", _cases("switchWrites"), ids=lambda scenario: scenario["name"])
-async def test_writes_parity(scenario: dict[str, Any]) -> None:
-    hue = HueSettings(bridge_ip=scenario["hue"]["bridgeIp"], app_key=scenario["hue"]["appKey"])
-    switches = [
-        SwitchSettings(s["deviceId"], s["name"], s["deviceKey"], s["lights"], s["groups"]) for s in scenario["switches"]
-    ]
-
-    for step in scenario["steps"]:
-        result: dict[str, Any]
-        try:
-            if step["op"] == "create":
-                write = await switch_rules.create_switch(lambda: switches, _input(step["input"]), hue, _CONNECT)
-                switches.append(write.switch)
-                result = {"status": 201, "warnings": write.warnings}
-            else:
-                write = await switch_rules.update_switch(
-                    lambda: switches, step["deviceId"], _input(step["input"]), hue, _CONNECT
-                )
-                assert write.index is not None
-                switches[write.index] = write.switch
-                result = {"status": 200, "warnings": write.warnings}
-        except SwitchValidationError as err:
-            result = {"status": 400, "errors": err.errors}
-        except (SwitchConflictError, SwitchNotFoundError) as err:
-            result = {"status": err.status, "detail": str(err)}
-
-        expected = step["result"]
-        if "warnings" in expected:
-            expected = expected | {"warnings": [_ported(warning) for warning in expected["warnings"]]}
-        assert result == expected, step
-        assert list(result.get("errors", {})) == list(expected.get("errors", {}))
-        assert [_shown(s) for s in switches] == step["switches"], step

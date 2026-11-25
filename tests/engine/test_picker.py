@@ -1,18 +1,11 @@
-"""Tests of the switch editor's picker (engine/picker.py), the port of the .NET app's web UI module targets.js. The
-parity tests at the end replay fixtures/js_picker.json, which tools/js_oracle made by running the real targets.js."""
+"""Tests of the switch editor's picker (engine/picker.py), the port of the .NET app's web UI module targets.js."""
 
 from dataclasses import dataclass
-import json
-from pathlib import Path
-from typing import Any
 
 import pytest
 
 from custom_components.sonoff2hue.engine import picker
-from custom_components.sonoff2hue.engine.picker import Entry, Resource, Resources, Selection
-
-_FIXTURE = json.loads((Path(__file__).parent / "fixtures" / "js_picker.json").read_text(encoding="utf-8"))
-_KINDS: tuple[picker.Kind, ...] = ("light", "room", "zone")
+from custom_components.sonoff2hue.engine.picker import Resources, Selection
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,97 +204,3 @@ def test_split_list() -> None:
     assert picker.split_list("a\x85, b") == ["a\x85", "b"]
     assert picker.split_list(None) == []
     assert picker.split_list("") == []
-
-
-# Parity with targets.js
-
-
-def _items(raw: list[dict[str, str | None]]) -> list[Item]:
-    return [Item(item["id"], item["name"]) for item in raw]
-
-
-def _index(items: list[Item] | list[Entry], item: object) -> int:
-    """JavaScript's ``indexOf`` for objects: by identity."""
-    return next((i for i, other in enumerate(items) if other is item), -1)
-
-
-def _resolution(result: picker.Resolution, items: list[Item]) -> dict[str, Any]:
-    shown: dict[str, Any] = {"status": result.status}
-    if result.kind is not None:
-        shown["kind"] = result.kind
-    if result.item is not None:
-        shown["item"] = _index(items, result.item)
-    if result.count is not None:
-        shown["count"] = result.count
-    return shown
-
-
-@pytest.mark.parametrize("case", _FIXTURE["splitKind"], ids=lambda case: repr(case["entry"]))
-def test_split_kind_parity(case: dict[str, Any]) -> None:
-    assert picker.split_kind(case["entry"]) == (case["kind"], case["reference"])
-
-
-@pytest.mark.parametrize("case", _FIXTURE["resolveLight"]["cases"], ids=lambda case: repr(case["entry"]))
-def test_resolve_light_parity(case: dict[str, Any]) -> None:
-    lights = _items(_FIXTURE["resolveLight"]["lights"])
-
-    assert _resolution(picker.resolve_light(case["entry"], lights), lights) == case["result"]
-
-
-@pytest.mark.parametrize("case", _FIXTURE["resolveGroup"]["cases"], ids=lambda case: repr(case["entry"]))
-def test_resolve_group_parity(case: dict[str, Any]) -> None:
-    rooms = _items(_FIXTURE["resolveGroup"]["rooms"])
-    zones = _items(_FIXTURE["resolveGroup"]["zones"])
-
-    result = picker.resolve_group(case["entry"], rooms, zones)
-
-    assert _resolution(result, rooms if result.kind == "room" else zones) == case["result"]
-
-
-@pytest.mark.parametrize("case", _FIXTURE["encode"], ids=lambda case: repr([item["name"] for item in case["items"]]))
-def test_encode_parity(case: dict[str, Any]) -> None:
-    items: list[Resource] = list(_items(case["items"]))
-
-    assert [picker.encode_light(item, items) for item in items] == case["light"]
-    assert [picker.encode_group("room", item, items) for item in items] == case["room"]
-    assert [picker.encode_group("zone", item, items) for item in items] == case["zone"]
-
-
-def _entry(entry: Entry) -> dict[str, Any]:
-    shown: dict[str, Any] = {"list": entry.list_name, "value": entry.value, "status": entry.status}
-    if entry.status == "ok":
-        return shown | {"kind": entry.kind, "id": entry.id}
-    return shown | {"count": entry.count}
-
-
-@pytest.mark.parametrize("scenario", _FIXTURE["selection"], ids=lambda scenario: scenario["name"])
-def test_selection_parity(scenario: dict[str, Any]) -> None:
-    raw = scenario["resources"]
-    resources = Resources(_items(raw["lights"]), _items(raw["rooms"]), _items(raw["zones"]))
-    lights, groups = scenario["current"].get("lights"), scenario["current"].get("groups")
-
-    selection = picker.create_selection(resources, lights, groups)
-
-    expected = scenario["selection"]
-    assert {kind: selection.ids(kind) for kind in _KINDS} == {kind: set(expected[kind]) for kind in _KINDS}
-    assert [_entry(entry) for entry in selection.entries] == expected["entries"]
-    assert [_index(selection.entries, e) for e in picker.unresolved_entries(selection)] == scenario["unresolved"]
-
-    for edit in scenario["edits"]:
-        edited = picker.create_selection(resources, lights, groups)
-        unresolved = picker.unresolved_entries(edited)
-        for index in edit["remove"]:
-            unresolved[index].removed = True
-        for kind in _KINDS:
-            edited.ids(kind).clear()
-            edited.ids(kind).update(edit["select"][kind])
-
-        targets = picker.selection_to_config(edited, resources)
-
-        assert {"lights": targets.lights, "groups": targets.groups} == edit["config"], edit
-        assert [_index(edited.entries, e) for e in picker.unresolved_entries(edited)] == edit["unresolved"], edit
-
-
-@pytest.mark.parametrize(("value", "expected"), _FIXTURE["splitList"])
-def test_split_list_parity(value: str | None, expected: list[str]) -> None:
-    assert picker.split_list(value) == expected

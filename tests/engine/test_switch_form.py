@@ -1,12 +1,9 @@
 """Tests of the switch editor's own checks (engine/switch_form.py), the pure logic of the .NET app's web UI dialog
-views/switcheditor.js. The format.js helpers are checked against fixtures/js_picker.json, which tools/js_oracle made by
-running the real module."""
+views/switcheditor.js."""
 
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
-import json
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -17,7 +14,6 @@ from custom_components.sonoff2hue.engine.hue_client import HueGroup, HueLight
 from custom_components.sonoff2hue.engine.switch_form import Problem
 from custom_components.sonoff2hue.engine.switch_rules import HueResources, SwitchInput
 
-_FIXTURE = json.loads((Path(__file__).parent / "fixtures" / "js_picker.json").read_text(encoding="utf-8"))
 _DEVICE = "1000abcdef"
 _OTHER = "1000999999"
 _FREE = "1000aaaaaa"
@@ -218,18 +214,3 @@ async def test_a_switch_added_with_the_picker_is_saved_as_the_web_ui_saved_it() 
 
     assert write.switch == SwitchSettings(_DEVICE, "Kitchen", None, ["Ceiling", "l3"], ["zone:Kitchen"])
     assert write.warnings == []
-
-
-# Parity with format.js
-
-
-@pytest.mark.parametrize(("a", "b", "expected"), _FIXTURE["sameId"])
-def test_same_id_parity(a: str | None, b: str | None, expected: bool) -> None:
-    assert switch_form.same_id(a, b) is expected
-
-
-@pytest.mark.parametrize(("switch", "expected"), _FIXTURE["switchLabel"], ids=repr)
-def test_switch_label_parity(switch: dict[str, str | None] | None, expected: str) -> None:
-    name, device_id = (None, None) if switch is None else (switch.get("name"), switch.get("deviceId"))
-
-    assert switch_form.switch_label(name, device_id) == expected

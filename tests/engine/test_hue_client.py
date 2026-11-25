@@ -1,5 +1,4 @@
-"""The Hue client over real HTTPS, against the fake bridge: what the .NET oracle's canned answers can't show, namely the
-pinned certificate and failed connections. How answers are read is in test_dotnet_parity.py."""
+"""The Hue client over real HTTPS, against the fake bridge: the pinned certificate and failed connections."""
 
 import asyncio
 from collections.abc import Callable

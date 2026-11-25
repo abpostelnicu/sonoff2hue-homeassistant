@@ -1,5 +1,5 @@
 """Finding bridges and pairing: the bridge's identity and certificate, one pairing attempt, the pairing loop and
-discovery, over real sockets on 127.0.0.1 where they matter. How pairing answers are read is in test_dotnet_parity.py."""
+discovery, over real sockets on 127.0.0.1 where they matter."""
 
 import asyncio
 from collections.abc import AsyncIterator, Callable

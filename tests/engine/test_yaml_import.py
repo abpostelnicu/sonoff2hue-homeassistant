@@ -1,6 +1,5 @@
 """The YAML import: the reading parts of the .NET app's ConfigurationTests and the YAML of its QaRegressionTests, with
-made-up ids and documentation addresses, and the port's own decisions (decision 15). tests/engine/test_dotnet_parity.py
-replays the "yaml" cases of the .NET oracle."""
+made-up ids and documentation addresses, and the port's own decisions (decision 15)."""
 
 import pytest
 
