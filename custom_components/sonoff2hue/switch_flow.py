@@ -51,7 +51,6 @@ from .const import (
 )
 from .engine import picker, switch_form, switch_rules
 from .engine.config import HueSettings, SwitchSettings
-from .engine.errors import UnexpectedError
 from .engine.hue_client import HueGroup, HueLight
 from .engine.picker import Entry, Kind, Resource, Resources, Selection
 from .engine.press import SwitchEventKind
@@ -236,6 +235,12 @@ def _multiple(options: list[SelectOptionDict], *, chips: bool = False) -> Select
     if chips:
         return SelectSelector(SelectSelectorConfig(options=options, multiple=True, mode=SelectSelectorMode.DROPDOWN))
     return SelectSelector(SelectSelectorConfig(options=options, multiple=True))
+
+
+def _ended(err: SwitchConflictError | SwitchNotFoundError) -> AbortFlow:
+    """Ends the flow with the rules' message: another switch has the device by now, or the switch being changed is
+    gone."""
+    return AbortFlow("conflict" if isinstance(err, SwitchConflictError) else "not_found", {"error": str(err)})
 
 
 class SwitchSubentryFlow(ConfigSubentryFlow):
@@ -533,8 +538,7 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
                 return await self.async_step_pair_first()
             self._load_error = str(err)
             return await self.async_step_lights_unavailable()
-        except UnexpectedError as err:
-            # The .NET app answered 500, which the web UI showed as it showed the bridge's errors.
+        except Exception as err:
             _LOGGER.exception("Listing the lights, rooms and zones of the Hue bridge failed.")
             self._load_error = str(err)
             return await self.async_step_lights_unavailable()
@@ -666,8 +670,9 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
             write = await self._async_write(body, self._hue())
         except SwitchValidationError as err:
             return self._show_errors(*switch_form.field_errors(err.errors, typed))
-        except UnexpectedError as err:
-            # The .NET app answered 500, and the web UI said "The switch was not saved" with its message.
+        except (SwitchConflictError, SwitchNotFoundError) as err:
+            raise _ended(err) from err
+        except Exception as err:
             _LOGGER.exception("Checking the switch %s against the Hue bridge failed.", body.device_id)
             return self._show_settings({"base": "unexpected"}, {"base_error": str(err)})
         if write.warnings:
@@ -694,18 +699,13 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
         return self._show_settings(errors, messages)
 
     async def _async_write(self, body: SwitchInput, hue: HueSettings) -> SwitchWrite:
-        """The server's write: ``POST /api/switches``, or ``PUT /api/switches/{deviceId}`` with the id the switch had.
-        Its conflict and its missing switch end the flow, with its messages."""
-        try:
-            if self._original is None:
-                return await switch_rules.create_switch(self._switches, body, hue, self._connect)
-            return await switch_rules.update_switch(
-                self._switches, self._original.normalized_device_id, body, hue, self._connect
-            )
-        except SwitchConflictError as err:
-            raise AbortFlow("conflict", {"error": str(err)}) from err
-        except SwitchNotFoundError as err:
-            raise AbortFlow("not_found", {"error": str(err)}) from err
+        """The switch rules' check of a new switch, or of the switch being changed, by the id it had. Raises
+        :class:`~.engine.switch_rules.SwitchError`."""
+        if self._original is None:
+            return await switch_rules.create_switch(self._switches, body, hue, self._connect)
+        return await switch_rules.update_switch(
+            self._switches, self._original.normalized_device_id, body, hue, self._connect
+        )
 
     async def async_step_unchecked(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         """The bridge couldn't check the names: save anyway, as the server did with its warning, or try again."""
@@ -720,7 +720,11 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
         as they are now; an unpaired bridge leaves the names unchecked without asking the bridge again."""
         body = self._body
         assert body is not None  # noqa: S101 - set before unchecked offers to save
-        return self._save(await self._async_write(body, HueSettings()), body)
+        try:
+            write = await self._async_write(body, HueSettings())
+        except (SwitchConflictError, SwitchNotFoundError) as err:
+            raise _ended(err) from err
+        return self._save(write, body)
 
     def _save(self, write: SwitchWrite, body: SwitchInput) -> SubentryFlowResult:
         """Adds the subentry, or updates the one being changed, with the values the server saved; its unique id is the

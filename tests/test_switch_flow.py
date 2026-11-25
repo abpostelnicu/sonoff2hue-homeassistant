@@ -53,8 +53,8 @@ from custom_components.sonoff2hue.const import (
     SUBENTRY_SWITCH,
 )
 from custom_components.sonoff2hue.engine.config import SwitchSettings
-from custom_components.sonoff2hue.engine.errors import NULL_REFERENCE
 from custom_components.sonoff2hue.engine.ewelink import EwelinkAnnouncement
+from custom_components.sonoff2hue.engine.hue_client import HueClient, HueLight
 from custom_components.sonoff2hue.engine.press import SwitchEvent, SwitchEventKind, TrackedEvent, TrackerUpdate
 from custom_components.sonoff2hue.engine.registry import DeviceRegistry
 from custom_components.sonoff2hue.engine.supervisor import create_hue_client
@@ -1208,38 +1208,49 @@ async def test_bridge_settings_that_cannot_be_used_ask_to_pair_it(hass: HomeAssi
     )
 
 
-async def test_an_answer_that_dotnet_fails_on_while_listing_the_lights(
-    hass: HomeAssistant, hue: HueBridge, caplog: pytest.LogCaptureFixture
+UNEXPECTED = "The client failed unexpectedly."
+
+
+async def broken(self: HueClient) -> list[HueLight]:
+    raise RuntimeError(UNEXPECTED)
+
+
+async def test_an_unexpected_failure_while_listing_the_lights(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     entry = await loaded(hass)
-    hue.resources["light"] = [None]
+    monkeypatch.setattr(HueClient, "get_lights", broken)
 
     result = await manual(hass, await start(hass, entry), DEVICE)
 
-    assert (result["step_id"], result["description_placeholders"]) == ("lights_unavailable", {"error": NULL_REFERENCE})
+    assert (result["step_id"], result["description_placeholders"]) == ("lights_unavailable", {"error": UNEXPECTED})
     [record] = [record for record in caplog.records if record.name == switch_flow.__name__]
     assert (record.levelno, record.getMessage()) == (
         logging.ERROR,
         "Listing the lights, rooms and zones of the Hue bridge failed.",
     )
     assert record.exc_info is not None
+    assert isinstance(record.exc_info[1], RuntimeError)
 
 
-async def test_an_answer_that_dotnet_fails_on_while_checking_the_switch(
-    hass: HomeAssistant, hue: HueBridge, caplog: pytest.LogCaptureFixture
+async def test_an_unexpected_failure_while_checking_the_switch(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    result = await settings_for(hass, await loaded(hass))
-    hue.resources["light"] = [None]
+    entry = await loaded(hass)
+    result = await settings_for(hass, entry)
+    monkeypatch.setattr(HueClient, "get_lights", broken)
 
     result = await go(hass, result, form(lights=["0"]))
 
     assert (result["step_id"], result["errors"]) == ("settings", {"base": "unexpected"})
-    assert result["description_placeholders"]["base_error"] == NULL_REFERENCE
+    assert result["description_placeholders"]["base_error"] == UNEXPECTED
     [record] = [record for record in caplog.records if record.name == switch_flow.__name__]
     assert (record.levelno, record.getMessage()) == (
         logging.ERROR,
         f"Checking the switch {DEVICE} against the Hue bridge failed.",
     )
+    assert record.exc_info is not None
+    assert switches_of(entry) == []
 
 
 # Another switch, or the edited one, changed meanwhile.
