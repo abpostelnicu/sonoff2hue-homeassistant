@@ -56,7 +56,7 @@ from .const import (
     ENTRY_TITLE,
     SUBENTRY_SWITCH,
 )
-from .engine import text, yaml_import
+from .engine import yaml_import
 from .engine.config import ConfigError, EngineConfig, HueSettings, SwitchSettings
 from .engine.errors import UnexpectedError
 from .engine.hue_address import try_create_base_url
@@ -145,9 +145,7 @@ def _check_for_run(config: EngineConfig) -> None:
 
 def _switch_title(switch: SwitchSettings) -> str:
     """A switch subentry's title: its name, or its device id without one."""
-    if switch.name is None or text.is_null_or_white_space(switch.name):
-        return switch.normalized_device_id
-    return text.trim(switch.name)
+    return (switch.name or "").strip() or switch.normalized_device_id
 
 
 def _switch_titles(config: EngineConfig) -> str:
@@ -290,9 +288,9 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
         """The bridge chosen at first: when reconfiguring, the paired one if it was found again (the web UI marked it as
         the current one), else the first, which the command line chose by default."""
         if self.source == SOURCE_RECONFIGURE:
-            current = self._get_reconfigure_entry().data.get(CONF_BRIDGE_ID)
+            current: str | None = self._get_reconfigure_entry().data.get(CONF_BRIDGE_ID)
             for bridge in self._bridges:
-                if current and bridge.bridge_id and text.equals_ignore_case(bridge.bridge_id, current):
+                if current and bridge.bridge_id and bridge.bridge_id.casefold() == current.casefold():
                     return bridge.ip
         return self._bridges[0].ip
 
@@ -302,7 +300,7 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
         placeholders: dict[str, str] = {}
         address = ""
         if user_input is not None:
-            address = text.trim(user_input[ADDRESS])
+            address = user_input[ADDRESS].strip()
             _, error = try_create_base_url(address)
             if error is not None:
                 errors[ADDRESS] = "invalid_address"
@@ -531,12 +529,13 @@ class Sonoff2HueConfigFlow(ConfigFlow, domain=DOMAIN):
         await self.async_set_unique_id(connected)
         placeholders = {"address": hue.bridge_ip or "", "switches": _switch_titles(config)}
         description = "imported"
-        file_id = hue.bridge_id or ""
-        if not text.is_null_or_white_space(file_id) and not text.equals_ignore_case(file_id, connected):
+        file_id = hue.bridge_id
+        if file_id and not file_id.isspace() and file_id.casefold() != connected.casefold():
             # Another bridge answers at the file's address; the same id in other letter case needs no word.
             description += "_other_id"
             placeholders |= {"file_bridge_id": file_id, "bridge_id": connected}
-        if text.is_null_or_white_space(hue.certificate_sha256):
+        pin = hue.certificate_sha256
+        if not pin or pin.isspace():
             description += "_unpinned"
             placeholders["warning"] = NOT_PINNED
         return self.async_create_entry(

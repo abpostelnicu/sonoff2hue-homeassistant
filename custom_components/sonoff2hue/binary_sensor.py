@@ -10,7 +10,6 @@ from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_call_later, async_track_point_in_utc_time
 
-from .engine import text
 from .engine.registry import ONLINE_WINDOW, LanDevice
 from .engine.status import StatusSnapshot
 from .entity import BridgeEntity, WallSwitchEntity, async_add_switch_entities
@@ -121,7 +120,7 @@ def _attributes(device: LanDevice | None, device_key: str | None) -> dict[str, o
         "last_press_at": None if device is None else device.last_press_at,
         "seq": None if device is None else device.seq,
         "encrypted": None if device is None else device.encrypted,
-        "has_device_key": not text.is_null_or_white_space(device_key),
+        "has_device_key": bool(device_key and not device_key.isspace()),
         "detached": None if device is None else device.detached,
         "decode_error": None if device is None else device.decode_error,
     }

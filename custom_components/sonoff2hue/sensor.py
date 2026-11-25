@@ -10,7 +10,6 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 
-from .engine import text
 from .engine.registry import LanDevice
 from .engine.status import PRESS_DROPPED, ServiceState, StatusSnapshot, SwitchStatus
 from .entity import BridgeEntity, WallSwitchEntity, async_add_switch_entities
@@ -123,8 +122,8 @@ class LastActionSensor(WallSwitchEntity, SensorEntity):
 
     @callback
     def _show(self, snapshot: StatusSnapshot) -> None:
-        key = text.fold(self._switch.normalized_device_id)
-        status = next((switch for switch in snapshot.switches if text.fold(switch.device_id) == key), None)
+        key = self._switch.normalized_device_id.casefold()
+        status = next((switch for switch in snapshot.switches if switch.device_id.casefold() == key), None)
         self._attr_native_value, self._attr_extra_state_attributes = _last_action(status)
 
 

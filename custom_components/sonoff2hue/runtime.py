@@ -85,7 +85,6 @@ from .const import (
     RESULT_TOGGLED,
     SUBENTRY_SWITCH,
 )
-from .engine import text
 from .engine.activity import ActivityBuffer
 from .engine.config import ConfigError, EngineConfig, HueSettings, SwitchSettings
 from .engine.hue_client import CERTIFICATE_MISMATCH, HueApiError, HueClient
@@ -299,7 +298,7 @@ class Sonoff2HueData:
         :class:`SwitchTestError` with .NET's message when no switch has ``device_id``, when the bridge isn't paired,
         when its settings can't be used, when some targets aren't on the bridge, and with the bridge's error."""
         config = self.config
-        settings = config.find_switch(text.trim(device_id))
+        settings = config.find_switch(device_id.strip())
         if settings is None:
             raise SwitchTestError(f"No switch with device id {device_id} is configured.")
         if not is_paired(config.hue):
@@ -385,13 +384,13 @@ class Sonoff2HueData:
 
     def _switch_device_id(self, settings: SwitchSettings) -> str | None:
         """The Home Assistant device of the switch's subentry, which the platforms make, if there is one."""
-        key = text.fold(settings.normalized_device_id)
+        key = settings.normalized_device_id.casefold()
         subentry_id = next(
             (
                 subentry_id
                 for subentry_id, subentry in self.entry.subentries.items()
                 if subentry.subentry_type == SUBENTRY_SWITCH
-                and text.fold(_switch(subentry.data).normalized_device_id) == key
+                and _switch(subentry.data).normalized_device_id.casefold() == key
             ),
             None,
         )

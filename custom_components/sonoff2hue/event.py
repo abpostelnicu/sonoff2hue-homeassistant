@@ -9,7 +9,6 @@ from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import ATTR_SEQ, ATTR_SWITCH_ID, EVENT_PRESS
-from .engine import text
 from .entity import WallSwitchEntity, async_add_switch_entities
 from .runtime import Sonoff2HueConfigEntry, Sonoff2HueData
 
@@ -43,7 +42,8 @@ class PressEvent(WallSwitchEntity, EventEntity):
 
     @callback
     def _is_this_switch(self, data: Mapping[str, Any]) -> bool:
-        return text.equals_ignore_case(data[ATTR_SWITCH_ID], self._switch.normalized_device_id)
+        switch_id: str = data[ATTR_SWITCH_ID]
+        return switch_id.casefold() == self._switch.normalized_device_id.casefold()
 
     @callback
     def _on_press(self, event: Event[Mapping[str, Any]]) -> None:
