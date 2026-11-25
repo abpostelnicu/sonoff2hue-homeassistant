@@ -183,7 +183,7 @@ async def test_pairing_posts_the_device_type_to_the_normalized_address() -> None
         async def send(
             self, method: str, path: str, body: bytes | None, headers: dict[str, str] | None = None
         ) -> HttpAnswer:
-            sent.append((method, request_url(self.url, path), body))
+            sent.append((method, str(request_url(self.url, path)), body))
             return HttpAnswer(200, None, b'[{"success":{"username":"new-app-key"}}]')
 
         async def close(self) -> None:

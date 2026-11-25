@@ -9,12 +9,17 @@ import pytest
 
 from custom_components.sonoff2hue.engine import hue_client
 from custom_components.sonoff2hue.engine.config import ConfigError
-from custom_components.sonoff2hue.engine.errors import UnexpectedError
 from custom_components.sonoff2hue.engine.hue_address import create_base_url
-from custom_components.sonoff2hue.engine.hue_client import HueApiError, HueClient, HueTarget, HueTargetKind
+from custom_components.sonoff2hue.engine.hue_client import (
+    HueApiError,
+    HueClient,
+    HueTarget,
+    HueTargetKind,
+    request_url,
+)
 from tools.fake_hue.bridge import FakeIds, Fault
 
-from ..hue import FakeHueHost
+from ..hue import FakeHueHost, InMemoryBridge, RecordedRequest
 
 PAIR_AGAIN = "reconfigure the sonoff2hue integration to pair the bridge again"
 
@@ -114,13 +119,55 @@ async def test_a_write_answered_with_errors_and_207_fails(fake_hue: FakeHueHost)
     assert not failure.value.is_transient
 
 
-async def test_a_host_without_an_idn_form_fails_as_in_dotnet() -> None:
-    client = HueClient("xn--b\u00fccher.local", "key", None)
+@pytest.mark.parametrize(
+    ("address", "path", "url"),
+    [
+        ("b\u00fccher.local", "api/0/config", "https://xn--bcher-kva.local/api/0/config"),
+        ("[fe80::1%eth0]:8443", "clip/v2/resource/light", "https://[fe80::1%eth0]:8443/clip/v2/resource/light"),
+        ("192.0.2.10", "clip/v2/resource/light/%2E%2E", "https://192.0.2.10/clip/v2/resource/light/%2E%2E"),
+    ],
+)
+def test_requests_go_to_the_bridges_url_with_the_path_as_escaped(address: str, path: str, url: str) -> None:
+    assert str(request_url(create_base_url(address), path)) == url
 
-    with pytest.raises(UnexpectedError) as failure:
-        await ping(client)
 
-    assert failure.value.dotnet_type == "UriFormatException"
+@pytest.mark.parametrize(
+    ("resource_id", "segment"),
+    [
+        ("11111111-0000-4000-8000-000000000001", "11111111-0000-4000-8000-000000000001"),
+        ("..", "%2E%2E"),
+        (".", "%2E"),
+        ("a/../b", "a%2F%2E%2E%2Fb"),
+        ("l?1#x", "l%3F1%23x"),
+        ("a b", "a%20b"),
+        ("b\u00fcro", "b%C3%BCro"),
+    ],
+)
+async def test_a_resource_id_stays_one_segment_of_the_path(resource_id: str, segment: str) -> None:
+    def respond(request: RecordedRequest) -> tuple[int, str]:
+        return 200, '{"errors":[],"data":[]}'
+
+    bridge = InMemoryBridge(respond)
+
+    await bridge.client().set_on(HueTarget(HueTargetKind.LIGHT, resource_id, "Lamp"), True)
+
+    assert [request.path for request in bridge.requests] == [f"/clip/v2/resource/light/{segment}"]
+
+
+async def test_an_id_of_dots_reaches_the_bridge_as_an_id(fake_hue: FakeHueHost) -> None:
+    client = fake_hue.hue_client(await fake_hue.pair())
+
+    try:
+        with pytest.raises(HueApiError) as failure:
+            await client.set_on(HueTarget(HueTargetKind.LIGHT, "..", "Lamp"), True)
+    finally:
+        await client.close()
+
+    assert failure.value.status == 404
+    assert (
+        await fake_hue.get_text("_fake/puts")
+        == "rejected PUT /clip/v2/resource/light/..: 404 no light with the id '..'\n"
+    )
 
 
 def test_a_malformed_address_is_reported_before_a_malformed_app_key() -> None:

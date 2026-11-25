@@ -19,6 +19,7 @@ import json
 import os
 import socket
 from typing import Any, Protocol
+from urllib.parse import quote
 
 import aiohttp
 from yarl import URL
@@ -26,7 +27,7 @@ from yarl import URL
 from . import errors, text
 from .config import ConfigError
 from .errors import UnexpectedError
-from .hue_address import BridgeUrl, create_base_url, remove_dot_segments
+from .hue_address import BridgeUrl, create_base_url
 from .jsonnode import MAX_DEPTH, nesting_depth, reject_constant
 
 PAIR_AGAIN = "reconfigure the sonoff2hue integration to pair the bridge again"
@@ -312,15 +313,11 @@ class AiohttpTransport:
     async def send(
         self, method: str, path: str, body: bytes | None, headers: dict[str, str] | None = None
     ) -> HttpAnswer:
-        if self._url.idn_host is None:
-            raise UnexpectedError(
-                "UriFormatException", "An invalid Unicode character by IDN standards was specified in the host."
-            )
         request_headers = dict(headers or {})
         if body is not None:
             request_headers["Content-Type"] = JSON_CONTENT_TYPE
         try:
-            url = URL(request_url(self._url, path), encoded=True)
+            url = request_url(self._url, path)
             async with self._client().request(method, url, data=body, headers=request_headers) as response:
                 content = await response.read()
                 return HttpAnswer(response.status, response.reason or None, content, response.charset)
@@ -365,11 +362,9 @@ def aiohttp_transport(
     return AiohttpTransport(url, certificate_sha256, on_certificate)
 
 
-def request_url(url: BridgeUrl, path: str) -> str:
-    """The URL that .NET sends a request to: ``IdnHost`` (with an IPv6 zone) and the path without dot segments."""
-    host = f"[{url.idn_host}]" if url.ipv6 else url.idn_host
-    port = "" if url.port == 443 else f":{url.port}"
-    return f"https://{host}{port}{remove_dot_segments('/' + path)}"
+def request_url(url: BridgeUrl, path: str) -> URL:
+    """The URL of a request for ``path``, a path below the bridge's base URL whose escapes are kept as they are."""
+    return url.url.with_path(f"/{path}", encoded=True)
 
 
 def _connect_failure(error: OSError, url: BridgeUrl) -> str:
@@ -383,7 +378,7 @@ def _connect_failure(error: OSError, url: BridgeUrl) -> str:
         reason = os.strerror(error.errno)
     else:
         reason = str(error) or _SEND_FAILED
-    return f"{reason} ({url.idn_host}:{url.port})"
+    return f"{reason} ({url.host}:{url.port})"
 
 
 # The client.
@@ -428,7 +423,7 @@ class HueClient:
     async def set_on(self, target: HueTarget, on: bool) -> None:
         resource_type = "light" if target.kind == HueTargetKind.LIGHT else "grouped_light"
         body = json.dumps({"on": {"on": on}}, separators=(",", ":")).encode()
-        await self._send("PUT", f"clip/v2/resource/{resource_type}/{_escape_data_string(target.id)}", body)
+        await self._send("PUT", f"clip/v2/resource/{resource_type}/{_escape(target.id)}", body)
 
     async def ping(self) -> None:
         """A cheap authenticated request; it keeps the TLS connection warm and tells whether the bridge is usable."""
@@ -484,14 +479,11 @@ def _check_app_key(app_key: str) -> str:
     return app_key
 
 
-def _escape_data_string(value: str | None) -> str:
-    """``Uri.EscapeDataString``: everything but the unreserved characters of RFC 3986 percent-encoded as UTF-8."""
-    if value is None:
+def _escape(resource_id: str | None) -> str:
+    """A resource id as one segment of a path: percent-encoded, dots too, so that ids such as ``..`` stay in it."""
+    if resource_id is None:
         raise errors.argument_null("stringToEscape")
-    unreserved = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
-    return "".join(
-        char if char in unreserved else "".join(f"%{b:02X}" for b in char.encode("utf-8", "replace")) for char in value
-    )
+    return quote(resource_id, safe="", errors="replace").replace(".", "%2E")
 
 
 # The CLIP v2 envelope, read as .NET's JsonSerializer reads HueEnvelope with JsonSerializerDefaults.Web: property names
