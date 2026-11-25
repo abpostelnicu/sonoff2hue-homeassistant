@@ -2,12 +2,12 @@
 (``tools/fake_hue``) and the simulated wall switch (``tools/send-ewelink-announcements.py``), all on this machine.
 ``scripts/e2e`` runs it, and so does CI's *End-to-end* job.
 
-It is the counterpart of the .NET app's *Local stack test* (``tests/local/local.sh test``, its decision 31). It sets up
-Home Assistant as a user does, through its API, and the integration as the frontend does: the setup flow pairs the
-bridge, and the switch subentry flow adds the switch, which a press identifies. It presses the switch twice and checks
-what reaches the bridge, Home Assistant's bus and the integration's status. Then it restarts Home Assistant and checks
-that the switch's next broadcast, its last ``seq`` again, is no press (the .NET app's decision 6), while the press after
-it still toggles.
+It is the one test that runs the integration as Home Assistant loads it: its flows, the runtime, the mDNS socket and
+the Hue client together, over real sockets and through a restart. It sets up Home Assistant as a user does, through its
+API, and the integration as the frontend does: the setup flow pairs the bridge, and the switch subentry flow adds the
+switch, which a press identifies. It presses the switch twice and checks what reaches the bridge, Home Assistant's bus
+and the integration's status. Then it restarts Home Assistant and checks that the switch's next broadcast, its last
+``seq`` again, is no press, as a restart starts from a new baseline, while the press after it still toggles.
 
 Everything listens on 127.0.0.1, on free ports, and the switch's announcements have a multicast TTL of 0, so they loop
 back to this machine and never reach a network. Home Assistant's configuration folder and the logs are in ``.dev/e2e``,

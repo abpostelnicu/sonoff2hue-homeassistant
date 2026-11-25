@@ -47,7 +47,7 @@ ignore = [
   "PLR0915", # too many statements
   "PLR0917", # too many positional arguments
   "PLR2004", # magic values
-  "TRY003",  # long exception messages: they are part of the behavior this port keeps
+  "TRY003",  # long exception messages: they are the integration's own, shown in its flows, log and diagnostics
 ]
 
 [tool.ruff.lint.per-file-ignores]

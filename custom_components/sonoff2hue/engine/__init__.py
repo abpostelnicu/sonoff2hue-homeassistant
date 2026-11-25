@@ -1,1 +1,1 @@
-"""The engine: ports of the .NET app's modules, with no Home Assistant imports."""
+"""The engine: what the integration does, from the mDNS socket to the Hue bridge, without Home Assistant imports."""

@@ -60,7 +60,7 @@ LOG_TIMEOUT: Final = 5.0
 RESTARTING: Final = "Configuration changed; restarting the bridge."
 """The supervisor's line when a change of the configuration, such as a switch added, restarts the bridge (decision 23)."""
 LISTENING: Final = "Listening for wall switch presses."
-"""The runner's line as it starts, as the .NET app's ``local.sh test`` looked for it."""
+"""The runner's line as it starts, which each start of the bridge has to log."""
 DISPLAY_NAME: Final = f"{SWITCH_NAME} ({DEVICE_ID})"
 """The switch as the integration's log names it."""
 SWITCH_ADDRESS: Final = "192.0.2.10"
@@ -285,7 +285,7 @@ class EndToEnd:
         diagnostics = await self._diagnostics()
         switches = [] if diagnostics is None else diagnostics["config"]["switches"]
         checks.expect_equal(
-            "the switch is saved as the web UI saved it: the light by its name, the room as room:<name>",
+            "the switch is saved with the light by its name and the room as room:<name>",
             [(DEVICE_ID, SWITCH_NAME, [LIGHT], [f"room:{ROOM}"])],
             [(item["device_id"], item["name"], item["lights"], item["groups"]) for item in switches],
         )
@@ -364,8 +364,8 @@ class EndToEnd:
         return status
 
     async def _check_status(self, turned_on: bool) -> None:
-        """The status after a toggle, as the .NET app's ``local.sh test`` read it from the dashboard's API: running, and
-        the switch with its last toggle, here also online at its address and in detached mode, without an error."""
+        """The status after a toggle: running, and the switch online at its address, in detached mode, with its targets
+        and its last toggle, without an error."""
         status = await self._status()
         switches = [] if status is None else status["switches"]
         actual = (
@@ -477,8 +477,8 @@ class EndToEnd:
         checks.ok(f"started again, it has finished starting ({elapsed:.1f} s since the restart)")
 
     async def _press_after_restart(self, websocket: WebSocket) -> None:
-        """The .NET app's decision 6: a restart starts from a new baseline, so the switch's first broadcast after it,
-        here its last seq again, is never a press, and the next seq is one."""
+        """A restart starts from a new baseline, so the switch's first broadcast after it, here its last seq again, is
+        never a press, and the next seq is one."""
         checks = self.checks
         checks.step("After the restart: the switch announces its last seq again (4), then the next (5)")
         events = await _subscribe(websocket)

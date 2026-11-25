@@ -1,5 +1,5 @@
-"""How the end-to-end test reports its checks, as the .NET app's ``local.sh test`` does, and the integration's bus events
-that it receives."""
+"""How the end-to-end test reports its checks, each with ``ok`` or ``FAIL`` as it is made, and the integration's bus
+events that it receives."""
 
 import asyncio
 from collections.abc import Callable
