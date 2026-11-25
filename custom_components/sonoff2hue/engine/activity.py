@@ -1,8 +1,8 @@
-"""The integration's recent activity: the last log entries, which Home Assistant shows in diagnostics.
+"""The integration's recent activity: its latest log entries, which the diagnostics show.
 
-A port of the .NET app's ``Web/Monitoring/LogBuffer.cs``, as a ``logging.Handler``. It keeps the most recent entries
-in memory, as the .NET app did for its web interface's activity and log views. Stack traces stay in the log; an entry
-has the exception's type and message only.
+:class:`ActivityBuffer` is a ``logging.Handler`` that keeps the newest entries of the loggers it is added to, at the
+levels those loggers let through (decision 23). An entry has the exception's type and message only; the traceback stays
+in Home Assistant's log.
 """
 
 from collections import deque
@@ -10,16 +10,17 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
+import itertools
 import logging
 import threading
 
-from .errors import UnexpectedError
-
 CAPACITY = 1000
+"""How many entries the buffer keeps."""
 
 
 class LogLevel(StrEnum):
-    """.NET's ``LogLevel``, as the web interface's API wrote it."""
+    """An entry's level. A record's level maps to the highest of these at or below it; anything below debug, such as
+    level 5, is trace."""
 
     TRACE = "trace"
     DEBUG = "debug"
@@ -27,6 +28,15 @@ class LogLevel(StrEnum):
     WARNING = "warning"
     ERROR = "error"
     CRITICAL = "critical"
+
+
+_LEVELS = (
+    (logging.CRITICAL, LogLevel.CRITICAL),
+    (logging.ERROR, LogLevel.ERROR),
+    (logging.WARNING, LogLevel.WARNING),
+    (logging.INFO, LogLevel.INFORMATION),
+    (logging.DEBUG, LogLevel.DEBUG),
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,7 +58,7 @@ class ActivityBuffer(logging.Handler):
         super().__init__()
         self._sync = threading.Lock()
         self._entries: deque[ActivityEntry] = deque(maxlen=capacity)
-        self._last_id = 0
+        self._ids = itertools.count(1)
         self._added: list[Callable[[ActivityEntry], None]] = []
 
     def add_added_callback(self, callback: Callable[[ActivityEntry], None]) -> Callable[[], None]:
@@ -58,14 +68,13 @@ class ActivityBuffer(logging.Handler):
         return lambda: self._added.remove(callback)
 
     def get(self, after: int, limit: int) -> list[ActivityEntry]:
-        """The newest ``limit`` entries with an id above ``after``, oldest first."""
+        """The newest ``limit`` entries with an id above ``after``, oldest first; a limit of 0 gives none."""
         with self._sync:
-            newer = [entry for entry in self._entries if entry.id > after]
-        return newer[len(newer) - limit :] if len(newer) > limit else newer
+            return list(deque((entry for entry in self._entries if entry.id > after), maxlen=limit))
 
     def handle(self, record: logging.LogRecord) -> bool:
-        # logging.Handler.handle holds the handler's I/O lock while it emits, which the buffer doesn't need: it has a
-        # lock of its own, and the callbacks run outside it, as in .NET.
+        # logging.Handler.handle emits under the handler's I/O lock, which the buffer doesn't need: it has a lock of its
+        # own, and the callbacks run outside any lock, so that one can't block another thread that logs.
         result = self.filter(record)
         if isinstance(result, logging.LogRecord):
             record = result
@@ -75,18 +84,12 @@ class ActivityBuffer(logging.Handler):
 
     def emit(self, record: logging.LogRecord) -> None:
         try:
+            at = datetime.fromtimestamp(record.created, UTC)
+            level = next((level for threshold, level in _LEVELS if record.levelno >= threshold), LogLevel.TRACE)
             message = record.getMessage()
             exception = _describe(record)
             with self._sync:
-                self._last_id += 1
-                entry = ActivityEntry(
-                    self._last_id,
-                    datetime.fromtimestamp(record.created, UTC),
-                    _level(record.levelno),
-                    _short_category(record.name),
-                    message,
-                    exception,
-                )
+                entry = ActivityEntry(next(self._ids), at, level, _category(record.name), message, exception)
                 self._entries.append(entry)
             for callback in list(self._added):
                 callback(entry)
@@ -94,29 +97,13 @@ class ActivityBuffer(logging.Handler):
             self.handleError(record)
 
 
-def _level(levelno: int) -> LogLevel:
-    if levelno >= logging.CRITICAL:
-        return LogLevel.CRITICAL
-    if levelno >= logging.ERROR:
-        return LogLevel.ERROR
-    if levelno >= logging.WARNING:
-        return LogLevel.WARNING
-    if levelno >= logging.INFO:
-        return LogLevel.INFORMATION
-    if levelno >= logging.DEBUG:
-        return LogLevel.DEBUG
-    return LogLevel.TRACE
-
-
-def _short_category(category: str) -> str:
-    dot = category.rfind(".")
-    return category if dot < 0 or dot == len(category) - 1 else category[dot + 1 :]
+def _category(logger_name: str) -> str:
+    """The logger's name after its last dot; the whole name when it has no dot or ends with one."""
+    return logger_name.rpartition(".")[2] or logger_name
 
 
 def _describe(record: logging.LogRecord) -> str | None:
-    """``{exception.GetType().Name}: {exception.Message}``. An :class:`UnexpectedError` stands for the .NET exception it
-    names."""
+    """``Type: message`` of the exception logged with ``record``, if any."""
     if record.exc_info is None or (error := record.exc_info[1]) is None:
         return None
-    name = error.dotnet_type if isinstance(error, UnexpectedError) else type(error).__name__
-    return f"{name}: {error}"
+    return f"{type(error).__name__}: {error}"

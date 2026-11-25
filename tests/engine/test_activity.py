@@ -1,4 +1,4 @@
-"""Tests of the activity buffer; a port of the .NET app's ``LogBuffer`` test, plus its entries' format."""
+"""Tests of the activity buffer: the entries it keeps, their format, and the callbacks."""
 
 from collections.abc import Iterator
 from datetime import UTC, datetime
@@ -7,7 +7,6 @@ import threading
 
 import pytest
 
-from custom_components.sonoff2hue.engine import errors
 from custom_components.sonoff2hue.engine.activity import ActivityBuffer, ActivityEntry, LogLevel
 from custom_components.sonoff2hue.engine.mdns import TRACE
 
@@ -15,7 +14,7 @@ from custom_components.sonoff2hue.engine.mdns import TRACE
 @pytest.fixture
 def logger() -> Iterator[logging.Logger]:
     """A logger of its own whose lines go to no other handler, at every level."""
-    logger = logging.getLogger("tests.engine.Sonoff2Hue.Web.Monitoring.Something")
+    logger = logging.getLogger("tests.engine.sonoff2hue.lan_monitor")
     logger.setLevel(TRACE)
     logger.propagate = False
     yield logger
@@ -30,7 +29,7 @@ def test_keeps_the_newest_entries(logger: logging.Logger) -> None:
 
     entries = buffer.get(after=0, limit=10)
     assert [entry.message for entry in entries] == ["entry 3", "entry 4", "entry 5"]
-    assert entries[0].category == "Something"
+    assert entries[0].category == "lan_monitor"
     assert [entry.message for entry in buffer.get(after=entries[1].id, limit=10)] == ["entry 5"]
 
 
@@ -46,7 +45,7 @@ def test_get_returns_the_newest_entries_after_an_id_oldest_first(logger: logging
     assert buffer.get(after=5, limit=10) == []
 
 
-def test_entries_have_dotnets_levels_and_short_categories(logger: logging.Logger) -> None:
+def test_entries_have_level_names_and_short_categories(logger: logging.Logger) -> None:
     buffer = ActivityBuffer()
     logger.addHandler(buffer)
     others = [logging.getLogger(name) for name in ("tests_engine_no_dot", "tests.engine.trailing.")]
@@ -76,6 +75,10 @@ def test_entries_have_dotnets_levels_and_short_categories(logger: logging.Logger
     assert [entry.category for entry in entries[-2:]] == ["tests_engine_no_dot", "tests.engine.trailing."]
 
 
+class BridgeTroubleError(RuntimeError):
+    pass
+
+
 def test_an_exception_is_its_type_and_message(logger: logging.Logger) -> None:
     buffer = ActivityBuffer()
     logger.addHandler(buffer)
@@ -88,17 +91,20 @@ def test_an_exception_is_its_type_and_message(logger: logging.Logger) -> None:
     except ValueError:
         logger.exception("first")
     try:
-        fail(errors.null_reference())
-    except errors.UnexpectedError:
+        fail(BridgeTroubleError("no answer"))
+    except BridgeTroubleError:
         logger.exception("second")
     logger.error("third", exc_info=True)  # noqa: LOG014 - with no exception being handled, on purpose
     logger.warning("fourth", exc_info=OSError(1, "Operation not permitted"))
+    logger.error("fifth", exc_info=KeyError("l1"))
 
+    # The type's own name, without its module, and the exception as str() writes it.
     assert [(entry.message, entry.exception) for entry in buffer.get(after=0, limit=10)] == [
         ("first", "ValueError: bad value"),
-        ("second", "NullReferenceException: Object reference not set to an instance of an object."),
+        ("second", "BridgeTroubleError: no answer"),
         ("third", None),
         ("fourth", "PermissionError: [Errno 1] Operation not permitted"),
+        ("fifth", "KeyError: 'l1'"),
     ]
 
 
@@ -112,7 +118,7 @@ def test_an_entry_has_the_time_it_was_logged(logger: logging.Logger) -> None:
 
     (entry,) = buffer.get(after=0, limit=1)
     assert entry == ActivityEntry(
-        1, datetime(2026, 11, 24, 12, 0, tzinfo=UTC), LogLevel.INFORMATION, "Something", "at noon", None
+        1, datetime(2026, 11, 24, 12, 0, tzinfo=UTC), LogLevel.INFORMATION, "lan_monitor", "at noon", None
     )
 
 
