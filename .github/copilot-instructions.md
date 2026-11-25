@@ -1665,7 +1665,34 @@ documentation:
   - **E `engine-core`:**
     - Pending.
   - **F `ha-layer`:**
-    - Pending.
+    - **Changed:** four commits on `py/ha-layer`, from `main` at cc3b702, the last of them this entry, in the Home
+      Assistant code (`__init__.py`, `runtime.py`, `config_flow.py`, `entity.py`, the four platforms,
+      `diagnostics.py`, `repairs.py` and `const.py`) and its tests. It imports neither `engine/text.py` nor
+      `engine/errors.py` any more. Input is trimmed with `strip()`, blank is `not s or s.isspace()`, and device ids and
+      bridge ids compare with `casefold()`: the switch test's lookup, the device that the bus events name, Last action,
+      Press, the paired bridge chosen first when reconfiguring, and the import's note about another bridge id. Where
+      the setup flow caught `UnexpectedError`, reading the bridge, connecting to an imported file's bridge and reading
+      the pasted file, it catches `Exception` and logs the traceback with `_LOGGER.exception`, with the same steps,
+      translation keys and texts. ruff counts that call as handling the exception, so these handlers have no
+      `# noqa: BLE001`, which it would flag as unused (RUF100). Docstrings, comments and test names describe the code
+      on its own terms, and say Home Assistant's frontend where they meant it.
+    - **User-visible:** nothing in the flows, steps, menus, translation keys, data, entities, unique ids, devices,
+      repairs, bus events, logbook or diagnostics. Edge cases only: the bridge address and the imported switches'
+      names are trimmed of Python's white space, which adds U+001C-U+001F; ids match under Unicode case folding, so
+      `ß` matches `ss`, which valid device ids and bridge ids never hold; and any other failure while reading the
+      bridge, connecting to the file's bridge or reading the file shows the flow's `unexpected` or `unreadable_config`
+      text and logs its traceback, where it used to escape the step and Home Assistant's flow API answered 500.
+    - **Tests:** `test_config_flow.py` keeps its 70 tests. The five that reached those paths through `UnexpectedError`,
+      or through an answer or a file that only the engine's old parsers failed on, raise a `RuntimeError` instead: in
+      the search's and the pairing's stand-ins, and from `get_bridge_info` or `yaml_import.parse`, replaced for the
+      test. How the engine reads malformed answers and files is for its own tests. Four tests were renamed, and
+      docstrings and comments in six test files reworded, with their expectations unchanged.
+    - **Checks:** `scripts/check` passed on each commit (`test-each-commit.sh`), with 749 tests, as on cc3b702. The
+      277 tests of the Home Assistant layer (`tests/` without `engine/` and `tools/`) cover every statement and branch
+      of its modules, `switch_flow.py` included: 1,449 statements and 282 branches. `tests/test_own_mdns.py` passes
+      its 47 cases. `check-commits.sh` passed for every commit, and `scripts/e2e` passed all 45 checks in 24.9 s, its
+      setup taking 8.6 s for a new `.dev/venv`. An AST scan of the 25 owned files finds no import of `text`, `errors`,
+      `jsonnode` or `jstext`, and no line with a term that the wording rule bars.
 
 ## Status
 
