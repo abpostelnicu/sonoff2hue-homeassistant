@@ -9,6 +9,10 @@ device ids and ``seq`` by rules of their own:
   two characters, stays, and a capital sigma always becomes the small sigma, also at the end of a word.
 - ``seq`` is a signed 64-bit decimal: an optional sign and ASCII digits, with optional ASCII white space around them,
   and trailing NULs ignored. Anything else, such as ``1_2``, other digits or a leading no-break space, gives no seq.
+
+The payload is the device's params as a JSON object, in plain text in DIY mode, else encrypted with AES-128-CBC and
+PKCS7 under the key MD5(device key), with a 16-byte IV; both are base64. It is read with ``base64`` (strictly: white
+space isn't base64) and ``json``, as UTF-8 where invalid sequences become U+FFFD.
 """
 
 import base64
@@ -16,13 +20,13 @@ from dataclasses import dataclass
 from datetime import datetime
 import hashlib
 from ipaddress import IPv4Address, IPv6Address, ip_address
+import json
 import os
 import re
 
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from . import jsonnode, text
 from .dns import (
     DnsMessage,
     DnsRecordType,
@@ -35,8 +39,6 @@ from .mdns import MdnsPacket
 
 SERVICE_TYPE = "_ewelink._tcp.local"
 _IV_LENGTH = 16
-_BASE64_WHITE_SPACE = str.maketrans("", "", " \t\r\n")  # what Convert.FromBase64String skips
-_LONE_SURROGATE = re.compile("[\ud800-\udfff]")
 
 _WHITE_SPACE = (
     "\t\n\v\f\r \x85\xa0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a"
@@ -44,6 +46,9 @@ _WHITE_SPACE = (
 )
 _SEQ = re.compile(r"[\t\n\v\f\r ]*([+-]?[0-9]+)[\t\n\v\f\r ]*\x00*")
 _SEQ_LIMIT = 1 << 63
+
+type Json = dict[str, Json] | list[Json] | str | int | float | bool | None
+"""A value as ``json.loads`` reads it."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,7 +68,7 @@ class EwelinkAnnouncement:
 
 
 def announcements(packet: MdnsPacket) -> list[EwelinkAnnouncement]:
-    """The eWeLink announcements in a packet (``EwelinkAnnouncement.FromPacket``)."""
+    """The eWeLink announcements in a packet."""
     if not packet.message.is_response:
         return []
 
@@ -170,46 +175,44 @@ def _parse_seq(value: str | None) -> int | None:
 
 
 def decrypt(data: str, iv: str, device_key: str) -> str:
-    """Decrypts a payload (AES-128-CBC, PKCS7, key MD5(device key)); raises ``ValueError`` for malformed input."""
-    return _decrypt(_from_base64(data), _from_base64(iv), device_key)
+    """Decrypts a payload with ``device_key``; raises ``ValueError`` for malformed input."""
+    return _decrypt(base64.b64decode(data, validate=True), base64.b64decode(iv, validate=True), device_key)
 
 
 def encrypt(plaintext: str, device_key: str, iv: bytes | None = None) -> tuple[str, str]:
     """Encrypts a payload the way a device does; returns the data and the IV, both base64."""
     iv = os.urandom(_IV_LENGTH) if iv is None else iv
     padder = padding.PKCS7(128).padder()
-    padded = padder.update(_utf8(plaintext)) + padder.finalize()
+    padded = padder.update(plaintext.encode()) + padder.finalize()
     encryptor = Cipher(algorithms.AES(_key(device_key)), modes.CBC(iv)).encryptor()
     ciphertext = encryptor.update(padded) + encryptor.finalize()
     return base64.b64encode(ciphertext).decode(), base64.b64encode(iv).decode()
 
 
-def read_params(
-    announcement: EwelinkAnnouncement, device_key: str | None
-) -> tuple[dict[str, jsonnode.JsonValue] | jsonnode.BrokenObject | None, str | None]:
-    """The device's params and an error (``EwelinkCrypto.TryReadParams``). The params are ``None`` when they can't be
-    read: no payload, or an encrypted payload without a device key; the error says why decoding failed. Never raises:
-    the payload comes from the network and may be malformed."""
+def read_params(announcement: EwelinkAnnouncement, device_key: str | None) -> tuple[dict[str, Json] | None, str | None]:
+    """The device's params and an error. The params are ``None`` when they can't be read: no payload, or an encrypted
+    payload without a device key; the error says why decoding failed. Never raises: the payload comes from the network
+    and may be malformed."""
     if not announcement.data:
         return None, None
 
     if announcement.encrypted:
-        if device_key is None or text.is_null_or_white_space(device_key):
+        if not device_key or device_key.isspace():
             return None, None
         if not announcement.iv:
             return None, "encrypted payload has no iv"
         try:
-            iv = _from_base64(announcement.iv)
+            iv = base64.b64decode(announcement.iv, validate=True)
         except ValueError:
             return None, "iv is not valid base64"
         if len(iv) != _IV_LENGTH:
             return None, f"iv has {len(iv)} bytes instead of {_IV_LENGTH}"
         try:
-            ciphertext = _from_base64(announcement.data)
+            ciphertext = base64.b64decode(announcement.data, validate=True)
         except ValueError:
             return None, "payload is not valid base64"
         try:
-            payload = _decrypt(ciphertext, iv, text.trim(device_key))
+            payload = _decrypt(ciphertext, iv, device_key.strip())
         except ValueError:
             # A wrong key shows up as bad padding.
             return None, "decryption failed, check the deviceKey"
@@ -217,12 +220,12 @@ def read_params(
         payload = announcement.data
 
     try:
-        params = jsonnode.parse(payload)
-    except jsonnode.JsonError:
+        params = json.loads(payload)
+    except ValueError, RecursionError:  # RecursionError: nested too deeply
         return None, (
             "payload is not valid JSON, check the deviceKey" if announcement.encrypted else "payload is not valid JSON"
         )
-    if isinstance(params, (dict, jsonnode.BrokenObject)):
+    if isinstance(params, dict):
         return params, None
     return None, "payload is not a JSON object"
 
@@ -231,20 +234,8 @@ def _decrypt(ciphertext: bytes, iv: bytes, device_key: str) -> str:
     decryptor = Cipher(algorithms.AES(_key(device_key)), modes.CBC(iv)).decryptor()
     padded = decryptor.update(ciphertext) + decryptor.finalize()
     unpadder = padding.PKCS7(128).unpadder()
-    # Encoding.UTF8.GetString replaces invalid sequences with U+FFFD, as "replace" does.
     return (unpadder.update(padded) + unpadder.finalize()).decode("utf-8", "replace")
 
 
 def _key(device_key: str) -> bytes:
-    return hashlib.md5(_utf8(device_key), usedforsecurity=False).digest()  # the protocol's key derivation
-
-
-def _utf8(value: str) -> bytes:
-    # Encoding.UTF8.GetBytes writes a lone surrogate as U+FFFD.
-    return _LONE_SURROGATE.sub("\ufffd", value).encode()
-
-
-def _from_base64(value: str) -> bytes:
-    """``Convert.FromBase64String``: skips spaces, tabs and line breaks, and is otherwise strict."""
-    # binascii.Error, and the ValueError for characters outside ASCII, are both ValueErrors.
-    return base64.b64decode(value.translate(_BASE64_WHITE_SPACE), validate=True)
+    return hashlib.md5(device_key.encode(), usedforsecurity=False).digest()  # the protocol's key derivation

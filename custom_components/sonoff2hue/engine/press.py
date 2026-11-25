@@ -1,24 +1,23 @@
 """Wall-switch presses from the state broadcasts of a MINIR4M.
 
-A port of the .NET app's ``Ewelink/PressDetector.cs`` and ``Ewelink/SwitchTracker.cs``.
-
 In detached relay mode the device sends the actual button event (``{"key":0}``) to the eWeLink cloud only. Over the LAN,
 every press shows up as a new state broadcast with a higher ``seq`` whose relay state didn't change (AlexxIT/SonoffLAN
 #1227 and #1880). So a press is "a new sequence number that isn't explained by a relay or settings change". Relay and
 settings changes can only be told apart when the payload can be decoded, that is when the device key is configured.
+The params are the values that ``json.loads`` reads, and settings compare with ``==``. Relay states compare without
+regard to case, and numbers such as an outlet's may also be written as text.
 """
 
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
+import json
 
-from . import jsonnode, text
 from .config import EngineConfig, SwitchSettings
-from .ewelink import EwelinkAnnouncement, announcements, probing_device_ids, read_params
-from .jsonnode import JsonValue
+from .ewelink import EwelinkAnnouncement, Json, announcements, probing_device_ids, read_params
 from .mdns import MdnsPacket
 
-type Params = Mapping[str, JsonValue]
+type Params = Mapping[str, Json]
 
 # Params that the user changes in the eWeLink app; a change in any of them is not a press. Volatile fields such as
 # rssi, triggerType, fwVersion or autoUpgrade are deliberately not listed.
@@ -34,6 +33,8 @@ _SETTING_KEYS = (
     "pulseWidth",
     "lock",
 )
+# The diagnostics that a summary shows after the relays.
+_SUMMARY_KEYS = ("relaySeparation", "swMode", "triggerType", "rssi", "fwVersion")
 
 
 class SwitchEventKind(Enum):
@@ -82,7 +83,7 @@ class PressDetector:
         self._last_params = None
 
     def process(self, announcement: EwelinkAnnouncement, params: Params | None) -> SwitchEvent:
-        if params is not None and (separation := _try_get_int(params.get("relaySeparation"))) is not None:
+        if params is not None and (separation := _integer(params.get("relaySeparation"))) is not None:
             self.is_detached = separation == 1
 
         seq = announcement.seq
@@ -112,9 +113,7 @@ class PressDetector:
                 return SwitchEvent(SwitchEventKind.RELAY_CHANGED, seq, relay_change)
 
             changed = [
-                key
-                for key in _SETTING_KEYS
-                if key in params and key in previous and not jsonnode.deep_equals(params[key], previous[key])
+                key for key in _SETTING_KEYS if key in params and key in previous and params[key] != previous[key]
             ]
             if changed:
                 return SwitchEvent(SwitchEventKind.SETTINGS_CHANGED, seq, ", ".join(changed))
@@ -129,15 +128,12 @@ class PressDetector:
 
 
 def summarize(params: Params | None) -> str:
-    """A short summary of the interesting params, for logs."""
+    """A short summary of the interesting params, for logs: the relays, then a few diagnostics, as JSON writes them."""
     if params is None:
         return "payload not decoded"
 
-    parts = [f"relay={state}" if outlet < 0 else f"relay{outlet}={state}" for outlet, state in _relay_states(params)]
-    for key in ("relaySeparation", "swMode", "triggerType", "rssi", "fwVersion"):
-        value = params.get(key)
-        if isinstance(value, (str, jsonnode.BrokenString, jsonnode.JsonNumber, bool)):
-            parts.append(f"{key}={jsonnode.to_json_string(value).strip('"')}")
+    parts = [f"relay{'' if outlet < 0 else outlet}={_text(state)}" for outlet, state in _relay_states(params)]
+    parts += [f"{key}={value}" for key in _SUMMARY_KEYS if (value := _scalar(params.get(key))) is not None]
     return " ".join(parts)
 
 
@@ -145,36 +141,59 @@ def _describe_relay_change(before: Params, after: Params) -> str | None:
     old = dict(_relay_states(before))
     for outlet, state in _relay_states(after):
         previous = old.get(outlet)
-        if previous is not None and not text.equals_ignore_case(previous, state):
-            return f"relay {previous} -> {state}" if outlet < 0 else f"relay {outlet} {previous} -> {state}"
+        if previous is not None and previous.casefold() != state.casefold():
+            change = f"{_text(previous)} -> {_text(state)}"
+            return f"relay {change}" if outlet < 0 else f"relay {outlet} {change}"
     return None
 
 
 def _relay_states(params: Params) -> list[tuple[int, str]]:
-    """The relay states by outlet, sorted; ``-1`` is the top-level ``switch`` of single-channel and DIY firmwares."""
+    """The relay states by outlet, sorted; ``-1`` is the top-level ``switch`` of single-channel and DIY firmwares. An
+    entry of ``switches`` without a readable ``outlet`` counts by its place in the list."""
     states: dict[int, str] = {}
-    switches = params.get("switches")
-    if isinstance(switches, list):
-        for i, item in enumerate(switches):
-            if isinstance(item, (dict, jsonnode.BrokenObject)):
-                state = item.get("switch")
-                if isinstance(state, (str, jsonnode.BrokenString)):
-                    outlet = _try_get_int(item.get("outlet"))
-                    states[i if outlet is None else outlet] = jsonnode.get_string(state)
+    if isinstance(switches := params.get("switches"), list):
+        for index, item in enumerate(switches):
+            if isinstance(item, dict) and isinstance(state := item.get("switch"), str):
+                outlet = _integer(item.get("outlet"))
+                states[index if outlet is None else outlet] = state
 
-    single = params.get("switch")
-    if isinstance(single, (str, jsonnode.BrokenString)):
-        states[-1] = jsonnode.get_string(single)
+    if isinstance(single := params.get("switch"), str):
+        states[-1] = single
     return sorted(states.items())
 
 
-def _try_get_int(value: JsonValue) -> int | None:
-    """``TryGetInt``: a number written as a 32-bit integer, or a string that ``int.TryParse`` reads."""
-    if isinstance(value, jsonnode.JsonNumber):
-        return jsonnode.try_get_int32(value)
-    if isinstance(value, (str, jsonnode.BrokenString)):
-        return text.try_parse_int(jsonnode.get_string(value), 32)
-    return None
+def _integer(value: Json) -> int | None:
+    """A whole number, written as a number or as text that ``int()`` reads; ``None`` for anything else, booleans and
+    numbers with a fraction included."""
+    match value:
+        case bool():
+            return None
+        case int():
+            return value
+        case str():
+            try:
+                return int(value)
+            except ValueError:
+                return None
+        case _:
+            return None
+
+
+def _scalar(value: Json) -> str | None:
+    """A text, number or boolean as JSON writes it, a text without its quotes; ``None`` for anything else."""
+    match value:
+        case str():
+            return _text(value)
+        case bool() | int() | float():
+            return json.dumps(value)
+        case _:
+            return None
+
+
+def _text(value: str) -> str:
+    """A text as JSON writes it, without its quotes: quotes, backslashes, control and non-ASCII characters escaped, so
+    that what a device sends can't break a log line."""
+    return json.dumps(value)[1:-1]
 
 
 @dataclass(frozen=True, slots=True)
@@ -209,7 +228,7 @@ class SwitchTracker:
             detector.reset()
 
     def has_seen(self, device_id: str) -> bool:
-        detector = self._detectors.get(text.fold(device_id))
+        detector = self._detectors.get(device_id.casefold())
         return detector is not None and detector.has_baseline
 
     def process(self, packet: MdnsPacket) -> TrackerUpdate:
@@ -217,14 +236,14 @@ class SwitchTracker:
         # for a press, even if its sequence number moved on.
         rejoined = probing_device_ids(packet.message)
         for device_id in rejoined:
-            if (detector := self._detectors.get(text.fold(device_id))) is not None:
+            if (detector := self._detectors.get(device_id.casefold())) is not None:
                 detector.reset()
 
         events: list[TrackedEvent] = []
         for announcement in announcements(packet):
             settings = self._config.find_switch(announcement.device_id)
             params, error = read_params(announcement, settings.device_key if settings is not None else None)
-            detector = self._detectors.setdefault(text.fold(announcement.device_id), PressDetector())
+            detector = self._detectors.setdefault(announcement.device_id.casefold(), PressDetector())
             event = detector.process(announcement, params)
             events.append(TrackedEvent(announcement, event, params, settings, error, detector.is_detached))
 

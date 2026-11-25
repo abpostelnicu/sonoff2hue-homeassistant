@@ -1,14 +1,18 @@
-"""Tests of eWeLink announcements and payloads; ports of the .NET app's EwelinkTests and the matching QA regressions."""
+"""Tests of eWeLink announcements, which the mDNS layer reads from its records, and of their payloads."""
 
 import base64
 from datetime import UTC, datetime
+import hashlib
 import importlib.util
 from ipaddress import IPv4Address
+import math
 from pathlib import Path
 
+from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 import pytest
 
-from custom_components.sonoff2hue.engine import ewelink, jsonnode
+from custom_components.sonoff2hue.engine import ewelink
 from custom_components.sonoff2hue.engine.dns import DnsRecordType
 from custom_components.sonoff2hue.engine.ewelink import EwelinkAnnouncement
 
@@ -101,8 +105,8 @@ def test_announcements_take_no_address_from_a_copy_that_this_host_relays() -> No
 
 
 def test_the_simulated_switch_on_this_host_keeps_its_a_records_address() -> None:
-    # tools/send-ewelink-announcements.py, the .NET app's simulated switch, sends from this host with TTL 0, with SRV
-    # and A records.
+    # tools/send-ewelink-announcements.py, the simulated switch, sends from this host with TTL 0, with SRV and A
+    # records.
     path = Path(__file__).parents[2] / "tools" / "send-ewelink-announcements.py"
     spec = importlib.util.spec_from_file_location("send_ewelink_announcements", path)
     assert spec is not None
@@ -135,16 +139,17 @@ def test_read_params_decodes_with_key_and_reports_wrong_key() -> None:
 
     params, error = ewelink.read_params(encrypted, DEVICE_KEY)
     assert error is None
-    assert params is not None
-    assert jsonnode.try_get_int32(params["relaySeparation"]) == 1
+    assert params == {"switches": [{"outlet": 0, "switch": "on"}], "relaySeparation": 1, "triggerType": 17}
+    # The key is stripped of white space first.
+    assert ewelink.read_params(encrypted, f"\t{DEVICE_KEY} \n") == (params, None)
 
     assert ewelink.read_params(encrypted, None) == (None, None)
+    assert ewelink.read_params(encrypted, "") == (None, None)
     assert ewelink.read_params(encrypted, "  ") == (None, None)
 
     params, error = ewelink.read_params(encrypted, "wrong-key")
     assert params is None
-    assert error is not None
-    assert "deviceKey" in error
+    assert error == "decryption failed, check the deviceKey"
 
 
 def test_read_params_reads_plain_diy_payload() -> None:
@@ -152,14 +157,23 @@ def test_read_params_reads_plain_diy_payload() -> None:
 
     assert error is None
     assert params == {"switch": "on"}
+    assert ewelink.read_params(_announcement('{"switch":"on"}', None, encrypted=False), DEVICE_KEY) == (params, None)
+
+
+def test_read_params_without_a_payload_reads_nothing() -> None:
+    assert ewelink.read_params(_announcement("", IV, encrypted=True), DEVICE_KEY) == (None, None)
+    assert ewelink.read_params(_announcement("", None, encrypted=False), None) == (None, None)
 
 
 @pytest.mark.parametrize(
     ("iv", "data", "expected"),
     [
         ("not base64!", CIPHERTEXT, "iv is not valid base64"),
+        ("AAECAwQFBgcICQoLDA0ODw", CIPHERTEXT, "iv is not valid base64"),  # without its padding
+        ("\u00c4AECAwQFBgcICQoLDA0ODw==", CIPHERTEXT, "iv is not valid base64"),
         (IV, "not base64!", "payload is not valid base64"),
-        (IV, "AAECAwQFBgcICQ==", "decryption failed, check the deviceKey"),
+        (IV, CIPHERTEXT + "\u00c4", "payload is not valid base64"),
+        (IV, "AAECAwQFBgcICQ==", "decryption failed, check the deviceKey"),  # 10 bytes, not a whole block
         ("", CIPHERTEXT, "encrypted payload has no iv"),
         (None, CIPHERTEXT, "encrypted payload has no iv"),
     ],
@@ -182,15 +196,40 @@ def test_malformed_encrypted_iv_is_reported_without_raising(iv_length: int) -> N
     assert error == f"iv has {iv_length} bytes instead of 16"
 
 
+def test_base64_with_white_space_is_not_valid() -> None:
+    spaced = " \n".join(CIPHERTEXT[i : i + 8] for i in range(0, len(CIPHERTEXT), 8))
+
+    assert ewelink.read_params(_announcement(CIPHERTEXT, f"\t{IV}\r\n", encrypted=True), DEVICE_KEY) == (
+        None,
+        "iv is not valid base64",
+    )
+    assert ewelink.read_params(_announcement(spaced, IV, encrypted=True), DEVICE_KEY) == (
+        None,
+        "payload is not valid base64",
+    )
+
+
+def test_a_key_that_cant_be_encoded_fails_to_decrypt() -> None:
+    encrypted = _announcement(CIPHERTEXT, IV, encrypted=True)
+
+    assert ewelink.read_params(encrypted, "key\ud800") == (None, "decryption failed, check the deviceKey")
+
+
 @pytest.mark.parametrize(
     ("payload", "encrypted", "expected"),
     [
         ("[1]", False, "payload is not a JSON object"),
         ("null", False, "payload is not a JSON object"),
+        ('"text"', False, "payload is not a JSON object"),
+        ("42", False, "payload is not a JSON object"),
+        ("[" * 65 + "]" * 65, False, "payload is not a JSON object"),
         ("{", False, "payload is not valid JSON"),
-        ('{"a":NaN}', False, "payload is not valid JSON"),
-        ("[" * 65 + "]" * 65, False, "payload is not valid JSON"),
+        ("{'a':1}", False, "payload is not valid JSON"),
+        ('{"a":1}x', False, "payload is not valid JSON"),
+        ("\ufeff{}", False, "payload is not valid JSON"),
+        ("[" * 100_000, False, "payload is not valid JSON"),  # nested too deeply for the decoder
         ("{", True, "payload is not valid JSON, check the deviceKey"),
+        ("[1]", True, "payload is not a JSON object"),
     ],
 )
 def test_read_params_reports_payloads_that_are_not_json_objects(payload: str, encrypted: bool, expected: str) -> None:
@@ -203,10 +242,27 @@ def test_read_params_reports_payloads_that_are_not_json_objects(payload: str, en
     assert ewelink.read_params(announcement, DEVICE_KEY) == (None, expected)
 
 
-def test_base64_skips_white_space_as_dotnet_does() -> None:
-    spaced = " \n".join(CIPHERTEXT[i : i + 8] for i in range(0, len(CIPHERTEXT), 8))
+def test_read_params_takes_json_as_python_reads_it() -> None:
+    payload = '{"a":NaN,"b":1,"b":2,"c":1.0,"d":"\\u00e4","e":[true,null]}'
 
-    params, error = ewelink.read_params(_announcement(spaced, f"\t{IV}\r\n", encrypted=True), DEVICE_KEY)
+    params, error = ewelink.read_params(_announcement(payload, None, encrypted=False), None)
 
     assert error is None
     assert params is not None
+    nan = params.pop("a")
+    assert isinstance(nan, float)
+    assert math.isnan(nan)
+    assert params == {"b": 2, "c": 1.0, "d": "\u00e4", "e": [True, None]}
+
+
+def test_invalid_utf8_in_a_decrypted_payload_becomes_replacement_characters() -> None:
+    padder = padding.PKCS7(128).padder()
+    padded = padder.update(b'{"fwVersion":"1.3\xff"}') + padder.finalize()
+    key = hashlib.md5(DEVICE_KEY.encode(), usedforsecurity=False).digest()
+    encryptor = Cipher(algorithms.AES(key), modes.CBC(base64.b64decode(IV))).encryptor()
+    data = base64.b64encode(encryptor.update(padded) + encryptor.finalize()).decode()
+
+    assert ewelink.read_params(_announcement(data, IV, encrypted=True), DEVICE_KEY) == (
+        {"fwVersion": "1.3\ufffd"},
+        None,
+    )

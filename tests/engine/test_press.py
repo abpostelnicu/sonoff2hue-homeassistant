@@ -1,10 +1,12 @@
-"""Tests of press detection; ports of the .NET app's PressDetectorTests."""
+"""Tests of press detection: the decisions on a device's broadcasts, the tracker of every device, and summaries."""
 
 from datetime import UTC, datetime
 import json
 from typing import Any
 
-from custom_components.sonoff2hue.engine import ewelink, jsonnode
+import pytest
+
+from custom_components.sonoff2hue.engine import ewelink
 from custom_components.sonoff2hue.engine.config import EngineConfig, SwitchSettings
 from custom_components.sonoff2hue.engine.ewelink import EwelinkAnnouncement
 from custom_components.sonoff2hue.engine.press import (
@@ -55,8 +57,9 @@ def minir4m_json(
     }
 
 
-def minir4m(**kwargs: Any) -> dict[str, jsonnode.JsonValue]:
-    params = jsonnode.parse(json.dumps(minir4m_json(**kwargs)))
+def minir4m(**kwargs: Any) -> dict[str, Any]:
+    """:func:`minir4m_json` as the tracker reads it from a broadcast."""
+    params = json.loads(json.dumps(minir4m_json(**kwargs)))
     assert isinstance(params, dict)
     return params
 
@@ -142,18 +145,151 @@ def test_without_sequence_falls_back_to_payload_changes() -> None:
     assert detector.process(at(None, data="bbb", iv="2"), None).kind == Kind.PRESS
 
 
+def test_a_duplicate_supplies_the_params_that_the_baseline_lacked() -> None:
+    detector = PressDetector()
+    detector.process(at(5), None)
+
+    assert detector.process(at(5), minir4m(relay="on")).kind == Kind.DUPLICATE
+    relay = detector.process(at(6), minir4m(relay="off"))
+
+    assert (relay.kind, relay.detail) == (Kind.RELAY_CHANGED, "relay 0 on -> off")
+
+
+def test_without_previous_params_a_new_sequence_is_a_press() -> None:
+    detector = PressDetector()
+    detector.process(at(5), None)
+
+    assert detector.process(at(6), minir4m(relay="off")).kind == Kind.PRESS
+    assert detector.process(at(7), minir4m(relay="on")).kind == Kind.RELAY_CHANGED
+
+
+def test_a_missing_sequence_after_a_known_one_compares_payloads() -> None:
+    detector = PressDetector()
+    detector.process(at(5, data="aaa"), None)  # the payload "aaa5"
+
+    assert detector.process(at(None, data="aaa5"), None).kind == Kind.DUPLICATE
+    assert detector.process(at(None, data="bbb"), None).kind == Kind.PRESS
+    assert detector.process(at(None, data="bbb"), None).kind == Kind.DUPLICATE
+    # A seq after a broadcast without one has only the payload to compare with.
+    assert detector.process(at(6, data="aaa"), None).kind == Kind.PRESS
+
+
+def test_a_single_channel_relay_change_is_not_a_press() -> None:
+    detector = PressDetector()
+    detector.process(at(1), {"switch": "on"})
+
+    relay = detector.process(at(2), {"switch": "off"})
+
+    assert (relay.kind, relay.detail) == (Kind.RELAY_CHANGED, "relay on -> off")
+
+
+def test_relay_states_compare_without_regard_to_case() -> None:
+    detector = PressDetector()
+    detector.process(at(1), {"switches": [{"outlet": 0, "switch": "on"}]})
+
+    assert detector.process(at(2), {"switches": [{"outlet": 0, "switch": "ON"}]}).kind == Kind.PRESS
+    # An outlet that only one broadcast has doesn't count either.
+    assert detector.process(at(3), {"switches": [{"outlet": 1, "switch": "off"}]}).kind == Kind.PRESS
+
+
+def test_settings_changes_list_every_changed_setting_in_order() -> None:
+    detector = PressDetector()
+    detector.process(at(1), {"swMode": 3, "lock": 0, "sledOnline": "on"})
+
+    settings = detector.process(at(2), {"swMode": 2, "lock": 0, "sledOnline": "off", "rssi": -50})
+
+    assert (settings.kind, settings.detail) == (Kind.SETTINGS_CHANGED, "sledOnline, swMode")
+
+
+@pytest.mark.parametrize(
+    ("before", "after"),
+    [
+        ({"lock": 1}, {"lock": True}),
+        ({"pulseWidth": 500}, {"pulseWidth": 500.0}),
+        ({"configure": [{"a": 1, "b": 2}]}, {"configure": [{"b": 2, "a": 1}]}),
+        ({}, {"lock": 1}),
+        ({"lock": 1}, {}),
+    ],
+)
+def test_settings_compare_as_python_compares_them(before: dict[str, Any], after: dict[str, Any]) -> None:
+    detector = PressDetector()
+    detector.process(at(1), before)
+
+    assert detector.process(at(2), after).kind == Kind.PRESS
+
+
+@pytest.mark.parametrize(
+    ("separation", "detached"),
+    [
+        (1, True),
+        (0, False),
+        (2, False),
+        ("1", True),
+        (" 0 ", False),
+        ("\u0661", True),
+        (True, None),
+        (1.0, None),
+        ("x", None),
+    ],
+)
+def test_detached_mode_reads_relay_separation_as_a_whole_number(separation: Any, detached: bool | None) -> None:
+    detector = PressDetector()
+
+    detector.process(at(1), {"relaySeparation": separation})
+
+    assert detector.is_detached is detached
+
+
+def test_detached_mode_stays_as_it_was_when_a_payload_doesnt_say() -> None:
+    detector = PressDetector()
+    detector.process(at(1), {"relaySeparation": 1})
+
+    detector.process(at(2), None)
+    detector.process(at(3), {"switch": "on"})
+
+    assert detector.is_detached is True
+
+
 def test_summarize_shows_relay_and_diagnostics() -> None:
     summary = summarize(minir4m(relay="on", rssi=-75, trigger_type=17))
 
     assert summary == "relay0=on relaySeparation=1 swMode=3 triggerType=17 rssi=-75 fwVersion=1.3.1"
     assert summarize(None) == "payload not decoded"
+    assert summarize({}) == ""
 
 
-def test_summarize_writes_values_as_system_text_json_does() -> None:
-    params = jsonnode.parse('{"switch":"on","fwVersion":"<1.0 & ä>","rssi":-7.50,"swMode":true}')
-    assert isinstance(params, dict)
+def test_summarize_orders_relays_by_outlet() -> None:
+    params: dict[str, Any] = {
+        "switches": [
+            {"outlet": "2", "switch": "on"},
+            {"switch": "off"},  # no outlet: its place in the list, 1
+            {"outlet": 1.5, "switch": "off"},  # not a whole number: its place, 2, so it replaces outlet 2
+            {"outlet": True, "switch": "on"},
+            {"outlet": 0},
+            "on",
+        ],
+        "switch": "on",
+    }
 
-    assert summarize(params) == "relay=on swMode=true rssi=-7.50 fwVersion=\\u003C1.0 \\u0026 \\u00E4\\u003E"
+    assert summarize(params) == "relay=on relay1=off relay2=off relay3=on"
+
+
+def test_summarize_writes_values_as_json_does() -> None:
+    params = json.loads(
+        '{"switch":"o\\nn","fwVersion":"<1.0 & \u00e4 \\"q\\">","rssi":-7.50,"swMode":true,"triggerType":null,'
+        '"relaySeparation":[1]}'
+    )
+
+    assert summarize(params) == 'relay=o\\nn swMode=true rssi=-7.5 fwVersion=<1.0 & \\u00e4 \\"q\\">'
+
+
+def test_relay_changes_are_written_as_json_writes_them() -> None:
+    detector = PressDetector()
+    detector.process(at(1), {"switch": "on"})
+
+    relay = detector.process(at(2), {"switch": "\u00f6ff\n"})
+
+    assert relay.detail == "relay on -> \\u00f6ff\\n"
 
 
 def test_tracker_probe_from_rebooted_device_rebaselines() -> None:
