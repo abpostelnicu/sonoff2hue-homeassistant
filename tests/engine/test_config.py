@@ -61,7 +61,7 @@ def test_a_device_id_is_configured_once_without_regard_to_case() -> None:
 def test_blank_values_are_empty_or_white_space() -> None:
     config = EngineConfig(
         HueSettings(bridge_ip="\x1c", app_key="\u3000"),
-        [SwitchSettings(" ", lights=["\x1f", None]), SwitchSettings("1000abcdef", "\x1e", groups=["\ufeff"])],
+        [SwitchSettings(" ", lights=["\x1f", ""]), SwitchSettings("1000abcdef", "\x1e", groups=["\ufeff"])],
     )
 
     with pytest.raises(ConfigError) as err:

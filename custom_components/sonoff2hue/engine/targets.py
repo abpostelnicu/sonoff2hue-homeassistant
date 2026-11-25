@@ -17,21 +17,21 @@ type GroupKind = Literal["room", "zone"]
 GROUP_KINDS: tuple[GroupKind, ...] = ("room", "zone")
 
 
-def name_key(value: str | None) -> str:
-    """A name or id as entries are compared with it: stripped and casefolded. ``None`` is empty."""
-    return "" if value is None else value.strip().casefold()
+def name_key(value: str) -> str:
+    """A name or id as entries are compared with it: stripped and casefolded."""
+    return value.strip().casefold()
 
 
-def refers_to(entry: str | None, resource_id: str, name: str) -> bool:
+def refers_to(entry: str, resource_id: str, name: str) -> bool:
     """Whether an entry names the resource with this id or name. An empty entry names nothing."""
     key = name_key(entry)
     return key != "" and key in (name_key(resource_id), name_key(name))
 
 
-def split_kind(entry: str | None) -> tuple[GroupKind | None, str]:
+def split_kind(entry: str) -> tuple[GroupKind | None, str]:
     """A ``groups`` entry as its ``room:`` or ``zone:`` prefix, in any case, or ``None`` without one, and the name or id,
     both stripped."""
-    value = "" if entry is None else entry.strip()
+    value = entry.strip()
     for kind in GROUP_KINDS:
         prefix = f"{kind}:"
         if value[: len(prefix)].casefold() == prefix:
@@ -43,12 +43,12 @@ def resolve(
     settings: SwitchSettings, lights: Sequence[HueLight], groups: Sequence[HueGroup], errors: list[str]
 ) -> list[HueTarget]:
     """The targets of a switch, each once. An entry that matches no resource, or several, adds a message to ``errors``
-    with the names it could mean; so does a room or zone without lights. A ``None`` entry, which ``validate_for_run``
-    refuses, is an empty name, which matches nothing."""
+    with the names it could mean; so does a room or zone without lights. An empty entry, which ``validate_for_run``
+    refuses, matches nothing."""
     name = settings.display_name
     targets: list[HueTarget] = []
     for entry in settings.lights:
-        reference = "" if entry is None else entry.strip()
+        reference = entry.strip()
         matches = [light for light in lights if refers_to(reference, light.id, light.name)]
         if len(matches) == 1:
             targets.append(HueTarget(HueTargetKind.LIGHT, matches[0].id, matches[0].name))
@@ -60,7 +60,7 @@ def resolve(
             errors.append(f"{name}: {len(matches)} lights are named '{reference}'; use the light id instead ({ids}).")
 
     for entry in settings.groups:
-        raw = "" if entry is None else entry.strip()
+        raw = entry.strip()
         kind, reference = split_kind(raw)
         found = [
             group

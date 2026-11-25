@@ -4,8 +4,9 @@ PyYAML reads the text, with its C loader when it was built with libyaml. Null is
 ``yes``, ``0x10``, ``010``, ``1e3`` and ``2001-12-14`` stay the text written, as every setting is text. The text is
 refused, in this order, for what PyYAML can't read; for a second document, a tag other than ``!!str`` on a value or
 nesting deeper than ``_MAX_DEPTH``; for a key that isn't a single value or that its mapping repeats; for what doesn't fit
-the probatio schema of the settings; and for an empty entry of ``switches``. Each message names the first such problem
-in the text, at its line and column, which the composed node tree gives the schema's errors too.
+the probatio schema of the settings, such as an empty entry of ``lights`` or ``groups``; and for an empty entry of
+``switches``. Each message names the first such problem in the text, at its line and column, which the composed node
+tree gives the schema's errors too.
 """
 
 from collections.abc import Sequence
@@ -55,7 +56,7 @@ class _Mark(Protocol):
 
 
 _TEXT: Final = vol.Maybe(str)
-_TEXTS: Final = vol.Maybe([_TEXT])
+_TEXTS: Final = vol.Maybe([str])
 _HUE_FIELDS: Final = dict.fromkeys(("bridgeIp", "bridgeId", "appKey", "certificateSha256"), _TEXT)
 _SWITCH_FIELDS: Final = {"name": _TEXT, "deviceId": _TEXT, "deviceKey": _TEXT, "lights": _TEXTS, "groups": _TEXTS}
 
@@ -184,7 +185,16 @@ def _problem(root: yaml.Node, error: vol.Invalid) -> tuple[yaml.Node, str]:
             return _node_at(root, error.path), "expected 'key: value' lines here."
         case vol.SequenceTypeInvalid():
             return _node_at(root, error.path), "expected a list here: '- item' lines, or [a, b]."
-    return _node_at(root, error.path), _SINGLE_VALUE  # where the schema expected str
+    node = _node_at(root, error.path)
+    if node.tag == _NULL:  # only an entry of 'lights' or 'groups' can't be null
+        return node, _empty_entry(error.path[-2])
+    return node, _SINGLE_VALUE  # where the schema expected str
+
+
+def _empty_entry(field: str) -> str:
+    """The problem with an empty entry of ``lights`` or ``groups``."""
+    what = "light's" if field == "lights" else "room's or zone's"
+    return f"an entry of '{field}' is empty. Write the {what} name or id, or remove the '-'."
 
 
 def _node_at(root: yaml.Node, path: Sequence[Any], *, key: bool = False) -> yaml.Node:

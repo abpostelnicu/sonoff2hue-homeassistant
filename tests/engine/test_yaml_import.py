@@ -182,16 +182,25 @@ def test_null_values_of_a_switch_are_empty() -> None:
     assert config.switches == [SwitchSettings(device_id="", lights=[], groups=[]), SwitchSettings()]
 
 
-def test_a_null_light_or_group_stays_and_the_run_refuses_it() -> None:
-    config = parse(
-        "switches:\n  - name: Hall\n    deviceId: 1000abcdef\n    lights: [Ceiling, ~]\n    groups: [null]\n"
-    )
+EMPTY_LIGHT = "an entry of 'lights' is empty. Write the light's name or id, or remove the '-'."
+EMPTY_GROUP = "an entry of 'groups' is empty. Write the room's or zone's name or id, or remove the '-'."
 
-    (switch,) = config.switches
-    assert (switch.lights, switch.groups) == (["Ceiling", None], [None])
-    with pytest.raises(ConfigError) as error:
-        config.validate_for_run()
-    assert "switches[0] ('Hall'): empty light/group name." in str(error.value)
+
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        (
+            "switches:\n  - deviceId: 1000abcdef\n    lights:\n      - Ceiling\n      -\n",
+            f"line 5, column 8: {EMPTY_LIGHT}",
+        ),
+        ("switches:\n  - deviceId: 1000abcdef\n    lights:\n      - ~\n", f"line 4, column 9: {EMPTY_LIGHT}"),
+        ("switches:\n  - deviceId: 1000abcdef\n    lights: [Ceiling, null]\n", f"line 3, column 23: {EMPTY_LIGHT}"),
+        ("switches:\n  - deviceId: 1000abcdef\n    groups: [room:Hall, ~]\n", f"line 3, column 25: {EMPTY_GROUP}"),
+    ],
+    ids=["a dash alone", "a null", "in a flow list", "a group"],
+)
+def test_an_empty_light_or_group_is_refused_where_it_is(text: str, message: str) -> None:
+    assert error_of(text) == f"Config, {message}"
 
 
 @pytest.mark.parametrize(
@@ -338,8 +347,9 @@ def test_a_value_of_the_wrong_kind_is_refused_where_it_is(text: str, message: st
             "switchs: []\nhue: [192.0.2.20]\nswitches:\n  - deviceId: a\n    lights: Ceiling\n",
             f"line 1, column 1: unknown key 'switchs' at the top level. {TOP_KEYS}",
         ),
+        ("switches:\n  - groups: [~]\n    lights: Ceiling\n", f"line 2, column 14: {EMPTY_GROUP}"),
     ],
-    ids=["in a switch", "in hue", "at the top level"],
+    ids=["in a switch", "in hue", "at the top level", "an empty entry"],
 )
 def test_of_several_problems_of_the_shape_the_first_in_the_text_is_reported(text: str, message: str) -> None:
     assert error_of(text) == f"Config, {message}"

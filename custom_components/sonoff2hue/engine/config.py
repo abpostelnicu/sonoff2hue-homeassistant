@@ -33,10 +33,9 @@ class SwitchSettings:
     device_key: str | None = None
     """The optional eWeLink device key. It lets the engine decrypt the broadcasts and ignore relay toggles and setting
     changes; without it, every new broadcast counts as a press."""
-    lights: Sequence[str | None] = field(default_factory=list)
-    """Hue lights, by name or resource id. An imported ``sonoff2hue.yaml`` can hold a null entry (``- ~``), which
-    ``validate_for_run`` reports as an empty name."""
-    groups: Sequence[str | None] = field(default_factory=list)
+    lights: Sequence[str] = field(default_factory=list)
+    """Hue lights, by name or resource id."""
+    groups: Sequence[str] = field(default_factory=list)
     """Hue rooms or zones, by name or resource id, optionally prefixed with ``room:`` or ``zone:``."""
 
     @property

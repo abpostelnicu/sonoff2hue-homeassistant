@@ -168,8 +168,8 @@ def switch(
     device_id: str = DEVICE_ID,
     name: str | None = "Hall",
     *,
-    lights: list[str | None] | None = None,
-    groups: list[str | None] | None = None,
+    lights: list[str] | None = None,
+    groups: list[str] | None = None,
     key: str | None = None,
 ) -> ConfigSubentryData:
     """A ``switch`` subentry, as the switch flow and the import store it."""

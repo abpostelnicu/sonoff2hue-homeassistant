@@ -44,8 +44,8 @@ def test_a_light_resolves_by_name_or_id_without_regard_to_case(entry: str, item:
     assert resolved.item is item
 
 
-@pytest.mark.parametrize("entry", ["Garage", "Hall", "", " ", None])
-def test_an_entry_that_names_no_light_is_missing(entry: str | None) -> None:
+@pytest.mark.parametrize("entry", ["Garage", "Hall", "", " "])
+def test_an_entry_that_names_no_light_is_missing(entry: str) -> None:
     assert picker.resolve_light(entry, [HALLWAY, DESK, Item("l3", "")]) == Resolution("missing", count=0)
 
 
@@ -87,7 +87,7 @@ def test_a_room_and_a_zone_that_share_a_name_need_a_prefix() -> None:
 
 
 def test_a_group_resolves_by_name_or_id_within_its_prefix() -> None:
-    def resolve(entry: str | None) -> Resolution:
+    def resolve(entry: str) -> Resolution:
         return picker.resolve_group(entry, RESOURCES.rooms, RESOURCES.zones)
 
     assert (resolve("study").item, resolve("study").kind) == (STUDY, "room")
@@ -95,7 +95,7 @@ def test_a_group_resolves_by_name_or_id_within_its_prefix() -> None:
     assert resolve("room:z2").item is None
     assert resolve("zone:Study") == Resolution("missing", count=0)
     assert resolve("room:") == Resolution("missing", count=0)
-    assert resolve(None) == Resolution("missing", count=0)
+    assert resolve("") == Resolution("missing", count=0)
 
 
 # Encoding the resources chosen
@@ -144,7 +144,7 @@ def test_create_selection_resolves_the_current_entries() -> None:
 
 def test_create_selection_without_entries() -> None:
     assert picker.create_selection(RESOURCES).entries == []
-    assert picker.create_selection(RESOURCES, [], None).light == set()
+    assert picker.create_selection(RESOURCES, [], []).light == set()
 
 
 def test_entries_keep_their_spelling_and_new_choices_are_encoded() -> None:
@@ -219,8 +219,7 @@ def test_new_choices_follow_the_order_of_the_resources() -> None:
         ("\ufeff", ["\ufeff"]),
         (",, ,", []),
         ("", []),
-        (None, []),
     ],
 )
-def test_split_list(text: str | None, values: list[str]) -> None:
+def test_split_list(text: str, values: list[str]) -> None:
     assert picker.split_list(text) == values

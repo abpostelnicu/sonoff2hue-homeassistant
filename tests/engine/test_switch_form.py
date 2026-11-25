@@ -179,7 +179,7 @@ def test_typed_entries_round_trip() -> None:
 
     assert text == "Ceiling, room:Hallway"
     assert picker.split_list(text) == ["Ceiling", "room:Hallway"]
-    assert switch_form.join_list(None) == ""
+    assert switch_form.join_list([]) == ""
 
 
 # The switch rules' errors on the form's fields

@@ -49,14 +49,13 @@ type Errors = dict[str, list[str]]
 
 @dataclass(slots=True)
 class SwitchInput:
-    """A switch as the form gives it. ``device_key``: ``None`` keeps the current key, ``""`` removes it. An entry of
-    ``lights`` or ``groups`` is ``None`` for a resource without an id, and counts as an empty entry."""
+    """A switch as the form gives it. ``device_key``: ``None`` keeps the current key, ``""`` removes it."""
 
     name: str | None = None
     device_id: str | None = None
     device_key: str | None = None
-    lights: Sequence[str | None] | None = None
-    groups: Sequence[str | None] | None = None
+    lights: Sequence[str] = ()
+    groups: Sequence[str] = ()
 
 
 class SwitchError(Exception):
@@ -140,10 +139,10 @@ def validate(switch: SwitchInput) -> tuple[Errors, SwitchSettings]:
     return errors, settings
 
 
-def _clean_references(values: Sequence[str | None] | None, field: str, errors: Errors) -> list[str]:
+def _clean_references(values: Sequence[str], field: str, errors: Errors) -> list[str]:
     """The entries, stripped, each once: the first of those that are equal without regard to case. The limits are
     checked before duplicates are removed."""
-    cleaned = [(value or "").strip() for value in values or []]
+    cleaned = [value.strip() for value in values]
     if len(cleaned) > MAX_REFERENCES:
         errors[field] = [f"Use at most {MAX_REFERENCES} entries."]
     elif any(not value or len(value) > MAX_REFERENCE_LENGTH or _has_control_characters(value) for value in cleaned):

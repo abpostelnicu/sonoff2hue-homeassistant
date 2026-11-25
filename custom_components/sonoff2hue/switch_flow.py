@@ -135,12 +135,6 @@ def _switches_by_subentry(entry: Sonoff2HueConfigEntry) -> dict[str, SwitchSetti
     return dict(zip(subentry_ids, config_from_entry(entry).switches, strict=True))
 
 
-def _texts(values: Sequence[str | None]) -> list[str]:
-    """Entries as text. An imported ``sonoff2hue.yaml`` can hold a null entry, which is an empty entry here: one that
-    doesn't match the bridge."""
-    return ["" if value is None else value for value in values]
-
-
 def _last_press(device: LanDevice) -> float:
     """When the device last reported a press, as a timestamp; 0 when it hasn't."""
     return 0.0 if device.last_press_at is None else device.last_press_at.timestamp()
@@ -264,8 +258,8 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
         self._load_error = ""
         """Why the bridge's lights, rooms and zones couldn't be listed."""
         self._selection = Selection()
-        self._lights: Sequence[str | None] = []
-        self._groups: Sequence[str | None] = []
+        self._lights: list[str] = []
+        self._groups: list[str] = []
         self._values: dict[str, Any] = {}
         """What the form was given, which it suggests when it is shown again."""
         self._body: SwitchInput | None = None
@@ -543,7 +537,7 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
             self._load_error = str(err)
             return await self.async_step_lights_unavailable()
         self._resources = resources
-        self._selection = picker.create_selection(resources, _texts(self._lights), _texts(self._groups))
+        self._selection = picker.create_selection(resources, self._lights, self._groups)
         return self._show_settings()
 
     async def async_step_pair_first(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
@@ -559,8 +553,8 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
     async def async_step_typed(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         """The lights, rooms and zones by hand, as names, ids and ``room:``/``zone:`` entries separated by commas."""
         self._resources = None
-        self._values[LIGHT_NAMES] = switch_form.join_list(_texts(self._lights))
-        self._values[GROUP_NAMES] = switch_form.join_list(_texts(self._groups))
+        self._values[LIGHT_NAMES] = switch_form.join_list(self._lights)
+        self._values[GROUP_NAMES] = switch_form.join_list(self._groups)
         return self._show_settings()
 
     def _unresolved(self) -> list[int]:
@@ -646,7 +640,7 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
         else:
             self._values[LIGHT_NAMES] = lights = user_input.get(LIGHT_NAMES, "")
             self._values[GROUP_NAMES] = groups = user_input.get(GROUP_NAMES, "")
-            self._lights, self._groups = [*picker.split_list(lights)], [*picker.split_list(groups)]
+            self._lights, self._groups = picker.split_list(lights), picker.split_list(groups)
         mode = self._key_mode()
         key = keys.get(NEW_DEVICE_KEY if self._has_key else DEVICE_KEY, "")
         return switch_form.form_input(name, self._device_id, mode, key, self._lights, self._groups)

@@ -33,8 +33,8 @@ def grouped(resource: HueGroup) -> HueTarget:
 
 
 def run(
-    lights: list[str | None] | None = None,
-    groups: list[str | None] | None = None,
+    lights: list[str] | None = None,
+    groups: list[str] | None = None,
     *,
     name: str | None = "Hall",
     bridge_lights: list[HueLight] = LIGHTS,
@@ -172,12 +172,11 @@ def test_every_entry_that_does_not_resolve_is_reported() -> None:
     ]
 
 
-def test_empty_and_null_entries_match_nothing() -> None:
-    """``validate_for_run`` refuses them first; here they are empty names, which match nothing, not even a light with an
-    empty name."""
+def test_empty_entries_match_nothing() -> None:
+    """``validate_for_run`` refuses them first; here they match nothing, not even a light with an empty name."""
     nameless = HueLight("l9", "", False)
 
-    targets, errors = run([None, " "], [None], bridge_lights=[nameless])
+    targets, errors = run(["", " "], ["\u3000"], bridge_lights=[nameless])
 
     assert targets == []
     assert errors == [
@@ -204,12 +203,9 @@ def test_empty_and_null_entries_match_nothing() -> None:
         ("light:x", (None, "light:x")),
         (" Kitchen ", (None, "Kitchen")),
         ("", (None, "")),
-        (None, (None, "")),
     ],
 )
-def test_split_kind_takes_a_room_or_zone_prefix_in_any_case(
-    entry: str | None, expected: tuple[str | None, str]
-) -> None:
+def test_split_kind_takes_a_room_or_zone_prefix_in_any_case(entry: str, expected: tuple[str | None, str]) -> None:
     assert split_kind(entry) == expected
 
 
@@ -223,10 +219,9 @@ def test_split_kind_takes_a_room_or_zone_prefix_in_any_case(
         ("l1", "l1", "", True),
         ("", "", "", False),
         (" ", "l1", " ", False),
-        (None, "l1", "", False),
     ],
 )
 def test_an_entry_refers_to_a_resource_by_its_id_or_its_name(
-    entry: str | None, resource_id: str, name: str, expected: bool
+    entry: str, resource_id: str, name: str, expected: bool
 ) -> None:
     assert refers_to(entry, resource_id, name) is expected

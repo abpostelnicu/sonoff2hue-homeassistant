@@ -131,9 +131,7 @@ def https_hue(fake_hue: FakeHueHost, monkeypatch: pytest.MonkeyPatch) -> FakeHue
 # The config entry and its switches.
 
 
-def switch(
-    device_id: str, name: str | None, *, key: str | None = None, **lists: list[str | None]
-) -> ConfigSubentryData:
+def switch(device_id: str, name: str | None, *, key: str | None = None, **lists: list[str]) -> ConfigSubentryData:
     """A switch subentry as the import of a ``sonoff2hue.yaml`` writes it: the values as given, the normalized device
     id as its unique id, and its name, or that id, as its title."""
     normalized = SwitchSettings(device_id).normalized_device_id
@@ -916,7 +914,7 @@ async def test_the_picker_lists_names_states_and_rooms_without_lights(hass: Home
 
 async def test_entries_that_dont_match_the_bridge_are_kept_until_removed(hass: HomeAssistant, hue: HueBridge) -> None:
     hue.resources["light"].append(light("l4", "Ceiling"))
-    hall = switch(DEVICE, "Hall", lights=["Kitchen", "Hallway", "ceiling"], groups=["room:Attic", "Living room", None])
+    hall = switch(DEVICE, "Hall", lights=["Kitchen", "Hallway", "ceiling"], groups=["room:Attic", "Living room"])
     entry = await loaded(hass, hall)
 
     result = await settings_for(hass, entry, DEVICE, edit=DEVICE)
@@ -926,9 +924,8 @@ async def test_entries_that_dont_match_the_bridge_are_kept_until_removed(hass: H
         ("0", "Kitchen — not found on the bridge"),
         ("2", "ceiling — matches 2 lights"),
         ("3", "room:Attic — not found on the bridge"),
-        ("5", " — not found on the bridge"),
     ]
-    assert suggested(result, "unresolved") == ["0", "2", "3", "5"]
+    assert suggested(result, "unresolved") == ["0", "2", "3"]
     assert (mode(result, "unresolved"), mode(result, "lights")) == ("dropdown", None)
     assert suggested(result, "lights") == ["3"]
     result = await go(hass, result, form(unresolved=["0", "3"], lights=["3"], rooms=["0"]))
@@ -1083,7 +1080,7 @@ async def test_a_new_switch_may_have_a_key(hass: HomeAssistant) -> None:
 async def test_lights_can_be_typed_and_saved_without_checking_while_the_bridge_is_down(
     hass: HomeAssistant, hue: HueBridge
 ) -> None:
-    entry = await loaded(hass, switch(DEVICE, "Hall", lights=["Ceiling", None], groups=["room:Living room"]))
+    entry = await loaded(hass, switch(DEVICE, "Hall", lights=["Ceiling"], groups=["room:Living room"]))
     hue.fail("/clip/v2/resource/light", 503)
     result = await choose(hass, await start(hass, entry, DEVICE), "keep")
 
@@ -1098,7 +1095,7 @@ async def test_lights_can_be_typed_and_saved_without_checking_while_the_bridge_i
 
     assert (result["type"], result["step_id"]) == (FlowResultType.FORM, "settings")
     assert field_names(result) == ["name", "light_names", "group_names", "advanced"]
-    assert (suggested(result, "light_names"), suggested(result, "group_names")) == ("Ceiling, ", "room:Living room")
+    assert (suggested(result, "light_names"), suggested(result, "group_names")) == ("Ceiling", "room:Living room")
     result = await go(hass, result, form(light_names=" Ceiling ,, Kitchen", group_names="zone:Downstairs"))
 
     assert (result["type"], result["step_id"], result["menu_options"]) == (

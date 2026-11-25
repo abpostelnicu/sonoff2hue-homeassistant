@@ -91,7 +91,7 @@ class Targets:
     groups: list[str]
 
 
-def resolve_light(entry: str | None, lights: Sequence[Resource]) -> Resolution:
+def resolve_light(entry: str, lights: Sequence[Resource]) -> Resolution:
     """A ``lights`` entry, by name or id, against the bridge's lights."""
     found = [light for light in lights if refers_to(entry, light.id, light.name)]
     if len(found) == 1:
@@ -99,7 +99,7 @@ def resolve_light(entry: str | None, lights: Sequence[Resource]) -> Resolution:
     return Resolution("ambiguous" if found else "missing", count=len(found))
 
 
-def resolve_group(entry: str | None, rooms: Sequence[Resource], zones: Sequence[Resource]) -> Resolution:
+def resolve_group(entry: str, rooms: Sequence[Resource], zones: Sequence[Resource]) -> Resolution:
     """A ``groups`` entry (``room:<name>``, ``zone:<name>``, a name or an id) against the rooms and zones."""
     kind, reference = split_kind(entry)
     candidates: list[tuple[GroupKind, Resource]] = [
@@ -131,19 +131,17 @@ def encode_group(kind: GroupKind, group: Resource, groups: Sequence[Resource]) -
     return group.id
 
 
-def create_selection(
-    resources: Resources, lights: Sequence[str] | None = None, groups: Sequence[str] | None = None
-) -> Selection:
+def create_selection(resources: Resources, lights: Sequence[str] = (), groups: Sequence[str] = ()) -> Selection:
     """The picker's selection for a switch's current ``lights`` and ``groups``."""
     selection = Selection()
-    for value in lights or []:
+    for value in lights:
         resolved = resolve_light(value, resources.lights)
         if resolved.status == "ok" and resolved.item is not None:
             selection.entries.append(Entry("lights", value, "ok", kind="light", id=resolved.item.id))
             selection.light.add(resolved.item.id)
         else:
             selection.entries.append(Entry("lights", value, resolved.status, count=resolved.count))
-    for value in groups or []:
+    for value in groups:
         resolved = resolve_group(value, resources.rooms, resources.zones)
         if resolved.status == "ok" and resolved.item is not None and resolved.kind is not None:
             selection.entries.append(Entry("groups", value, "ok", kind=resolved.kind, id=resolved.item.id))
@@ -184,6 +182,6 @@ def selection_to_config(selection: Selection, resources: Resources) -> Targets:
     return result
 
 
-def split_list(text: str | None) -> list[str]:
+def split_list(text: str) -> list[str]:
     """Typed entries separated by commas, stripped, without empty ones."""
-    return [value for value in (part.strip() for part in (text or "").split(",")) if value]
+    return [value for value in (part.strip() for part in text.split(",")) if value]

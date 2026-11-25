@@ -469,10 +469,9 @@ def test_a_device_key_has_at_most_128_characters_without_white_space_or_control_
         ("Ceil\x85ing", False),
         ("", False),
         (" \u2028", False),
-        (None, False),
     ],
 )
-def test_an_entry_has_1_to_200_characters_without_control_characters(entry: str | None, valid: bool) -> None:
+def test_an_entry_has_1_to_200_characters_without_control_characters(entry: str, valid: bool) -> None:
     assert validate(lights=["Desk", entry])[0] == ({} if valid else {"lights": BAD_ENTRY})
     assert validate(lights=[], groups=[entry])[0] == ({} if valid else {"groups": BAD_ENTRY})
 
@@ -490,13 +489,12 @@ def test_a_list_has_at_most_50_entries_counted_before_duplicates_are_removed() -
 
 def test_a_switch_needs_at_least_one_light_room_or_zone() -> None:
     assert validate(lights=[], groups=[])[0] == NO_TARGET
-    assert validate(lights=None, groups=None)[0] == NO_TARGET
     assert validate(lights=[], groups=["room:Hallway"])[0] == {}
-    assert validate(lights=[None], groups=[" "])[0] == {"lights": BAD_ENTRY, "groups": BAD_ENTRY}
+    assert validate(lights=[""], groups=[" "])[0] == {"lights": BAD_ENTRY, "groups": BAD_ENTRY}
 
 
 def test_the_errors_come_in_the_order_of_the_fields() -> None:
-    errors, _ = switch_rules.validate(SwitchInput("x" * 65, "abc", "a key", ["x" * 201], [None]))
+    errors, _ = switch_rules.validate(SwitchInput("x" * 65, "abc", "a key", ["x" * 201], [""]))
     assert list(errors) == ["name", "deviceId", "deviceKey", "lights", "groups"]
 
     errors, _ = switch_rules.validate(SwitchInput("Hall\x07", "", "a key", [], []))

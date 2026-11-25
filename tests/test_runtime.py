@@ -150,7 +150,7 @@ async def check_texts(hass: HomeAssistant, issue: ir.IssueEntry) -> None:
 
 def test_the_configuration_is_the_entrys_data_and_its_switches_as_stored() -> None:
     entry = paired(
-        switch(" 1000ABCDEF ", None, lights=[" ceiling ", None], groups=["room:Hall"], key=DEVICE_KEY),
+        switch(" 1000ABCDEF ", None, lights=[" ceiling "], groups=["room:Hall"], key=DEVICE_KEY),
         ConfigSubentryData(data={}, subentry_type="other", title="Other", unique_id=None),
         switch(OTHER_DEVICE_ID, "Desk", lights=["Desk"]),
         ConfigSubentryData(data={CONF_DEVICE_ID: None}, subentry_type=SUBENTRY_SWITCH, title="", unique_id=None),
@@ -159,7 +159,7 @@ def test_the_configuration_is_the_entrys_data_and_its_switches_as_stored() -> No
     assert config_from_entry(entry) == EngineConfig(
         HueSettings(BRIDGE_ADDRESS, BRIDGE_ID, APP_KEY, PIN),
         [
-            SwitchSettings(" 1000ABCDEF ", None, DEVICE_KEY, [" ceiling ", None], ["room:Hall"]),
+            SwitchSettings(" 1000ABCDEF ", None, DEVICE_KEY, [" ceiling "], ["room:Hall"]),
             SwitchSettings(OTHER_DEVICE_ID, "Desk", None, ["Desk"], []),
             SwitchSettings("", None, None, [], []),
         ],
@@ -825,7 +825,7 @@ async def test_a_changed_certificate_raises_an_issue_until_the_bridge_is_paired_
 async def test_an_unexpected_configuration_problem_shows_its_message(
     hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
 ) -> None:
-    entry = paired(switch(lights=[None]))
+    entry = paired(switch(lights=[" "]))
     await start(hass, entry)
     await tick(freezer, 0.5)
 

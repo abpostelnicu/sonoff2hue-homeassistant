@@ -92,8 +92,8 @@ def form_input(
     device_id: str,
     key_mode: KeyMode,
     key_text: str,
-    lights: Sequence[str | None],
-    groups: Sequence[str | None],
+    lights: Sequence[str],
+    groups: Sequence[str],
 ) -> SwitchInput:
     """The switch the form gives the rules, from its inputs: the name stripped, or ``None`` if empty."""
     return SwitchInput(
@@ -101,9 +101,9 @@ def form_input(
     )
 
 
-def join_list(values: Sequence[str] | None) -> str:
+def join_list(values: Sequence[str]) -> str:
     """The typed entries' first text, when the bridge's lights can't be listed."""
-    return ", ".join(values or [])
+    return ", ".join(values)
 
 
 def form_problems(
