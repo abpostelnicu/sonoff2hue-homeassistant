@@ -1,38 +1,27 @@
-"""The logbook's entries for presses and their outcomes (decision 26): the runner's log lines, in Home Assistant's logbook
-and on the switch's device."""
+"""The logbook (decision 26): Home Assistant's own entries for each press, the switch's Press and its Last action, and
+nothing for the runtime's bus events, in the real logbook on the recorder and on the switch's device page."""
 
-from collections.abc import Callable
 from typing import Any
 
 from freezegun.api import FrozenDateTimeFactory
-from homeassistant.components.logbook.models import LazyEventPartialState, async_event_to_row
 from homeassistant.components.recorder import Recorder
-from homeassistant.core import Event, HomeAssistant, callback
-from homeassistant.helpers import device_registry as dr
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
 import pytest
-from pytest_homeassistant.common import mock_component
+from pytest_homeassistant.common import async_capture_events, mock_component
 from pytest_homeassistant.components.recorder.common import async_wait_recording_done
 from pytest_homeassistant.typing import WebSocketGenerator
 
-from custom_components.sonoff2hue import logbook
 from custom_components.sonoff2hue.const import DOMAIN, EVENT_PRESS, EVENT_TOGGLE
 from custom_components.sonoff2hue.engine import toggler
-from custom_components.sonoff2hue.engine.status import PRESS_DROPPED
-from custom_components.sonoff2hue.runtime import INTEGRATION_LOGGER
 
-from .fakes import BRIDGE_ID, DEVICE_ID, OTHER_DEVICE_ID, Bridge, Lan, paired, switch
-from .test_runtime import HALL, settle, start, subentry_of, tick
+from .fakes import DEVICE_ID, Bridge, Lan, paired, switch
+from .platforms import LAST_ACTION, ONLINE, PRESS, REACHABLE, settle, start, tick
 
-LIGHTS_DOWN = "Hue bridge returned 503 Service Unavailable for GET /clip/v2/resource/light"
-NOT_SWITCHED = (
-    '{"errors":[{"description":"device (grouped_light) has communication issues, command (.on.on) may not have '
-    'effect"}],"data":[]}'
-)
-HALL_SWITCH = {"device_id": "a1b2c3d4", "switch_id": DEVICE_ID, "name": "Hall"}
-
-type Describe = Callable[[LazyEventPartialState], dict[str, str]]
+type Change = tuple[str, str]
+"""A logbook entry: the entity whose state changed, and the new state, or for an event entity its event type."""
 
 
 @pytest.fixture(autouse=True)
@@ -41,264 +30,135 @@ def no_retry_delay(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(toggler, "RETRY_DELAY", 0)
 
 
-def describers(hass: HomeAssistant) -> dict[str, Describe]:
-    """What the integration tells the logbook: how to describe each of its events."""
-    described: dict[str, Describe] = {}
-
-    def describe_event(domain: str, event_type: str, describe: Describe) -> None:
-        assert domain == DOMAIN
-        described[event_type] = describe
-
-    logbook.async_describe_events(hass, describe_event)
-    return described
+@pytest.fixture
+async def logbook(recorder_mock: Recorder, hass: HomeAssistant) -> None:
+    """The real logbook, on the recorder; its dependency, the frontend, counts as set up, as the tests don't have it."""
+    mock_component(hass, "frontend")
+    assert await async_setup_component(hass, "logbook", {})
 
 
-def describe(hass: HomeAssistant, event: Event[Any]) -> dict[str, str]:
-    """The event's entry, as the logbook's live stream reads it."""
-    return describers(hass)[event.event_type](LazyEventPartialState(async_event_to_row(event), {}))
+async def press(lan: Lan, freezer: FrozenDateTimeFactory, seq: int) -> None:
+    """A press a second after what came before, and the status that the entities show 500 ms later. The logbook lists
+    what happened after the time it is asked from, so the press comes after it."""
+    await tick(freezer, 1)
+    lan.broadcast(seq)
+    await settle()
+    await tick(freezer, 0.5)
 
 
-@pytest.mark.parametrize(
-    ("event_type", "data", "name", "message"),
-    [
-        (EVENT_PRESS, {**HALL_SWITCH, "seq": 12}, HALL, "wall switch operated (seq 12)."),
-        (EVENT_PRESS, {**HALL_SWITCH, "seq": None}, HALL, "wall switch operated (seq (null))."),
-        (
-            EVENT_PRESS,
-            {"device_id": None, "switch_id": DEVICE_ID, "name": None, "seq": 3},
-            DEVICE_ID,
-            "wall switch operated (seq 3).",
-        ),
-        (EVENT_PRESS, {**HALL_SWITCH, "name": " ", "seq": 3}, DEVICE_ID, "wall switch operated (seq 3)."),
-        (
-            EVENT_TOGGLE,
-            {
-                **HALL_SWITCH,
-                "result": "toggled",
-                "targets": ["light 'Ceiling'"],
-                "turned_on": True,
-                "changed": 1,
-                "unchanged": 0,
-                "failed": 0,
-                "elapsed_ms": 85,
-            },
-            HALL,
-            "turned ON light 'Ceiling' in 85 ms.",
-        ),
-        (
-            EVENT_TOGGLE,
-            {
-                **HALL_SWITCH,
-                "result": "toggled",
-                "targets": ["light 'Ceiling'", "group 'Hall'", "light 'Desk'"],
-                "turned_on": False,
-                "changed": 1,
-                "unchanged": 1,
-                "failed": 1,
-                "elapsed_ms": 120,
-            },
-            HALL,
-            "turned OFF light 'Ceiling', group 'Hall', light 'Desk' in 120 ms (1 already off, 1 failed).",
-        ),
-        (
-            EVENT_TOGGLE,
-            {
-                **HALL_SWITCH,
-                "result": "toggled",
-                "targets": ["light 'Ceiling'", "group 'Hall'"],
-                "turned_on": True,
-                "changed": 0,
-                "unchanged": 2,
-                "failed": 0,
-                "elapsed_ms": 40,
-            },
-            HALL,
-            "turned ON light 'Ceiling', group 'Hall' in 40 ms (2 already on).",
-        ),
-        (
-            EVENT_TOGGLE,
-            {
-                **HALL_SWITCH,
-                "result": "toggled",
-                "targets": ["light 'Ceiling'", "group 'Hall'"],
-                "turned_on": True,
-                "changed": 0,
-                "unchanged": 0,
-                "failed": 2,
-                "elapsed_ms": 4012,
-            },
-            HALL,
-            "turned ON light 'Ceiling', group 'Hall' in 4012 ms (2 failed).",
-        ),
-        (
-            EVENT_TOGGLE,
-            {**HALL_SWITCH, "result": "failed", "targets": ["light 'Ceiling'"], "message": LIGHTS_DOWN},
-            HALL,
-            f"could not toggle the lights: {LIGHTS_DOWN}",
-        ),
-        (
-            EVENT_TOGGLE,
-            {**HALL_SWITCH, "result": "dropped", "targets": ["light 'Ceiling'"], "message": PRESS_DROPPED},
-            HALL,
-            "dropped a press that waited more than 5s for the bridge.",
-        ),
-        (
-            EVENT_TOGGLE,
-            {**HALL_SWITCH, "result": "stopped", "message": "Stopped."},
-            HALL,
-            "could not toggle the lights: Stopped.",
-        ),
-        (EVENT_PRESS, {}, "", "wall switch operated (seq (null))."),
-        (EVENT_TOGGLE, {}, "", "could not toggle the lights: (null)"),
-        (
-            EVENT_TOGGLE,
-            {"switch_id": 1000, "name": 7, "result": "toggled", "targets": "light 'Ceiling'", "unchanged": "1"},
-            "7 (1000)",
-            "turned OFF light 'Ceiling' in (null) ms.",
-        ),
-    ],
-    ids=[
-        "press",
-        "press without a seq",
-        "press of a switch without a name or device",
-        "press of a switch with a blank name",
-        "turned on",
-        "turned off, one already off and one failed",
-        "turned on, all already on",
-        "turned on, all failed",
-        "failed",
-        "dropped",
-        "another result",
-        "press without data",
-        "toggle without data",
-        "values of other types",
-    ],
-)
-async def test_each_event_is_described_as_the_runner_logs_it(
-    hass: HomeAssistant, event_type: str, data: dict[str, Any], name: str, message: str
+class Logbook:
+    """The logbook over the websocket API, as the frontend asks for it."""
+
+    def __init__(self, hass: HomeAssistant, hass_ws_client: WebSocketGenerator, freezer: FrozenDateTimeFactory) -> None:
+        self._hass = hass
+        self._hass_ws_client = hass_ws_client
+        self._freezer = freezer
+
+    async def everything(self, since: str) -> list[dict[str, Any]]:
+        return await self._get({"start_time": since})
+
+    async def device_page(self, since: str, device_id: str) -> list[dict[str, Any]]:
+        """A device's page asks for its entities and for the device."""
+        entities = er.async_entries_for_device(er.async_get(self._hass), device_id)
+        return await self._get(
+            {"start_time": since, "entity_ids": [entity.entity_id for entity in entities], "device_ids": [device_id]}
+        )
+
+    async def _get(self, query: dict[str, Any]) -> list[dict[str, Any]]:
+        """It lists what happened before the moment it is asked, so time goes on a second first."""
+        await tick(self._freezer, 1)
+        await async_wait_recording_done(self._hass)
+        client = await self._hass_ws_client()
+        await client.send_json_auto_id({"type": "logbook/get_events", **query})
+        response = await client.receive_json()
+        assert response["success"]
+        entries: list[dict[str, Any]] = response["result"]
+        return entries
+
+
+def changes(entries: list[dict[str, Any]]) -> list[Change]:
+    """The entries, each of them an entity's change; an event entity's shows its event type."""
+    assert all("entity_id" in entry for entry in entries), entries
+    return [(entry["entity_id"], entry.get("attributes", {}).get("event_type", entry["state"])) for entry in entries]
+
+
+@pytest.mark.usefixtures("logbook", "socket_enabled")
+async def test_each_press_gives_the_logbook_press_and_last_action_and_nothing_else(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
 ) -> None:
-    """The switch's name is the entry's name, and the message is the rest of the line. The logbook also describes events
-    that Home Assistant stored long ago, or that someone fired with other data, so nothing makes it fail."""
-    assert describe(hass, Event(event_type, data)) == {"name": name, "message": message}
+    """The user's choice: Home Assistant's own entries, two for each press, also on the switch's device page; the
+    runtime's bus events are there for automations and the entities, and the logbook has nothing for them."""
+    entry = paired(switch())
+    await start(hass, entry)
+    logbook = Logbook(hass, hass_ws_client, freezer)
+    presses = async_capture_events(hass, EVENT_PRESS)
+    toggles = async_capture_events(hass, EVENT_TOGGLE)
+    started = dt_util.utcnow().isoformat()
+    await press(lan, freezer, 1)  # The switch's first broadcast, its baseline: no press, but now it is online.
+    since = dt_util.utcnow().isoformat()
+
+    await press(lan, freezer, 2)
+    await press(lan, freezer, 3)
+
+    each_press = [(PRESS, "press"), (LAST_ACTION, "turned_on"), (PRESS, "press"), (LAST_ACTION, "turned_off")]
+    assert changes(await logbook.everything(since)) == each_press
+    device = dr.async_get(hass).async_get_device_by_identifier((DOMAIN, DEVICE_ID), entry.entry_id)
+    assert device is not None
+    assert changes(await logbook.device_page(since, device.id)) == each_press
+    assert changes(await logbook.everything(started)) == [(ONLINE, "on"), *each_press]
+    # The bus events were fired, and named the switch's device.
+    assert [event.data["seq"] for event in presses] == [2, 3]
+    assert [event.data["result"] for event in toggles] == ["toggled", "toggled"]
+    assert {event.data["device_id"] for event in [*presses, *toggles]} == {device.id}
 
 
-async def test_the_entries_are_the_runners_log_lines(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, caplog: pytest.LogCaptureFixture, freezer: FrozenDateTimeFactory
+@pytest.mark.usefixtures("logbook", "socket_enabled")
+async def test_last_action_shows_only_when_its_state_changes(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
 ) -> None:
-    """Every press, and every outcome of its toggle: "<name>: <message>" is the line that the runner logs."""
-    caplog.set_level("INFO", logger=INTEGRATION_LOGGER.name)
-    bridge.on["l2"] = True  # The room Hall is on, through its light Desk.
-    await start(hass, paired(switch(lights=["Ceiling"], groups=["Hall"])))
-    events: list[Event[Any]] = []
+    """The logbook lists changes of a state, not of its attributes alone, and the entities show the status 500 ms after
+    a change: an outcome like the one before, or one that another replaces within the 500 ms, adds only the press."""
+    entry = paired(switch())
+    await start(hass, entry)
+    logbook = Logbook(hass, hass_ws_client, freezer)
+    await press(lan, freezer, 1)
+    since = dt_util.utcnow().isoformat()
 
-    @callback
-    def capture(event: Event[Any]) -> None:
-        events.append(event)
-
-    for event_type in (EVENT_PRESS, EVENT_TOGGLE):
-        hass.bus.async_listen(event_type, capture)
-    lan.broadcast(1)
-    await settle()
-    caplog.clear()
-
-    # The room goes off, its light Ceiling was off already, and the bridge doesn't switch the room.
-    bridge.fail("/clip/v2/resource/grouped_light/g1", 207, NOT_SWITCHED)
-    lan.broadcast(2)
-    await settle()
-    # Again, and the bridge switches the room off.
-    bridge.heal()
-    lan.broadcast(3)
-    await settle()
-    # The lights' state can't be read.
+    # The bridge can't be read twice: the second outcome is the first one again. The first one also shows on the
+    # bridge's device, as Reachable goes off.
     bridge.fail("/clip/v2/resource/light", 503)
-    lan.broadcast(4)
-    await settle()
-    # Both go on, slowly, while the next press waits more than 5 s.
+    await press(lan, freezer, 2)
+    await press(lan, freezer, 3)
+    # A press that the bridge takes 6 s to toggle, and the next, dropped as it waited more than 5 s: the toggle and the
+    # dropped press come together, and Last action shows the newer.
     bridge.heal()
     held = bridge.hold("/clip/v2/resource/light")
+    await tick(freezer, 1)
+    lan.broadcast(4)
     lan.broadcast(5)
-    lan.broadcast(6)
     await settle()
     await tick(freezer, 6)
     held.set()
     await settle()
+    await tick(freezer, 0.5)
 
-    entries = [describe(hass, event) for event in events]
-    lines = [
-        record.getMessage()
-        for record in caplog.records
-        if record.name == "custom_components.sonoff2hue.engine.runner" and record.getMessage().startswith(f"{HALL}: ")
+    assert changes(await logbook.everything(since)) == [
+        (PRESS, "press"),
+        (REACHABLE, "off"),
+        (LAST_ACTION, "failed"),
+        (PRESS, "press"),
+        (PRESS, "press"),
+        (PRESS, "press"),
+        (REACHABLE, "on"),
+        (LAST_ACTION, "dropped"),
     ]
-    assert [f"{entry['name']}: {entry['message']}" for entry in entries] == lines
-    assert lines == [
-        f"{HALL}: wall switch operated (seq 2).",
-        f"{HALL}: turned OFF light 'Ceiling', group 'Hall' in 0 ms (1 already off, 1 failed).",
-        f"{HALL}: wall switch operated (seq 3).",
-        f"{HALL}: turned OFF light 'Ceiling', group 'Hall' in 0 ms (1 already off).",
-        f"{HALL}: wall switch operated (seq 4).",
-        f"{HALL}: could not toggle the lights: {LIGHTS_DOWN}",
-        f"{HALL}: wall switch operated (seq 5).",
-        f"{HALL}: wall switch operated (seq 6).",
-        f"{HALL}: turned ON light 'Ceiling', group 'Hall' in 6000 ms.",
-        f"{HALL}: dropped a press that waited more than 5s for the bridge.",
+    device = dr.async_get(hass).async_get_device_by_identifier((DOMAIN, DEVICE_ID), entry.entry_id)
+    assert device is not None
+    assert changes(await logbook.device_page(since, device.id)) == [
+        (PRESS, "press"),
+        (LAST_ACTION, "failed"),
+        (PRESS, "press"),
+        (PRESS, "press"),
+        (PRESS, "press"),
+        (LAST_ACTION, "dropped"),
     ]
-
-
-@pytest.mark.parametrize("logbook_first", [True, False], ids=["logbook first", "logbook after the integration"])
-@pytest.mark.usefixtures("socket_enabled")
-async def test_the_logbook_shows_the_entries_and_a_switchs_device_shows_its_own(
-    recorder_mock: Recorder,
-    hass: HomeAssistant,
-    hass_ws_client: WebSocketGenerator,
-    lan: Lan,
-    bridge: Bridge,
-    logbook_first: bool,
-) -> None:
-    """The real logbook, with the events stored by the recorder: it finds the integration's descriptions whichever of
-    the two Home Assistant sets up first, and matches an event to the switch's device, which the platforms made, by the
-    ``device_id`` in its data. The logbook also shows the entities' changes (decision 25), which this test leaves out."""
-    mock_component(hass, "frontend")
-    if logbook_first:
-        assert await async_setup_component(hass, "logbook", {})
-    since = dt_util.utcnow()
-    entry = paired(switch(), switch(OTHER_DEVICE_ID, "Desk", lights=["Desk"]))
-    await start(hass, entry)
-    if not logbook_first:
-        assert await async_setup_component(hass, "logbook", {})
-    devices = dr.async_get(hass)
-    bridge_device = devices.async_get_device_by_identifier((DOMAIN, BRIDGE_ID), entry.entry_id)
-    hall_device = devices.async_get_device_by_identifier((DOMAIN, DEVICE_ID), entry.entry_id)
-    desk_device = devices.async_get_device_by_identifier((DOMAIN, OTHER_DEVICE_ID), entry.entry_id)
-    assert bridge_device is not None
-    assert hall_device is not None
-    assert desk_device is not None
-    assert hall_device.config_subentry_id == subentry_of(entry).subentry_id
-    for device_id in (DEVICE_ID, OTHER_DEVICE_ID):
-        lan.broadcast(1, device_id)
-        lan.broadcast(2, device_id)
-    await settle()
-    await async_wait_recording_done(hass)
-    client = await hass_ws_client()
-
-    async def logbook_of(device_ids: list[str] | None) -> list[tuple[str, str, str]]:
-        query: dict[str, Any] = {"type": "logbook/get_events", "start_time": since.isoformat()}
-        if device_ids is not None:
-            query["device_ids"] = device_ids
-        await client.send_json_auto_id(query)
-        response = await client.receive_json()
-        assert response["success"]
-        # The integration's own entries, without the entities' changes.
-        return [(entry["domain"], entry["name"], entry["message"]) for entry in response["result"] if "domain" in entry]
-
-    hall = [
-        (DOMAIN, HALL, "wall switch operated (seq 2)."),
-        (DOMAIN, HALL, "turned ON light 'Ceiling' in 0 ms."),
-    ]
-    desk = [
-        (DOMAIN, "Desk (1000999999)", "wall switch operated (seq 2)."),
-        (DOMAIN, "Desk (1000999999)", "turned ON light 'Desk' in 0 ms."),
-    ]
-    assert await logbook_of(None) == hall + desk
-    assert await logbook_of([hall_device.id]) == hall
-    assert await logbook_of([desk_device.id]) == desk
-    assert await logbook_of([bridge_device.id]) == []

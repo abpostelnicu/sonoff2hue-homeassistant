@@ -28,7 +28,7 @@ CONF_DEVICE_KEY: Final = "device_key"
 CONF_LIGHTS: Final = "lights"
 CONF_GROUPS: Final = "groups"
 
-# The bus events of the runtime (decision 23), for the logbook, the entities and automations. Each names its switch:
+# The bus events of the runtime (decision 23), for the entities and automations. Each names its switch:
 # ``device_id``, the Home Assistant device of the switch's subentry, or None while it has none; ``switch_id``; and
 # ``name``, the switch's name as configured, or None.
 EVENT_PRESS: Final = "sonoff2hue_press"

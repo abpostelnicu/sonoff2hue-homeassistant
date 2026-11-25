@@ -72,7 +72,7 @@ async def test_press_fires_for_each_press_of_its_switch(
 async def test_press_fires_only_while_the_bridge_runs(
     hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
 ) -> None:
-    """Its events are the presses that the runner acts on, as the toggle events and the logbook have them."""
+    """Its events are the presses that the runner acts on, as the toggle events have them."""
     bridge.fail("/clip/v2/resource/bridge", 503)
     await start(hass, paired(switch()))
 

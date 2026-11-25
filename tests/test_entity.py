@@ -1,8 +1,8 @@
 """The devices of the integration and the entities on them (decision 25): the bridge's device and one per switch, their
 unique ids across restarts, switches added, changed and removed while the entry is loaded, also with *Add switch*, the
-device ids that the bus events give the logbook, the entities' texts, and the devices kept when reconfiguring gives a
-switch another name or another MINIR4M, or the entry another bridge. The LAN is on a fake network and the Hue bridge
-in memory."""
+device ids that the bus events carry, the entities' texts, and the devices kept when reconfiguring gives a switch
+another name or another MINIR4M, or the entry another bridge. The LAN is on a fake network and the Hue bridge in
+memory."""
 
 from types import MappingProxyType
 
@@ -176,7 +176,7 @@ async def test_a_switch_added_changed_and_removed_while_loaded_gets_and_loses_it
     for entity_id in DESK_ENTITIES:
         state_of(hass, entity_id)
 
-    # Its presses name its device, for the logbook.
+    # Its presses name its device.
     lan.broadcast(1, OTHER_DEVICE_ID)
     lan.broadcast(2, OTHER_DEVICE_ID)
     await settle()

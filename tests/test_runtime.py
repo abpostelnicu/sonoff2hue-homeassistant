@@ -261,7 +261,7 @@ async def test_a_press_toggles_the_lights_and_fires_the_events(
     runtime_data = await start(hass, entry)
     presses = async_capture_events(hass, EVENT_PRESS)
     toggles = async_capture_events(hass, EVENT_TOGGLE)
-    # The events name the switch's device, which the platforms made for its subentry, so the logbook finds them.
+    # The events name the switch's device, which the platforms made for its subentry.
     device = dr.async_get(hass).async_get_device_by_identifier((DOMAIN, DEVICE_ID), entry.entry_id)
     assert device is not None
     assert device.config_subentry_id == subentry_of(entry).subentry_id
