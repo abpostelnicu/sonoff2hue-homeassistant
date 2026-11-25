@@ -1,4 +1,5 @@
-"""The fake bridge's state; a port of the .NET app's ``tests/local/FakeHue/FakeBridge.cs``."""
+"""The fake bridge's state: its lights, rooms and zones, the application keys it issued, its link button, and the logs
+of the requests and PUTs it answered."""
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -192,7 +193,7 @@ class FakeBridge:
         _append(self._puts, f"rejected PUT {path}: {status} {reason}")
 
     def record_request(self, method: str, path: str, status: int) -> None:
-        _append(self._requests, f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]} {method} {path} {status}")  # noqa: DTZ005 - local time, as in .NET
+        _append(self._requests, f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]} {method} {path} {status}")  # noqa: DTZ005 - local time, for people
 
     def describe_lights(self) -> str:
         """One line per light, room and zone, e.g. ``room 'Living room' on (Ceiling, Floor lamp)``."""

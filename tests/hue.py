@@ -1,5 +1,5 @@
-"""The fake Hue bridge over real HTTPS on 127.0.0.1, for tests (``tools/fake_hue``); a port of the .NET app's
-``FakeHueTestHost``. Tests that use it need sockets: ``pytest.mark.usefixtures("socket_enabled")``."""
+"""Hue bridges for tests: the fake bridge of ``tools/fake_hue`` over real HTTPS on 127.0.0.1, which needs sockets
+(``pytest.mark.usefixtures("socket_enabled")``), and a bridge in memory without them."""
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -115,8 +115,8 @@ type Respond = Callable[[RecordedRequest], tuple[int, str] | Awaitable[tuple[int
 
 
 class InMemoryBridge:
-    """A stand-in for the Hue bridge without sockets (the .NET tests' ``FakeHttpHandler``): every request gets the
-    status and body that ``respond`` returns for it, and is recorded."""
+    """A stand-in for the Hue bridge without sockets: every request gets the status and body that ``respond`` returns
+    for it, and is recorded."""
 
     def __init__(self, respond: Respond) -> None:
         self._respond = respond

@@ -1,5 +1,4 @@
-"""The fake bridge's endpoints and HTTPS; a port of the .NET app's ``tests/local/FakeHue/FakeHueServer.cs`` and
-``FakeHueCertificate.cs``.
+"""The fake bridge's endpoints and HTTPS.
 
 The Hue API calls that sonoff2hue makes: ``GET /api/0/config`` (anonymous), pairing with ``POST /api``, and with the
 ``hue-application-key`` header ``GET /clip/v2/resource/{light,room,zone,grouped_light,bridge}`` and
@@ -24,8 +23,6 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
-
-from custom_components.sonoff2hue.engine import jsonnode, text
 
 from .bridge import BRIDGE_ID, LINK_BUTTON_WINDOW, NAME, FakeBridge
 
@@ -96,15 +93,15 @@ async def _pair(request: web.Request) -> web.Response:
     200: ``[{"success":{"username":"...","clientkey":"..."}}]``, or an error such as type 101."""
     bridge = request.app[_BRIDGE]
     try:
-        body = jsonnode.parse(await request.text())
-    except jsonnode.JsonError:
+        body = json.loads(await request.text())
+    except ValueError:
         return _pairing_error(2, "/", "body contains invalid JSON")
 
-    device_type = body.get("devicetype") if isinstance(body, (dict, jsonnode.BrokenObject)) else None
-    if not isinstance(device_type, str) or text.is_null_or_white_space(device_type):
+    device_type = body.get("devicetype") if isinstance(body, dict) else None
+    if not isinstance(device_type, str) or not device_type.strip():
         return _pairing_error(5, "/", "invalid/missing parameters in body")
     # "<application, at most 20 characters>#<device, at most 19>"
-    if text.utf16_length(device_type) > 40:
+    if len(device_type) > 40:
         return _pairing_error(7, "/devicetype", f"invalid value, {device_type}, for parameter, devicetype")
 
     keys = bridge.try_pair()
@@ -137,11 +134,11 @@ async def _put(request: web.Request) -> web.Response:
         return _unauthorized()
 
     try:
-        body = jsonnode.parse(await request.text())
-    except jsonnode.JsonError:
+        body = json.loads(await request.text())
+    except ValueError:
         return _reject_put(bridge, path, 400, "body contains invalid JSON")
-    on = body.get("on") if isinstance(body, (dict, jsonnode.BrokenObject)) else None
-    value = on.get("on") if isinstance(on, (dict, jsonnode.BrokenObject)) else None
+    on = body.get("on") if isinstance(body, dict) else None
+    value = on.get("on") if isinstance(on, dict) else None
     if not isinstance(value, bool):
         return _reject_put(bridge, path, 400, "the body has no boolean on.on")
 

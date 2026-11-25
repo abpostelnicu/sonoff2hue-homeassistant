@@ -1,5 +1,5 @@
-"""The fake Hue bridge answers sonoff2hue's own Hue client as a real bridge would; a port of the .NET app's
-``FakeHueTests``, ``FakeHueOptionsTests`` and ``FakeHueCertificateTests``."""
+"""The fake Hue bridge answers sonoff2hue's own Hue client as a real bridge would: pairing, the lights, rooms and zones,
+the test endpoints and faults, its settings and its certificate."""
 
 import asyncio
 from datetime import UTC, datetime
@@ -76,9 +76,9 @@ async def test_pairing_succeeds_at_once_when_the_link_button_is_always_pressed(f
         ("{}", 5),
         ('{"devicetype":42}', 5),
         ('{"devicetype":" \\u3000"}', 5),
+        ('{"devicetype":"\\u001c"}', 5),
         ('{"devicetype":"an-application-name-that#is-far-too-long-for-a-bridge"}', 7),
-        # 40 characters but 41 UTF-16 code units, which is what the bridge counts.
-        ('{"devicetype":"' + "a" * 39 + '\\ud83d\\ude00"}', 7),
+        ('{"devicetype":"' + "a" * 41 + '"}', 7),
     ],
 )
 async def test_pairing_rejects_malformed_requests_like_a_bridge(
@@ -90,8 +90,8 @@ async def test_pairing_rejects_malformed_requests_like_a_bridge(
     assert json.loads(text)[0]["error"]["type"] == error_type
 
 
-async def test_pairing_accepts_what_dotnet_does_not_count_as_white_space(fake_hue_pressed: FakeHueHost) -> None:
-    status, text = await fake_hue_pressed.request("POST", "api", '{"devicetype":"\\u001c"}')
+async def test_pairing_accepts_a_device_type_of_40_characters(fake_hue_pressed: FakeHueHost) -> None:
+    status, text = await fake_hue_pressed.request("POST", "api", '{"devicetype":"' + "a" * 39 + '\\ud83d\\ude00"}')
 
     assert status == 200
     assert "success" in json.loads(text)[0]
@@ -310,7 +310,7 @@ def test_options_come_from_the_environment() -> None:
         ("FAKE_HUE_PORT", "0", "FAKE_HUE_PORT must be a port number"),
         ("FAKE_HUE_PORT", "65536", "FAKE_HUE_PORT must be a port number"),
         ("FAKE_HUE_PORT", "https", "FAKE_HUE_PORT must be a port number"),
-        ("FAKE_HUE_PORT", "1_8443", "FAKE_HUE_PORT must be a port number"),
+        ("FAKE_HUE_PORT", "18443.0", "FAKE_HUE_PORT must be a port number from 1 to 65535, not '18443.0'."),
         ("FAKE_HUE_LINK_BUTTON", "held", "FAKE_HUE_LINK_BUTTON must be 'released' or 'pressed', not 'held'."),
     ],
 )

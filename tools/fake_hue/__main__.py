@@ -7,8 +7,6 @@ import logging
 import os
 import sys
 
-from custom_components.sonoff2hue.engine import text
-
 from .bridge import BRIDGE_ID, FakeBridge
 from .server import HELP, start
 
@@ -29,29 +27,33 @@ class OptionsError(Exception):
 
 
 def options(environment: Mapping[str, str]) -> tuple[str, int, bool]:
-    """The address, port and link button from ``FAKE_HUE_*``, read as ``FakeHueOptions.FromEnvironment`` reads them;
-    raises :class:`OptionsError`."""
+    """The address, port and link button from ``FAKE_HUE_*``, white space around them ignored; raises
+    :class:`OptionsError`."""
+    bind_text = environment.get("FAKE_HUE_BIND", "")
+    port_text = environment.get("FAKE_HUE_PORT", "")
+    link_button = environment.get("FAKE_HUE_LINK_BUTTON", "")
+
     bind = "127.0.0.1"
-    bind_text = environment.get("FAKE_HUE_BIND")
-    if not text.is_null_or_white_space(bind_text):
+    if bind_text.strip():
         try:
-            bind = str(ipaddress.ip_address(text.trim(bind_text or "")))
+            bind = str(ipaddress.ip_address(bind_text.strip()))
         except ValueError:
             raise OptionsError(
                 f"FAKE_HUE_BIND must be an IP address, such as 127.0.0.1 or 0.0.0.0, not '{bind_text}'."
             ) from None
 
     port = DEFAULT_PORT
-    port_text = environment.get("FAKE_HUE_PORT")
-    if not text.is_null_or_white_space(port_text):
-        number = text.try_parse_int(text.trim(port_text or ""), 32)
-        if number is None or not 1 <= number <= 65535:
-            raise OptionsError(f"FAKE_HUE_PORT must be a port number from 1 to 65535, not '{port_text}'.")
-        port = number
+    if port_text.strip():
+        invalid_port = OptionsError(f"FAKE_HUE_PORT must be a port number from 1 to 65535, not '{port_text}'.")
+        try:
+            port = int(port_text)
+        except ValueError:
+            raise invalid_port from None
+        if not 1 <= port <= 65535:
+            raise invalid_port
 
-    link_button = environment.get("FAKE_HUE_LINK_BUTTON")
-    match None if link_button is None else text.lower_invariant(text.trim(link_button)):
-        case None | "" | "released":
+    match link_button.strip().lower():
+        case "" | "released":
             pressed = False
         case "pressed":
             pressed = True
