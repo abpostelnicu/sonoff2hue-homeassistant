@@ -1,0 +1,40 @@
+name: Copilot Setup Steps
+
+# Copilot cloud agent's environment (decision 38). Before an agent session on GitHub Actions starts, such as the
+# Release agent's, this job installs uv and the pinned tools of requirements_test.txt in .venv, as scripts/setup makes
+# them and CI uses them, so that the agent can run scripts/check. Copilot runs only a job named copilot-setup-steps,
+# from this file on main, and keeps only its steps, permissions, runs-on, services, snapshot and timeout-minutes (at
+# most 59). The job also runs when this file changes, and on demand, so that a change shows whether it still works. No
+# ruleset requires it.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [.github/workflows/copilot-setup-steps.yml]
+  pull_request:
+    paths: [.github/workflows/copilot-setup-steps.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  # Copilot runs a job of this name only.
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Copilot gets a token of its own for its work; the setup only reads the repository.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      # CI's uv and cache, so that a session reuses what CI downloaded.
+      - uses: astral-sh/setup-uv@v10.4.0
+        with:
+          version: "0.13.7"
+          enable-cache: true
+          cache-dependency-glob: requirements_test.txt
+          cache-python: true
+
+      - name: Set up Python and the tools
+        run: scripts/setup

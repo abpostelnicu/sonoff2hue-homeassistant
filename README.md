@@ -640,6 +640,22 @@ git tag -a vX.Y.Z -m "sonoff2hue X.Y.Z"
 git push origin vX.Y.Z
 ```
 
+### The Release agent
+
+The *Release* agent prepares a release as described above, writes its notes, and checks the published Release. It
+follows the procedure in `.github/skills/release/SKILL.md`.
+
+- **In VS Code's chat or in Copilot CLI:** `/release 1.2.0`, `/release patch`, `minor` or `major`, or `/release` to
+  have the version proposed. It opens the release pull request, waits for its checks, asks you before it merges, and
+  then checks the published Release and records it.
+- **On GitHub, without your computer:** start Copilot cloud agent with the *Release* agent, from the Agents page of
+  github.com or GitHub Mobile, by assigning an issue to Copilot, or with
+  `gh agent-task create "/release 1.2.0" --custom-agent release`. It opens a draft release pull request. Approve its
+  workflow runs if GitHub asks, mark it ready for review, and merge it with *Squash and merge*: once CI has passed on
+  `main`, the release is published. Then `/release check 1.2.0` checks it and records it.
+- **`--dry-run`** stops at a draft pull request that adds only the notes, so that merging it would release nothing.
+  Close it without merging.
+
 ## License
 
 [Apache License 2.0](LICENSE).
