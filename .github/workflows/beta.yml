@@ -1,0 +1,74 @@
+name: Beta
+
+# A canary for the next Home Assistant release (decision 35): mypy and the tests against the newest pytest-homeassistant
+# on PyPI, pre-releases included, so that a beta that breaks the integration shows before users update. Between betas,
+# the newest is the latest release. It runs weekly, on demand, and on a pull request that changes this file, so that a
+# change to it is tested before it reaches main. No ruleset requires it.
+on:
+  schedule:
+    # Mondays at 06:23 UTC. GitHub delays scheduled runs at busy times, such as the start of each hour, and may drop
+    # some. It notifies the user who last changed this line of the scheduled runs.
+    - cron: "23 6 * * 1"
+  workflow_dispatch:
+  pull_request:
+    paths: [.github/workflows/beta.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: beta-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    # The ruleset on main matches its required checks by their job names, so this one must never take one of theirs.
+    name: Test (Home Assistant beta)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # A cache key of its own (cache-suffix). setup-uv restores only an exact key and saves none that it restored, so
+      # with CI's key the first job to run after a change of requirements_test.txt would fill the cache for both.
+      - uses: astral-sh/setup-uv@v10.4.0
+        with:
+          version: "0.13.7"
+          enable-cache: true
+          cache-dependency-glob: requirements_test.txt
+          cache-suffix: beta
+          cache-python: true
+
+      - name: Create the virtual environment
+        run: uv venv --python 3.14 .venv
+
+      - name: Install the newest pytest-homeassistant and the other pins of requirements_test.txt
+        id: install
+        run: |
+          # The newest pytest-homeassistant, pre-releases included, as an exact pin, such as
+          # pytest-homeassistant==2026.12.0b0. It is looked up for any Python (3.99) rather than the runner's, so that
+          # one that needs a newer Python fails to install below instead of being passed over for an older one.
+          uv pip compile --prerelease allow --no-deps --python-version 3.99 --no-header --no-annotate --quiet - \
+            <<< pytest-homeassistant > "$RUNNER_TEMP/newest.txt"
+          # requirements_test.txt with that pin in place of its own. Other packages take a pre-release only where a pin
+          # asks for one, such as pytest-homeassistant's homeassistant==2026.12.0b0, and otherwise resolve as in CI.
+          uv pip install --python .venv/bin/python -r requirements_test.txt --overrides "$RUNNER_TEMP/newest.txt"
+
+      - name: Show the Home Assistant version
+        run: |
+          version=$(.venv/bin/python -c 'import importlib.metadata; print(importlib.metadata.version("homeassistant"))')
+          python=$(.venv/bin/python -c 'import platform; print(platform.python_version())')
+          echo "Home Assistant $version on Python $python" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Check types (mypy)
+        run: .venv/bin/python -m mypy
+
+      # After a mypy failure too, as CI runs them in separate jobs. The test of requirements_dev.txt's pins is left
+      # out: they are what the pinned release requires, so it fails on any other.
+      - name: Test (pytest)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: >-
+          .venv/bin/python -m pytest
+          --deselect tests/tools/test_develop.py::test_requirements_dev_pins_what_home_assistant_requires
