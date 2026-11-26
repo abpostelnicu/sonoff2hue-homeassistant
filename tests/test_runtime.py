@@ -42,7 +42,7 @@ from custom_components.sonoff2hue.engine.config import EngineConfig, HueSettings
 from custom_components.sonoff2hue.engine.hue_client import CERTIFICATE_MISMATCH
 from custom_components.sonoff2hue.engine.runner import NO_TARGETS, ResolvedSwitches
 from custom_components.sonoff2hue.engine.status import PRESS_DROPPED, ServiceState
-from custom_components.sonoff2hue.engine.supervisor import KEY_REJECTED
+from custom_components.sonoff2hue.engine.supervisor import KEY_REJECTED, TARGETS_CHECK_INTERVAL
 from custom_components.sonoff2hue.engine.targets import EntryKey, RememberedResource, Renamed
 from custom_components.sonoff2hue.remembered import SAVE_DELAY
 from custom_components.sonoff2hue.runtime import (
@@ -808,6 +808,67 @@ async def test_the_remembered_resources_are_written_as_the_entry_unloads_and_rem
     assert await hass.config_entries.async_remove(entry.entry_id)
 
     assert store_key(entry) not in hass_storage
+
+
+async def test_a_light_deleted_while_running_is_missing_after_the_next_press_and_the_rest_still_toggles(
+    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+) -> None:
+    """The bridge's 404 has the switches resolved again at once (decision 32): the status runs on with the problem, the
+    repair comes, and the runner, which doesn't restart, toggles the rest."""
+    entry = paired(switch(lights=["Ceiling", "Desk"]))
+    runtime_data = await start(hass, entry)
+    toggles = async_capture_events(hass, EVENT_TOGGLE)
+    lan.broadcast(1)
+    bridge.deleted.add("l2")
+
+    lan.broadcast(2)
+    await settle()
+    await tick(freezer, 0.5)
+
+    desk = f"{HALL}: no Hue light named 'Desk'. Known lights: 'Ceiling'"
+    service = runtime_data.status.service
+    assert (service.state, service.message, service.problems) == (
+        ServiceState.RUNNING,
+        "1 wall switch toggles 1 Hue light, room or zone; 1 is missing.",
+        (desk,),
+    )
+    assert issues(hass)[f"missing_targets_{DEVICE_ID}"].translation_placeholders == {
+        "name": HALL,
+        "problems": f"- {desk}",
+    }
+
+    lan.broadcast(3)
+    await settle()
+
+    assert bridge.puts() == [("l1", True), ("l2", True), ("l1", False)]
+    assert [(event.data["targets"], event.data["changed"], event.data["failed"]) for event in toggles] == [
+        (["light 'Ceiling'", "light 'Desk'"], 1, 1),
+        (["light 'Ceiling'"], 1, 0),
+    ]
+    assert bridge.created == 1
+
+
+async def test_a_rename_found_while_running_is_saved_as_one_found_at_the_start(
+    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Within the 15 minutes after which the switches are resolved again; then the supervisor restarts once."""
+    caplog.set_level(logging.INFO, logger=INTEGRATION_LOGGER.name)
+    entry = paired(switch(lights=["Ceiling"]))
+    runtime_data = await start(hass, entry)
+    bridge.names["l1"] = "Ceiling lamp"
+
+    await tick(freezer, TARGETS_CHECK_INTERVAL - 1)
+    assert subentry_of(entry).data[CONF_LIGHTS] == ["Ceiling"]
+    await tick(freezer, 1)
+    await settle()
+
+    assert subentry_of(entry).data[CONF_LIGHTS] == ["Ceiling lamp"]
+    assert logged(caplog, "custom_components.sonoff2hue.runtime") == [
+        f"{HALL}: light 'Ceiling' was renamed to 'Ceiling lamp' on the Hue bridge; saved the new name."
+    ]
+    assert logged(caplog, SUPERVISOR).count(RESTARTING) == 1
+    assert (bridge.created, bridge.closed) == (2, 1)
+    assert runtime_data.status.snapshot().switches[0].targets == ("light 'Ceiling lamp'",)
 
 
 async def test_the_switch_test_resolves_with_the_remembered_resources(

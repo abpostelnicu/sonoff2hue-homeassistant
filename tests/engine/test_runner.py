@@ -3,6 +3,7 @@ runner on a listener (``run``) on a fake network."""
 
 import asyncio
 import base64
+from collections.abc import Awaitable
 from datetime import UTC, datetime, timedelta
 import json
 import logging
@@ -101,6 +102,9 @@ class RecordingObserver(RunnerObserver):
 
     def on_bridge_reachability(self, reachable: bool, message: str | None) -> None:
         self.events.append("bridge up" if reachable else f"bridge down: {message}")
+
+    def on_targets_gone(self, binding: SwitchBinding, targets: list[HueTarget]) -> None:
+        self.events.append(f"gone {binding.settings.name}: {', '.join(map(str, targets))}")
 
 
 class KeyObserver(RecordingObserver):
@@ -429,6 +433,102 @@ async def test_a_switch_with_nothing_left_to_toggle_reports_its_presses_and_fail
     assert runner_log(caplog)[-2:] == [
         (logging.INFO, "Hall (1000abcdef): wall switch operated (seq 102)."),
         (logging.ERROR, f"Hall (1000abcdef): could not toggle the lights: {NO_TARGETS}"),
+    ]
+
+
+# New targets while the runner runs, and targets gone (decision 32).
+
+
+class HeldBridge(LightBridge):
+    """A LightBridge whose answers to the reads of the lights wait while ``release`` isn't set."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.release = asyncio.Event()
+        self.release.set()
+
+    def _answer(self, request: RecordedRequest) -> tuple[int, str] | Awaitable[tuple[int, str]]:
+        answer = super()._answer(request)
+        if request.method == "GET" and not self.release.is_set():
+            return self._later(answer)
+        return answer
+
+    async def _later(self, answer: tuple[int, str]) -> tuple[int, str]:
+        await self.release.wait()
+        return answer
+
+
+async def test_new_targets_reach_a_running_runner_which_keeps_its_baselines_and_the_switchs_turns(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A toggle that a press started before goes on with the targets that it had, and the next one waits for it."""
+    caplog.set_level(logging.INFO, logger=runner.__name__)
+    bridge = HeldBridge()
+    bridge.lights = {"l1": False, "l2": False}
+    observer = RecordingObserver()
+    switch = create_runner(bridge.client(), observer)
+    desk = HueTarget(HueTargetKind.LIGHT, "l2", "Desk")
+    switch.handle_packet(plain(100))
+    bridge.release.clear()
+    switch.handle_packet(plain(101))
+    switch.handle_packet(plain(102))
+    await asyncio.sleep(0)
+    caplog.clear()
+
+    switch.update_targets([SwitchBinding(hall().settings, [desk], ["Hall (1000abcdef): no light"])])
+    switch.update_targets([SwitchBinding(hall().settings, [desk], ["Hall (1000abcdef): no light"])])
+    switch.handle_packet(plain(103))
+    bridge.release.set()
+    await switch.when_toggles_complete()
+
+    # The presses before the new targets toggle the light they had, in turn; the one after toggles the new one.
+    assert bridge.paths == [
+        "GET /clip/v2/resource/light",
+        "PUT /clip/v2/resource/light/l1",
+        "GET /clip/v2/resource/light",
+        "PUT /clip/v2/resource/light/l1",
+        "GET /clip/v2/resource/light",
+        "PUT /clip/v2/resource/light/l2",
+    ]
+    assert observer.events == [
+        "press Hall seq=101",
+        "press Hall seq=102",
+        "press Hall seq=103",
+        "bridge up",
+        "toggled Hall on changed=1 unchanged=0 failed=0",
+        "toggled Hall off changed=1 unchanged=0 failed=0",
+        "toggled Hall on changed=1 unchanged=0 failed=0",
+    ]
+    assert runner_log(caplog)[0] == (logging.INFO, "Hall (1000abcdef) -> light 'Desk'")
+    assert [message for _, message in runner_log(caplog)].count("Hall (1000abcdef) -> light 'Desk'") == 1
+
+
+async def test_a_toggle_that_finds_targets_gone_reports_them_after_its_outcome() -> None:
+    """The bridge answers 404 for a light that it no longer has; another failure isn't a target gone."""
+    bridge = LightBridge()
+    bridge.lights = {"l1": False, "l2": False, "l3": False}
+    observer = RecordingObserver()
+
+    def answer(request: RecordedRequest) -> tuple[int, str]:
+        if request.method == "PUT" and request.path.endswith("/l2"):
+            return 404, '{"errors":[{"description":"not found"}],"data":[]}'
+        if request.method == "PUT" and request.path.endswith("/l3"):
+            return 503, "{}"
+        return LightBridge._answer(bridge, request)
+
+    bridge._respond = answer
+    targets = [HueTarget(HueTargetKind.LIGHT, light, name) for light, name in (("l1", "A"), ("l2", "B"), ("l3", "C"))]
+    switch = create_runner(bridge.client(), observer, SwitchBinding(hall().settings, targets))
+
+    switch.handle_packet(plain(100))
+    switch.handle_packet(plain(101))
+    await switch.when_toggles_complete()
+
+    assert observer.events == [
+        "press Hall seq=101",
+        "bridge up",
+        "toggled Hall on changed=1 unchanged=0 failed=2",
+        "gone Hall: light 'B'",
     ]
 
 

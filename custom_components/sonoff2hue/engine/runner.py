@@ -14,8 +14,9 @@ before it awaits anything, then waits for all of it to end.
 
 import asyncio
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
+from http import HTTPStatus
 import logging
 from operator import methodcaller
 import time
@@ -81,6 +82,11 @@ class RunnerObserver:
         keep-alive request that :meth:`Runner.run` sends right away; toggle outcomes count too. These calls arrive in
         the order the changes happened."""
 
+    def on_targets_gone(self, binding: SwitchBinding, targets: list[HueTarget]) -> None:
+        """A toggle of ``binding`` found these targets gone: the bridge answered 404 for them, as it has no such
+        resource any more. It comes right after :meth:`on_toggled`, so that the names are resolved again at once
+        (decision 32)."""
+
     def on_key_rejected(self) -> None:
         """The bridge rejected the application key (401 or 403): it ended a keep-alive request or a toggle. It comes
         after each such failure, right after the reachability report, so that Home Assistant can offer to pair the
@@ -134,22 +140,26 @@ def resolve_switches(
     return ResolvedSwitches(config, bindings, kept, renames)
 
 
+async def resolve_once(config: EngineConfig, hue: HueClient, remembered: Remembered | None = None) -> ResolvedSwitches:
+    """Resolves the switches with :func:`resolve_switches`, with the bridge's lights and groups as they are now. Raises
+    :class:`HueApiError` when the bridge can't list them."""
+    lights, groups = await hue.get_lights_and_groups()
+    return resolve_switches(config, lights, groups, remembered)
+
+
 async def resolve_bindings(
     config: EngineConfig, hue: HueClient, logger: logging.Logger = _LOGGER, remembered: Remembered | None = None
 ) -> ResolvedSwitches:
-    """Resolves the switches with :func:`resolve_switches`, with the bridge's lights and groups as they are now. Waits
-    for the bridge if it isn't usable yet, logging that on ``logger``, and raises :class:`HueApiError` when the bridge
-    refuses."""
+    """Resolves the switches with :func:`resolve_once`, and waits for the bridge if it isn't usable yet, logging that
+    on ``logger``. Raises :class:`HueApiError` when the bridge refuses."""
     while True:
         try:
-            lights, groups = await hue.get_lights_and_groups()
+            return await resolve_once(config, hue, remembered)
         except HueApiError as err:
             if not err.is_transient:
                 raise
             logger.warning("Hue bridge at %s not usable yet (%s); retrying in 10s.", config.hue.bridge_ip, err)
             await asyncio.sleep(RESOLVE_RETRY_DELAY)
-        else:
-            return resolve_switches(config, lights, groups, remembered)
 
 
 def labels(targets: Iterable[HueTarget]) -> str:
@@ -237,6 +247,20 @@ class Runner:
                 return
             _LOGGER.warning("Not seen on the LAN yet: %s", ", ".join(b.settings.display_name for b in missing))
             listener.query(SERVICE_TYPE, DnsRecordType.PTR)
+
+    def update_targets(self, bindings: Iterable[SwitchBinding]) -> None:
+        """Takes the targets and problems of a new resolution of the switches while the runner runs, without restarting
+        it (decision 32): each switch keeps its turn for toggles, its warnings and its tracker's baseline, and a toggle
+        that a press started before goes on with the targets that it had. Logs the new targets of each switch whose
+        targets changed."""
+        for new in bindings:
+            key = new.settings.normalized_device_id.casefold()
+            current = self._bindings.get(key)
+            if current is None or (current.targets, current.problems) == (new.targets, new.problems):
+                continue
+            self._bindings[key] = replace(current, targets=new.targets, problems=new.problems)
+            if current.targets != new.targets:
+                _LOGGER.info("%s -> %s", current.settings.display_name, labels(new.targets))
 
     def handle_packet(self, packet: MdnsPacket) -> None:
         """Handles a packet from the listener: logs what each broadcast of a configured switch means, and starts a
@@ -377,6 +401,8 @@ class Runner:
                     f" ({', '.join(notes)})" if notes else "",
                 )
                 self._notify(methodcaller("on_toggled", binding, result, elapsed))
+                if gone := [failure.target for failure in result.failures if failure.status == HTTPStatus.NOT_FOUND]:
+                    self._notify(methodcaller("on_targets_gone", binding, gone))
             except HueApiError as err:
                 # The bridge state could not be read, so the bridge is unusable right now.
                 self._report_bridge_reachability(False, str(err))

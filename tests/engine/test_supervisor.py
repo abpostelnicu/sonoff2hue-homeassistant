@@ -19,7 +19,7 @@ from custom_components.sonoff2hue.engine.hue_client import HueClient
 from custom_components.sonoff2hue.engine.mdns import MdnsListener
 from custom_components.sonoff2hue.engine.registry import DeviceRegistry
 from custom_components.sonoff2hue.engine.runner import ResolvedSwitches, RunnerObserver, SwitchBinding
-from custom_components.sonoff2hue.engine.status import ServiceState, ServiceStatus, StatusTracker
+from custom_components.sonoff2hue.engine.status import ServiceState, ServiceStatus, StatusSnapshot, StatusTracker
 from custom_components.sonoff2hue.engine.supervisor import BridgeSupervisor, HueClientFactory, create_hue_client
 from custom_components.sonoff2hue.engine.targets import EntryKey, Remembered, RememberedResource, Renamed
 from custom_components.sonoff2hue.engine.toggler import ToggleResult
@@ -51,8 +51,8 @@ async def time() -> AsyncIterator[VirtualTime]:
 
 
 class Bridge(InMemoryBridge):
-    """A Hue bridge with the light Ceiling (l1), whose name a test may change, which records when each request came,
-    and how many clients were made for it and closed."""
+    """A Hue bridge with the light Ceiling (l1), whose name a test may change and which it may delete (``gone``), which
+    records when each request came, and how many clients were made for it and closed."""
 
     def __init__(self, time: VirtualTime) -> None:
         super().__init__(self._answer)
@@ -60,6 +60,7 @@ class Bridge(InMemoryBridge):
         self._faults: list[list[Any]] = []
         self.on = False
         self.name = "Ceiling"
+        self.gone = False
         self.hang = False
         self.times: list[tuple[float, str]] = []
         self.created = 0
@@ -95,11 +96,14 @@ class Bridge(InMemoryBridge):
                 fault[3] = None if count is None else count - 1
                 return status, body
         if request.method == "PUT" and request.path == "/clip/v2/resource/light/l1":
+            if self.gone:
+                return 404, '{"errors":[{"description":"not found"}],"data":[]}'
             self.on = request.on
             return 200, NO_ERRORS
+        light = {"id": "l1", "metadata": {"name": self.name}, "on": {"on": self.on}}
         data: list[dict[str, Any]] = {
             "/clip/v2/resource/bridge": [{"id": "b1", "type": "bridge"}],
-            "/clip/v2/resource/light": [{"id": "l1", "metadata": {"name": self.name}, "on": {"on": self.on}}],
+            "/clip/v2/resource/light": [] if self.gone else [light],
             "/clip/v2/resource/room": [],
             "/clip/v2/resource/zone": [],
         }[request.path]
@@ -680,6 +684,130 @@ async def test_an_on_resolved_that_raises_does_not_stop_the_supervisor(time: Vir
     assert harness.status.history == [(0, State.CONNECTING, CONNECTING), (0, State.RUNNING, RUNNING)]
     assert harness.running is not None
     assert not harness.running.done()
+    await harness.stop()
+
+
+# Resolving again while the runner runs (decision 32).
+
+MISSING = "1 wall switch toggles 0 Hue lights, rooms and zones; 1 is missing."
+
+
+async def test_the_switches_are_resolved_again_every_15_minutes_and_the_runner_takes_their_new_targets(
+    time: VirtualTime, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Without a restart: the runner keeps the switch's baseline, and a rename is reported as at the start."""
+    caplog.set_level(logging.INFO)
+    resolutions: list[tuple[float, ResolvedSwitches]] = []
+    harness = Harness(
+        time,
+        EngineConfig(PAIRED, [hall()]),
+        on_resolved=lambda resolved: resolutions.append((time.elapsed, resolved)),
+    )
+    published: list[StatusSnapshot] = []
+    harness.status.add_listener(published.append)
+    await harness.start()
+    await asyncio.sleep(1)
+    harness.broadcast(1)
+    await asyncio.sleep(100)
+    harness.bridge.name = "Ceiling lamp"
+    await asyncio.sleep(800)
+
+    # The resolutions at 0 and 900 s, each one read of the lights.
+    assert harness.bridge.requested("/clip/v2/resource/light") == pytest.approx([0, 900])
+    assert harness.status.snapshot().switches[0].targets == ("light 'Ceiling lamp'",)
+    assert [(at, [rename.new_entry for rename in resolved.renames]) for at, resolved in resolutions] == [
+        (0, []),
+        (900, ["Ceiling lamp"]),
+    ]
+    # The status published the new targets, without moving since.
+    assert published[-1].switches[0].targets == ("light 'Ceiling lamp'",)
+    assert published[-1].service.since == VirtualTime.START
+
+    harness.broadcast(2)
+    await asyncio.sleep(1)
+
+    assert harness.bridge.on is True
+    assert harness.status.history == [(0, State.CONNECTING, CONNECTING), (0, State.RUNNING, RUNNING)]
+    assert harness.bridge.created == 1
+    lines = [record.getMessage() for record in caplog.records]
+    assert lines.count("Listening for wall switch presses.") == 1
+    assert "Hall (1000abcdef) -> light 'Ceiling lamp'" in lines
+    await harness.stop()
+
+
+async def test_while_a_switch_misses_an_entry_the_switches_are_resolved_again_every_minute(
+    time: VirtualTime, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Until it is found; each problem is warned about once."""
+    caplog.set_level(logging.INFO, logger=supervisor.__name__)
+    harness = Harness(time, EngineConfig(PAIRED, [hall("Porch")]))
+    await harness.start()
+    await asyncio.sleep(90)
+    harness.bridge.name = "Porch"
+    await asyncio.sleep(1000)
+
+    assert harness.bridge.requested("/clip/v2/resource/light") == pytest.approx([0, 60, 120, 1020])
+    assert harness.status.history == [
+        (0, State.CONNECTING, CONNECTING),
+        (0, State.RUNNING, MISSING),
+        (120, State.RUNNING, RUNNING),
+    ]
+    assert supervisor_log(caplog) == [
+        (logging.WARNING, "Hall (1000abcdef): no Hue light named 'Porch'. Known lights: 'Ceiling'")
+    ]
+    await harness.stop()
+
+
+async def test_a_toggle_that_finds_a_target_gone_resolves_the_switches_again_at_once(time: VirtualTime) -> None:
+    harness = Harness(time, EngineConfig(PAIRED, [hall()]))
+    await harness.start()
+    await asyncio.sleep(1)
+    harness.broadcast(1)
+    await asyncio.sleep(1)
+    harness.bridge.gone = True
+    harness.broadcast(2)
+    await asyncio.sleep(70)
+
+    # The toggle's read and the resolution after its 404, both at 2 s, then one a minute later.
+    assert harness.bridge.requested("/clip/v2/resource/light") == pytest.approx([0, 2, 2, 62])
+    (switch,) = harness.status.snapshot().switches
+    assert (switch.targets, switch.problems) == (
+        (),
+        ("Hall (1000abcdef): no Hue light named 'Ceiling'. Known lights: (none)",),
+    )
+    assert harness.status.history[-1] == (2, State.RUNNING, MISSING)
+    assert switch.last_action is not None
+    assert (switch.last_action.changed, switch.last_action.failed) == (0, 1)
+    await harness.stop()
+
+
+async def test_a_bridge_error_while_resolving_again_changes_nothing(
+    time: VirtualTime, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The keep-alive tells whether the bridge is reachable; the next resolution comes after the same interval."""
+    caplog.set_level(logging.DEBUG, logger=supervisor.__name__)
+    resolutions: list[float] = []
+    harness = Harness(
+        time, EngineConfig(PAIRED, [hall()]), on_resolved=lambda resolved: resolutions.append(time.elapsed)
+    )
+    await harness.start()
+    await asyncio.sleep(899)
+    harness.bridge.fail("/clip/v2/resource/light", 503, count=1)
+    harness.bridge.name = "Ceiling lamp"
+    await asyncio.sleep(2)
+    stayed = harness.status.snapshot().switches[0].targets
+    await asyncio.sleep(900)
+
+    assert stayed == ("light 'Ceiling'",)
+    assert resolutions == pytest.approx([0, 1800])
+    assert harness.bridge.requested("/clip/v2/resource/light") == pytest.approx([0, 900, 1800])
+    assert harness.status.history == [(0, State.CONNECTING, CONNECTING), (0, State.RUNNING, RUNNING)]
+    assert harness.status.snapshot().switches[0].targets == ("light 'Ceiling lamp'",)
+    assert (
+        logging.DEBUG,
+        "The lights, rooms and zones stay as they were: the Hue bridge didn't list them (Hue bridge returned 503 Service "
+        "Unavailable for GET /clip/v2/resource/light).",
+    ) in supervisor_log(caplog)
     await harness.stop()
 
 

@@ -95,14 +95,16 @@ def relay(detached: bool) -> dict[str, Any]:
 class Bridge(InMemoryBridge):
     """A Hue bridge in memory, with the lights Ceiling (l1) and Desk (l2) and the room Hall (r1), which switches both
     through its grouped light g1, and the zones that ``POST /clip/v2/resource/zone`` creates, which it lists and gives
-    by id. ``names`` holds the names of l1, l2 and r1, which a test may change. It records the requests, and how many
-    clients were made for it and closed. ``hold`` keeps the answers to requests for a path until the test releases
-    them."""
+    by id. ``names`` holds the names of l1, l2 and r1, which a test may change, and ``deleted`` the ones that a test
+    deleted, as the Hue app does: they aren't listed, nor among the zones' children, and their PUTs are answered 404. It
+    records the requests, and how many clients were made for it and closed. ``hold`` keeps the answers to requests for
+    a path until the test releases them."""
 
     def __init__(self) -> None:
         super().__init__(self._answer)
         self.on = {"l1": False, "l2": False}
         self.names = {"l1": "Ceiling", "l2": "Desk", "r1": "Hall"}
+        self.deleted: set[str] = set()
         self.created = 0
         self.closed = 0
         self.zones: list[dict[str, Any]] = []
@@ -169,6 +171,10 @@ class Bridge(InMemoryBridge):
         )
         return zone_id
 
+    def _listed(self, zone: dict[str, Any]) -> dict[str, Any]:
+        """A zone as it is listed: without the lights that a test deleted among its children."""
+        return {**zone, "children": [child for child in zone["children"] if child["rid"] not in self.deleted]}
+
     def _now(self, request: RecordedRequest) -> tuple[int, str]:
         for fault in self._faults:
             path, status, body, count, method = fault
@@ -179,17 +185,21 @@ class Bridge(InMemoryBridge):
             return 200, json.dumps({"errors": [], "data": [{"rid": self._create_zone(request), "rtype": "zone"}]})
         if request.path.startswith("/clip/v2/resource/zone/"):
             zone_id = request.path.rsplit("/", 1)[-1]
-            return 200, json.dumps({"errors": [], "data": [zone for zone in self._zones() if zone["id"] == zone_id]})
+            zones = [self._listed(zone) for zone in self._zones() if zone["id"] == zone_id]
+            return 200, json.dumps({"errors": [], "data": zones})
+        lights = [light for light in ("l1", "l2") if light not in self.deleted]
+        room = "r1" not in self.deleted
         if request.method == "PUT":
             target = request.path.rsplit("/", 1)[-1]
-            for light in ["l1", "l2"] if target == "g1" else [target]:
+            if target in self.deleted or (target == "g1" and not room):
+                return 404, '{"errors":[{"description":"not found"}],"data":[]}'
+            for light in lights if target == "g1" else [target]:
                 self.on[light] = request.on
             return 200, NO_ERRORS
         data: list[dict[str, Any]] = {
             "/clip/v2/resource/bridge": [{"id": "b1", "type": "bridge"}],
             "/clip/v2/resource/light": [
-                {"id": light, "metadata": {"name": self.names[light]}, "on": {"on": on}}
-                for light, on in self.on.items()
+                {"id": light, "metadata": {"name": self.names[light]}, "on": {"on": self.on[light]}} for light in lights
             ],
             "/clip/v2/resource/room": [
                 {
@@ -197,9 +207,13 @@ class Bridge(InMemoryBridge):
                     "metadata": {"name": self.names["r1"]},
                     "services": [{"rid": "g1", "rtype": "grouped_light"}],
                 }
-            ],
-            "/clip/v2/resource/zone": self._zones(),
-            "/clip/v2/resource/grouped_light": [{"id": "g1", "on": {"on": any(self.on.values())}}],
+            ]
+            if room
+            else [],
+            "/clip/v2/resource/zone": [self._listed(zone) for zone in self._zones()],
+            "/clip/v2/resource/grouped_light": [{"id": "g1", "on": {"on": any(self.on[light] for light in lights)}}]
+            if room
+            else [],
         }[request.path]
         return 200, json.dumps({"errors": [], "data": data})
 

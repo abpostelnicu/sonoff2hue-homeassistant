@@ -16,11 +16,22 @@ RETRY_DELAY = 0.3
 
 
 @dataclass(frozen=True, slots=True)
+class TargetFailure:
+    """A target that the bridge didn't switch, and the HTTP status of the bridge's answer, ``None`` without one: 404
+    means that the bridge has no such resource."""
+
+    target: HueTarget
+    status: int | None
+
+
+@dataclass(frozen=True, slots=True)
 class ToggleResult:
     turned_on: bool
     changed: int
     unchanged: int
     failed: int
+    """How many targets the bridge didn't switch: those of ``failures``."""
+    failures: tuple[TargetFailure, ...] = ()
 
 
 class HueToggler:
@@ -30,7 +41,8 @@ class HueToggler:
 
     async def toggle(self, targets: list[HueTarget]) -> ToggleResult:
         """Reads the states, then switches the targets one after the other; a target the bridge doesn't switch counts
-        as failed. Raises :class:`HueApiError` when the states can't be read."""
+        as failed, with the status of the bridge's answer. Raises :class:`HueApiError` when the states can't be
+        read."""
         kinds = {target.kind for target in targets}
         light_states: dict[str, bool] = (
             await _with_retry(self._hue.get_light_states) if HueTargetKind.LIGHT in kinds else {}
@@ -44,7 +56,8 @@ class HueToggler:
             return states.get(target.id)
 
         turn_on = not any(state_of(target) is True for target in targets)
-        changed = unchanged = failed = 0
+        changed = unchanged = 0
+        failures: list[TargetFailure] = []
         # Sequential on purpose: reuses the warm TLS connection and respects the bridge's rate limits.
         for target in targets:
             if state_of(target) == turn_on:
@@ -54,10 +67,10 @@ class HueToggler:
                 await _with_retry(partial(self._hue.set_on, target, turn_on))
                 changed += 1
             except HueApiError as err:
-                failed += 1
+                failures.append(TargetFailure(target, err.status))
                 # The bridge's message says what failed; a stack trace would add nothing.
                 self._logger.error("Could not switch %s %s: %s", target, "on" if turn_on else "off", err)  # noqa: TRY400
-        return ToggleResult(turn_on, changed, unchanged, failed)
+        return ToggleResult(turn_on, changed, unchanged, len(failures), tuple(failures))
 
 
 async def _with_retry[T](action: Callable[[], Awaitable[T]]) -> T:

@@ -227,11 +227,12 @@ Home Assistant's storage (`.storage/sonoff2hue.<entry id>`, deleted with the int
 
 - When you rename one in the Hue app, the switch still finds it, and sonoff2hue saves the new name in the switch, as
   *Switch settings* would save it: the new name, or the id when another one of its kind has that name. It then
-  restarts its connection to the bridge with the new name. It notices a rename when it starts, and when its bridge or
-  its switches change.
+  restarts its connection to the bridge with the new name. It notices a rename when it starts, when its bridge or its
+  switches change, and within 15 minutes while it runs.
 - When it no longer finds one, for example because it was deleted in the Hue app, the switch goes on toggling the
   others, and the repair *Some lights, rooms or zones of … are missing* says which one and why. The other switches
-  aren't affected.
+  aren't affected. sonoff2hue looks for it again every minute, and notices a deletion at the next press, when the
+  bridge says that it no longer has that light, room or zone.
 
 If the bridge can't list its lights, because it isn't paired or doesn't answer, choose *Try again* or *Enter them by
 hand*: light names or ids, and rooms and zones as `room:Name` or `zone:Name` (or ids), separated by commas. If the
@@ -362,9 +363,8 @@ sonoff2hue reports these in Settings → System → Repairs:
 - *Some lights, rooms or zones of … are missing*: the switch can't toggle some of its lights, rooms or zones, and it
   lists why: one isn't on the bridge, for example because it was deleted in the Hue app, a name matches several of them,
   or a room or zone has no lights. The switch goes on toggling the others, and when none is left, each press fails.
-  The other switches aren't affected. Edit the switch to choose them again. If you fix them in the Hue app instead,
-  reload the integration (⋮ → *Reload*): sonoff2hue looks them up again when it starts, or when its bridge or its
-  switches change.
+  The other switches aren't affected. Edit the switch to choose them again, or fix them in the Hue app: sonoff2hue
+  looks for them again every minute, and the repair goes once it finds them.
 - *… is not in detached relay mode*: the MINIR4M reports that its relay isn't detached, so the wall switch cuts the
   power to the lights. sonoff2hue can tell when it decrypts the announcements with the switch's device key. Turn on
   **Detach relay** in the eWeLink app; the repair goes away with the switch's next announcement.

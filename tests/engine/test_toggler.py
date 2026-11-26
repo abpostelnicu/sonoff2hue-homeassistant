@@ -10,7 +10,7 @@ from custom_components.sonoff2hue.engine import toggler
 from custom_components.sonoff2hue.engine.config import SwitchSettings
 from custom_components.sonoff2hue.engine.hue_client import HueApiError, HueTarget, HueTargetKind
 from custom_components.sonoff2hue.engine.targets import resolve
-from custom_components.sonoff2hue.engine.toggler import HueToggler, ToggleResult
+from custom_components.sonoff2hue.engine.toggler import HueToggler, TargetFailure, ToggleResult
 
 from ..hue import FakeHueHost, InMemoryBridge, RecordedRequest
 from .fakes import until
@@ -74,7 +74,7 @@ async def test_a_write_answered_with_errors_counts_as_failed() -> None:
 
     result = await HueToggler(bridge.client(), LOGGER).toggle([light("l1"), light("l2")])
 
-    assert result == ToggleResult(turned_on=True, changed=1, unchanged=0, failed=1)
+    assert result == ToggleResult(True, 1, 0, 1, (TargetFailure(light("l1"), 207),))
     assert len(bridge.requests) == 3
 
 
@@ -104,7 +104,7 @@ async def test_transient_errors_are_retried_once_and_failures_dont_stop_the_othe
 
     result = await HueToggler(hue, LOGGER).toggle([light("l1"), light("l2"), light("l3")])
 
-    assert result == ToggleResult(turned_on=True, changed=2, unchanged=0, failed=1)
+    assert result == ToggleResult(True, 2, 0, 1, (TargetFailure(light("l2"), 503),))
     assert hue.sets == [("l1", True), ("l3", True)]
     assert [r.getMessage() for r in caplog.records if r.levelno == logging.ERROR] == [
         "Could not switch light 'l2' on: bridge busy"
@@ -160,7 +160,8 @@ async def test_a_write_refused_for_good_is_not_tried_again(caplog: pytest.LogCap
 
     result = await HueToggler(bridge.client(), LOGGER).toggle([light("l1")])
 
-    assert result == ToggleResult(turned_on=True, changed=0, unchanged=0, failed=1)
+    # The bridge has no such light: the status tells (decision 32).
+    assert result == ToggleResult(True, 0, 0, 1, (TargetFailure(light("l1"), 404),))
     assert [r.method for r in bridge.requests] == ["GET", "PUT"]
     message = "Could not switch light 'l1' on: Hue bridge returned 404 Not Found for PUT /clip/v2/resource/light/l1"
     assert [r.getMessage() for r in caplog.records if r.levelno == logging.ERROR] == [f"{message}: not found"]

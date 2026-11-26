@@ -5,7 +5,9 @@ paired, that a switch is configured, that :meth:`EngineConfig.validate_for_run` 
 for the bridge's settings. Then it waits for the bridge, resolves the switches' lights, rooms and zones, and runs the
 :class:`Runner` on the config entry's mDNS listener, which the LAN monitor runs and keeps running. Each switch is resolved
 on its own: an entry that resolves to nothing is a problem of that switch, which toggles the others, and never stops
-another switch (decision 32). Each step is reported to the :class:`StatusTracker`, which is also the runner's observer.
+another switch (decision 32). While the runner runs, the supervisor resolves the switches again, every 60 s while one
+of them has such an entry, else every 15 minutes, and at once after a toggle found a target gone, and hands the new
+targets to the running runner. Each step is reported to the :class:`StatusTracker`, which is also the runner's observer.
 A check that fails holds its state until the configuration changes; an unexpected failure starts the bridge again 30 s
 later.
 
@@ -21,14 +23,15 @@ reports what each resolution found and which resources were renamed, which the r
 
 import asyncio
 from collections.abc import Callable
+import contextlib
 from datetime import UTC, datetime, timedelta
 import logging
 from typing import NoReturn
 
 from .config import ConfigError, EngineConfig, HueSettings
-from .hue_client import PAIR_AGAIN, HueApiError, HueClient
+from .hue_client import PAIR_AGAIN, HueApiError, HueClient, HueTarget
 from .mdns import MdnsListener
-from .runner import ResolvedSwitches, Runner, RunnerObserver, SwitchBinding, resolve_bindings
+from .runner import ResolvedSwitches, Runner, RunnerObserver, SwitchBinding, resolve_bindings, resolve_once
 from .status import ServiceState, StatusTracker
 from .targets import Remembered
 from .toggler import ToggleResult
@@ -39,6 +42,10 @@ BRIDGE_RETRY_DELAY = 10.0
 """Seconds between the attempts to reach the bridge."""
 FAILURE_RETRY_DELAY = 30.0
 """Seconds before the bridge is started again after an unexpected stop."""
+TARGETS_CHECK_INTERVAL = 15 * 60.0
+"""Seconds between the resolutions of the switches while the runner runs, which notice a rename (decision 32)."""
+MISSING_TARGETS_CHECK_INTERVAL = 60.0
+"""Seconds between them while a switch has an entry that resolves to nothing, which notice a fix within a minute."""
 
 _PAIR_AGAIN_SENTENCE = PAIR_AGAIN[:1].upper() + PAIR_AGAIN[1:]
 NOT_PAIRED = "Pair the Hue bridge to get started: reconfigure the sonoff2hue integration."
@@ -169,16 +176,57 @@ class BridgeSupervisor:
             if _is_blank(settings.hue.certificate_sha256):
                 _LOGGER.warning(NOT_PINNED)
             self._report_resolved(resolved)
-            bindings = resolved.bindings
-            for binding in bindings:
-                for problem in binding.problems:
-                    _LOGGER.warning("%s", problem)
 
-            self._status.set_running(bindings)
-            observer = _Observer(self._status, self._report_key_rejected, self._observer)
-            await Runner(settings, bindings, hue, observer, self._clock).run(self._listener)
+            self._status.set_running(resolved.bindings)
+            check_now = asyncio.Event()
+            observer = _Observer(self._status, self._report_key_rejected, self._observer, check_now.set)
+            runner = Runner(settings, resolved.bindings, hue, observer, self._clock)
+            # Eager: the runner adds its packet handler in this turn of the event loop, in which the status says that
+            # it runs, so that from then on a broadcast reaches it.
+            running = asyncio.get_running_loop().create_task(runner.run(self._listener), eager_start=True)
+            try:
+                await self._keep_targets_current(hue, runner, running, check_now, resolved)
+            finally:
+                running.cancel()
+                await asyncio.wait([running])
         finally:
             await hue.close()
+
+    async def _keep_targets_current(
+        self,
+        hue: HueClient,
+        runner: Runner,
+        running: asyncio.Task[None],
+        check_now: asyncio.Event,
+        resolved: ResolvedSwitches,
+    ) -> None:
+        """Resolves the switches again while the runner runs (decision 32): every 60 s while a switch has an entry that
+        resolves to nothing, else every 15 minutes, and at once when ``check_now`` is set, after a toggle found targets
+        gone. The new targets and problems go to the running runner and to the status, and the resolution is reported
+        as at the start, renames included. A bridge error changes nothing. Returns when the runner returns, and raises
+        what it raised."""
+        running.add_done_callback(lambda _: check_now.set())
+        while True:
+            problems = any(binding.problems for binding in resolved.bindings)
+            with contextlib.suppress(TimeoutError):
+                async with asyncio.timeout(MISSING_TARGETS_CHECK_INTERVAL if problems else TARGETS_CHECK_INTERVAL):
+                    await check_now.wait()
+            if running.done():
+                running.result()
+                return
+
+            check_now.clear()
+            try:
+                current = await resolve_once(self._config, hue, self._remembered)
+            except HueApiError as err:
+                _LOGGER.debug(
+                    "The lights, rooms and zones stay as they were: the Hue bridge didn't list them (%s).", err
+                )
+                continue
+            self._report_resolved(current, resolved)
+            runner.update_targets(current.bindings)
+            self._status.set_running(current.bindings)
+            resolved = current
 
     def _report_key_rejected(self) -> None:
         """Runs the hook on the event loop's next turn, so that one that raises can't stop the supervisor or the
@@ -186,9 +234,16 @@ class BridgeSupervisor:
         if self._on_key_rejected is not None:
             asyncio.get_running_loop().call_soon(self._on_key_rejected)
 
-    def _report_resolved(self, resolved: ResolvedSwitches) -> None:
-        """Remembers what the resolution found, for the next one, and runs the hook on the event loop's next turn, as
-        :meth:`_report_key_rejected` does."""
+    def _report_resolved(self, resolved: ResolvedSwitches, previous: ResolvedSwitches | None = None) -> None:
+        """Warns about each problem that ``previous`` didn't have, remembers what the resolution found, for the next
+        one, and runs the hook on the event loop's next turn, as :meth:`_report_key_rejected` does."""
+        known = (
+            set() if previous is None else {problem for binding in previous.bindings for problem in binding.problems}
+        )
+        for binding in resolved.bindings:
+            for problem in binding.problems:
+                if problem not in known:
+                    _LOGGER.warning("%s", problem)
         self._remembered = resolved.remembered
         if self._on_resolved is not None:
             asyncio.get_running_loop().call_soon(self._on_resolved, resolved)
@@ -218,13 +273,19 @@ class BridgeSupervisor:
 
 class _Observer(RunnerObserver):
     """The runner's observer: every report goes to the status tracker, then to the supervisor's ``observer`` if it has
-    one, and a rejected key to the supervisor's hook as well."""
+    one, a rejected key to the supervisor's hook as well, and targets gone to ``targets_gone``, which checks the
+    targets again."""
 
     def __init__(
-        self, status: StatusTracker, key_rejected: Callable[[], None], observer: RunnerObserver | None = None
+        self,
+        status: StatusTracker,
+        key_rejected: Callable[[], None],
+        observer: RunnerObserver | None = None,
+        targets_gone: Callable[[], None] | None = None,
     ) -> None:
         self._observers: tuple[RunnerObserver, ...] = (status,) if observer is None else (status, observer)
         self._key_rejected = key_rejected
+        self._targets_gone = targets_gone
 
     def on_press(self, binding: SwitchBinding, seq: int | None) -> None:
         for observer in self._observers:
@@ -245,6 +306,12 @@ class _Observer(RunnerObserver):
     def on_bridge_reachability(self, reachable: bool, message: str | None) -> None:
         for observer in self._observers:
             observer.on_bridge_reachability(reachable, message)
+
+    def on_targets_gone(self, binding: SwitchBinding, targets: list[HueTarget]) -> None:
+        for observer in self._observers:
+            observer.on_targets_gone(binding, targets)
+        if self._targets_gone is not None:
+            self._targets_gone()
 
     def on_key_rejected(self) -> None:
         for observer in self._observers:
