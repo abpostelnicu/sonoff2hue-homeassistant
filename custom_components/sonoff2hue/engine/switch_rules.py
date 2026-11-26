@@ -164,9 +164,19 @@ type ResolveTargets = Callable[[SwitchSettings, list[HueLight], list[HueGroup], 
 
 
 @dataclass(frozen=True, slots=True)
+class BridgeLists:
+    """The bridge's lights, and its rooms and zones with the lights each holds, as a check read them."""
+
+    lights: list[HueLight]
+    groups: list[HueGroup]
+
+
+@dataclass(frozen=True, slots=True)
 class TargetCheck:
     errors: list[str]
     warnings: list[str]
+    lists: BridgeLists | None = None
+    """What the bridge listed, which the entries were resolved against; ``None`` when it wasn't asked."""
 
 
 async def check_targets(
@@ -187,7 +197,7 @@ async def check_targets(
         )
     errors: list[str] = []
     resolve(candidate, lights, groups, errors)
-    return TargetCheck(errors, [])
+    return TargetCheck(errors, [], BridgeLists(lights, groups))
 
 
 def hue_resources(lights: Sequence[HueLight], groups: Sequence[HueGroup]) -> Resources:
@@ -232,11 +242,13 @@ async def load_resources(hue: HueSettings, connect: ConnectHue) -> Resources:
 
 @dataclass(frozen=True, slots=True)
 class SwitchWrite:
-    """A switch to save, with the warnings to show. ``index`` is the position of the switch it replaces."""
+    """A switch to save, with the warnings to show. ``index`` is the position of the switch it replaces, and ``lists``
+    are the bridge's lights, rooms and zones that the check read, ``None`` when it didn't ask the bridge."""
 
     switch: SwitchSettings
     warnings: list[str]
     index: int | None = None
+    lists: BridgeLists | None = None
 
 
 def _position(switches: Sequence[SwitchSettings], device_id: str) -> int | None:
@@ -265,7 +277,7 @@ async def create_switch(
 
     if _position(current(), candidate.device_id) is not None:
         raise SwitchConflictError(conflict)
-    return SwitchWrite(candidate, check.warnings)
+    return SwitchWrite(candidate, check.warnings, lists=check.lists)
 
 
 async def update_switch(
@@ -299,4 +311,4 @@ async def update_switch(
     # The device key belongs to the device, so it is only kept while the device stays the same.
     if switch.device_key is None and same_device:
         candidate.device_key = switches[index].device_key
-    return SwitchWrite(candidate, check.warnings, index)
+    return SwitchWrite(candidate, check.warnings, index, check.lists)

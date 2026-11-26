@@ -11,6 +11,7 @@ from custom_components.sonoff2hue.engine import switch_rules
 from custom_components.sonoff2hue.engine.config import ConfigError, HueSettings, SwitchSettings
 from custom_components.sonoff2hue.engine.hue_client import HueApiError, HueGroup, HueLight
 from custom_components.sonoff2hue.engine.switch_rules import (
+    BridgeLists,
     HueResources,
     SwitchConflictError,
     SwitchInput,
@@ -245,9 +246,24 @@ async def test_check_targets_resolves_against_a_reachable_bridge() -> None:
     check = await switch_rules.check_targets(candidate, PAIRED, bridge.connect)
 
     assert check == switch_rules.TargetCheck(
-        ["Hall (1000abcdef): no Hue light named 'Garage'. Known lights: 'Ceiling', 'Floor lamp'"], []
+        ["Hall (1000abcdef): no Hue light named 'Garage'. Known lights: 'Ceiling', 'Floor lamp'"],
+        [],
+        BridgeLists([CEILING, FLOOR_LAMP], [HALLWAY]),
     )
     assert (bridge.opened, bridge.closed) == (1, 1)
+
+
+@pytest.mark.parametrize(("hue", "lists"), [(PAIRED, BridgeLists([CEILING, FLOOR_LAMP], [HALLWAY])), (UNPAIRED, None)])
+async def test_a_switch_to_save_comes_with_the_lists_that_the_bridge_gave_its_check(
+    hue: HueSettings, lists: BridgeLists | None
+) -> None:
+    """The switch dialog offers a room or zone from them (decision 34); without a paired bridge there are none."""
+    switches: list[SwitchSettings] = []
+
+    created = await create(switches, SwitchInput("Hall", _DEVICE, lights=["Ceiling", "Floor lamp"]), hue)
+    updated = await update(switches, _DEVICE, SwitchInput("Hall", _DEVICE, groups=["room:Hallway"]), hue)
+
+    assert (created.lists, updated.lists) == (lists, lists)
 
 
 async def test_check_targets_can_take_another_resolver() -> None:
