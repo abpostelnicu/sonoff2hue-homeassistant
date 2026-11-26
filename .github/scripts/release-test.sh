@@ -1575,6 +1575,128 @@ tag_run_fails
 tag_unfit_outputs
 
 echo
+echo "Mistakes that the checks above catch"
+# mistake DESCRIPTION FILE OLD NEW CHECK...: in a copy of .github/scripts and .github/workflows whose FILE, such as
+# .github/workflows/tag.yml, has NEW in place of OLD, which it has exactly once, at least one of the checks that the
+# functions CHECK... run fails. The copy's release.sh is the scratch checkout's meanwhile.
+mistake() {
+    local description=$1 file=$2 old=$3 new=$4 output failed
+    shift 4
+    rm -rf "$scratch/copy"
+    mkdir -p "$scratch/copy/.github"
+    cp -R "$root/.github/scripts" "$root/.github/workflows" "$scratch/copy/.github/"
+    if ! "$python" -c '
+import sys
+
+path, old, new = sys.argv[1:]
+with open(path, encoding="utf-8") as file:
+    text = file.read()
+if text.count(old) != 1:
+    sys.exit(f"{path} has {old!r} {text.count(old)} times, not once")
+with open(path, "w", encoding="utf-8") as file:
+    file.write(text.replace(old, new))
+' "$scratch/copy/$file" "$old" "$new"; then
+        fail "the mistake can't be made, as $file has changed: $description"
+        return
+    fi
+    output=$(
+        set +e
+        release=$scratch/copy/.github/scripts/release.sh
+        workflow=$scratch/copy/.github/workflows/release.yml
+        tag_workflow=$scratch/copy/.github/workflows/tag.yml
+        ci_workflow=$scratch/copy/.github/workflows/ci.yml
+        cp "$release" "$workspace/.github/scripts/release.sh"
+        for check_function in "$@"; do
+            "$check_function"
+        done 2>&1
+    ) || true
+    cp "$root/.github/scripts/release.sh" "$workspace/.github/scripts/release.sh"
+    failed=$(printf '%s\n' "$output" | grep -c '^  FAIL  ' || true)
+    if [ "$failed" -gt 0 ]; then
+        pass "caught by $* ($failed failed): $description"
+    else
+        fail "not caught by $*: $description"
+    fi
+}
+
+# Each OLD and NEW as the files have them, so in single quotes.
+# shellcheck disable=SC2016
+mistakes() {
+    local workflows=.github/workflows checkout run_first
+    checkout=$'    steps:\n      - uses: actions/checkout@v7\n\n      # An annotated tag'
+    run_first=$'      - name: Run the Release workflow first\n'
+    run_first+=$'        run: gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "v$VERSION"\n\n'
+    run_first+=$'      - name: Tag the commit vX.Y.Z\n'
+    mistake "Release also runs for pull requests" "$workflows/release.yml" \
+        $'  workflow_dispatch:\n' $'  workflow_dispatch:\n  pull_request:\n' structure_checks
+    mistake "Release asks for an input when it is run" "$workflows/release.yml" \
+        $'  workflow_dispatch:\n' $'  workflow_dispatch:\n    inputs:\n      tag:\n        type: string\n' \
+        structure_checks
+    mistake "Release's checkout keeps its credentials" "$workflows/release.yml" \
+        'persist-credentials: false' 'persist-credentials: true' structure_checks
+    mistake "Release's check job takes a version without checking the ref" "$workflows/release.yml" \
+        'version=$(.github/scripts/release.sh version "$GITHUB_REF")' 'version=1.1.0' release_on_main
+    mistake "Release takes a branch for a tag without saying so" .github/scripts/release.sh \
+        '    if [ "$tag" = "$1" ]; then' '    if false; then' release_on_main
+    mistake "Release generates notes as well as the notes file's" "$workflows/release.yml" \
+        'options+=(--notes-file "$RUNNER_TEMP/notes.md")' \
+        'options+=(--notes-file "$RUNNER_TEMP/notes.md" --generate-notes)' release_notes_file
+    mistake "Release generates notes in place of the notes file's" "$workflows/release.yml" \
+        '            options+=(--notes-file "$RUNNER_TEMP/notes.md")' '            options+=(--generate-notes)' \
+        release_notes_file
+    mistake "Release reads the notes on main, not in the tagged commit" "$workflows/release.yml" \
+        'contents/$notes?ref=$GITHUB_SHA' 'contents/$notes?ref=main' release_notes_file
+    mistake "Release takes any failure to read the notes for a missing file" "$workflows/release.yml" \
+        'elif grep -qF "(HTTP 404)" "$RUNNER_TEMP/notes.log"; then' 'elif true; then' release_notes_unreadable
+    mistake "Tag the release checks out the repository in its tag job" "$workflows/tag.yml" \
+        $'    steps:\n      # An annotated tag' "$checkout" structure_checks
+    mistake "Tag the release's checkout keeps its credentials" "$workflows/tag.yml" \
+        'persist-credentials: false' 'persist-credentials: true' structure_checks
+    mistake "Tag the release doesn't check CI's conclusion" "$workflows/tag.yml" \
+        "github.event.workflow_run.conclusion == 'success' && " '' structure_checks
+    mistake "Tag the release runs after CI failed on the release commit" "$workflows/tag.yml" \
+        "github.event.workflow_run.conclusion == 'success' && " '' tag_after_failed_ci
+    mistake "Tag the release runs after CI was cancelled on the release commit" "$workflows/tag.yml" \
+        "github.event.workflow_run.conclusion == 'success' && " '' tag_after_cancelled_ci
+    mistake "Tag the release runs after CI on a pull request" "$workflows/tag.yml" \
+        " && github.event.workflow_run.event == 'push'" '' tag_after_pull_request
+    mistake "Tag the release's tag job runs without a commit to tag" "$workflows/tag.yml" \
+        $'    if: needs.check.outputs.tag == \'true\'\n' '' tag_without_notes
+    mistake "Tag the release tags a commit without the notes file" "$workflows/tag.yml" \
+        'if [[ $entry != *" blob "* ]]; then' 'if false; then' tag_without_notes
+    mistake "Tag the release takes a version that isn't X.Y.Z" .github/scripts/release.sh \
+        '|| [[ ! $version =~ $version_re ]]' '' tag_bad_version
+    mistake "Tag the release doesn't see that the tag names this commit" "$workflows/tag.yml" \
+        'if [ "$tagged" = "$SHA" ]; then' 'if false; then' tag_already_on_commit
+    mistake "Tag the release fails for the tag on a commit before this one" "$workflows/tag.yml" \
+        'elif git merge-base --is-ancestor "$tagged" "$SHA" 2> /dev/null; then' 'elif false; then' \
+        tag_on_earlier_commit
+    mistake "Tag the release takes a tag on any commit for one before this one" "$workflows/tag.yml" \
+        'elif git merge-base --is-ancestor "$tagged" "$SHA" 2> /dev/null; then' 'elif true; then' \
+        tag_on_later_commit
+    mistake "Tag the release takes a failed read for a missing tag" "$workflows/tag.yml" \
+        'if [[ $tagged != *"(HTTP 422)"* ]]; then' 'if false; then' tag_unreadable
+    mistake "Tag the release accepts a lower version" "$workflows/tag.yml" \
+        '.github/scripts/release.sh check-higher "$VERSION" <<< "$released"' 'true' tag_not_higher
+    mistake "check-higher accepts a version that isn't higher" .github/scripts/release.sh \
+        $'fail "$version isn\'t higher than every released version' \
+        $'echo "$version isn\'t higher than every released version' tag_not_higher higher_checks
+    mistake "Tag the release tags main's newest commit, not the one that CI passed on" "$workflows/tag.yml" \
+        '      sha: ${{ github.event.workflow_run.head_sha }}' '      sha: ${{ github.sha }}' tag_release_commit
+    mistake "Tag the release runs Release before the tag exists" "$workflows/tag.yml" \
+        $'      - name: Tag the commit vX.Y.Z\n' "$run_first" tag_release_commit
+    mistake "Tag the release makes a lightweight tag" "$workflows/tag.yml" \
+        '-f sha="$object"' '-f sha="$SHA"' tag_release_commit
+    mistake "Tag the release takes the check job's outputs unchecked" "$workflows/tag.yml" \
+        'if [[ ! $VERSION =~ $strict || ! $SHA =~ $commit ]]; then' 'if false; then' tag_unfit_outputs
+    mistake "Tag the release runs Release again for a tag pushed meanwhile" "$workflows/tag.yml" \
+        'echo "run=false" >> "$GITHUB_OUTPUT"' 'echo "run=true" >> "$GITHUB_OUTPUT"' tag_pushed_meanwhile
+    mistake "Tag the release accepts a tag pushed meanwhile on another commit" "$workflows/tag.yml" \
+        'if [ "$tagged" != "$SHA" ]; then' 'if false; then' tag_pushed_elsewhere_meanwhile
+}
+mistakes
+
+echo
 if [ $failures -eq 0 ]; then
     echo "PASS: all $checks checks passed."
 else
