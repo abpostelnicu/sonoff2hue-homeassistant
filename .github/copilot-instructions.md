@@ -2611,6 +2611,32 @@ frontend 20261028.8 on GitHub, hassfest 2026.11.3 run from core's tag, and the c
     port. It runs on CI, not on macOS, so no mistake was tried against it.
   - **Checks:** `scripts/check` passed with mypy for Linux: 1,533 tests, and on macOS 3 skipped, the Linux socket tests,
     the new one among them. On CI, where they run, 1,536 passed. `scripts/e2e` passed its 64 checks.
+- 2026-11-26: decision 39 on the user's Home Assistant OS (Core 2026.11.3): `main` at 887c859, merged as #55, whose
+  *CI*, *Commits* and *Validate* passed, and on `main` *CI* (run 45875557565) and *Validate*; *Tag the release* tagged
+  nothing.
+  - **Deployed** by hand over SSH, as before:
+    - the installed folder was saved off the host, and its 40 files were the same as cb4e0fc's by SHA-256;
+    - 887c859's 40 files were staged outside `custom_components` and checked by SHA-256; two of them changed,
+      `engine/lan_monitor.py` and `engine/mdns.py`;
+    - the folders were swapped, `ha core check` passed, and `ha core restart` restarted it at 18:24 UTC.
+  - **After the restart:**
+    - the entry loaded, and *Status* was running with its 4 switches and 17 targets, without problems;
+    - every switch was *Online*, and 21 eWeLink devices were seen;
+    - no false press: each switch kept its last *Press* and `seq`;
+    - the log had no warning or error of the integration, only Home Assistant's notice about custom integrations.
+  - **Watched for 55 minutes,** from 18:26 UTC, with debug logging on for the LAN monitor alone (`logger.set_level`).
+    The log was read once a minute, then the level went back to warning.
+    - Exactly one switch was late, once: the one that misses the group's traffic about once an hour, at 19:05:48 UTC,
+      in the minutes past the hour when it used to.
+    - The LAN monitor asked it directly once ("…: not heard for more than 150 s; asking it directly at …."), and the
+      next look, 30 s later, found it heard again.
+    - Its *Online* stayed on throughout, as every switch's did since the restart.
+    - The multicast catch-up query went out at the same look, so this run doesn't tell which of the two it answered.
+      In the morning's measurements it answered none of the multicast queries during such a time.
+  - **For later live checks:** *Online*'s `last_seen_at` is refreshed only at status snapshots and at the entity's own
+    look 5 minutes after the time it shows, so it can be minutes old, as it was for all four switches at once during
+    this watch. How long a switch has really been silent shows in the LAN monitor's debug lines, or in the diagnostics'
+    `lan_devices`.
 
 ## Status
 
@@ -2669,5 +2695,6 @@ frontend 20261028.8 on GitHub, hassfest 2026.11.3 run from core's tag, and the c
   rename in the Hue app and the room or zone offer
 - [ ] Home Assistant 2026.12 (decision 35, part 2): once 2026.12.0 is on PyPI, the pins at it and a required job for
   the 2026.11.3 minimum; the user chose on 2026-11-26 to wait for the release rather than prepare it against a beta
-- [x] A late switch is asked directly at its address (decision 39), as the user chose on 2026-11-26. Left: its
-  deployment to the user's Home Assistant OS, and a look at the switch that misses the group's traffic
+- [x] A late switch is asked directly at its address (decision 39), as the user chose on 2026-11-26. `main` at 887c859
+  runs on the user's Home Assistant OS, where the switch that misses the group's traffic was asked directly once, in
+  the minutes past the hour, and stayed *Online* (Verification log)
