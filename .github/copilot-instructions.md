@@ -2373,6 +2373,47 @@ frontend 20261028.8 on GitHub, hassfest 2026.11.3 run from core's tag, and the c
     - real presses;
     - a light renamed in the Hue app, followed and saved;
     - the room or zone offer when editing a switch.
+- 2026-11-26: decision 37, releases from a merged release pull request, on the branch `release-on-merge` (#51).
+  - **`release-test.sh`** passed 236 checks on CI, in 29.5 s on the *Test* job's runner (CI run 45847033533), and
+    `scripts/check` passed for each of the two commits (Commits run 45847033595); the second commit's summary lines
+    were reworded afterwards. The session that wrote it couldn't run it locally, so these were its first runs. The new
+    checks:
+    - `release.sh`: a branch's or a pull request's ref "isn't a tag"; `manifest-version` reads three versions and
+      refuses `1.1`, `1.1.0-rc.1`, a number, an escaped newline, a missing version, a list, broken JSON and a missing
+      manifest; `check-higher` passes with nothing released, a higher version, 1.10.0 after 1.9.0 and lines that
+      aren't versions, and refuses an equal or a lower version.
+    - The structure: `release.yml` runs only for the tags' push and when it is run, without inputs. `tag.yml` runs
+      only when *CI*, ci.yml's name, completes on `main`, has no `pull_request` trigger, may only read by default, has
+      a concurrency group of its own, and gives write access only to the tag job, which runs no action; its jobs'
+      conditions, the check job's checkout and its outputs are as decision 37 has them.
+    - *Release*: a run by hand on `v1.0.0` releases it as its push does; a run on `main` fails the check job and calls
+      no gh. With the notes file, the Release's notes are exactly the file, given with `--notes-file` alone, read in
+      the tagged commit with the raw media type, and the job shows them; without it, a 404, GitHub's notes from
+      `v1.0.0`; a 500 leaves no Release.
+    - *Tag the release*: after a failed or a cancelled CI run, or a pull request's, neither job runs. A commit without
+      its version's notes is tagged nothing and gh isn't called. A version that isn't X.Y.Z, the tag on a later commit
+      or off `main`, a tag that can't be read, a commit off `main`, 1.1.0 after the Release of 1.2.0, and Releases
+      that can't be listed fail the check. The release commit, not main's newest commit, gets `v1.1.0`, with the
+      calls in order (the tag object, the ref, the run of *Release*) and the summary. CI again on the tagged commit,
+      and a commit after it, tag nothing. A tag pushed meanwhile on the commit stops the tag job without a second run
+      of *Release*, and on another commit fails it. A tag object, ref or run that can't be made fails the job, and
+      outputs of the check job that aren't a version and a commit are refused before any call.
+  - **The mistakes,** 30, each caught by the checks that it names, in 11 s: *Release* for pull requests or with an
+    input; a checkout that keeps its credentials, in each workflow; a version taken without checking the ref, or a
+    branch taken for a tag without saying so; generated notes as well as the file's or in their place, the notes
+    read on `main`, and any failure taken for a missing file; a checkout in the tag job; no check of CI's conclusion,
+    caught by the structure and by the failed and the cancelled run each; no check of the event; the tag job without
+    its condition; a tag without the notes file; a version that isn't X.Y.Z; each branch of the check of the tag; a
+    lower version, in `tag.yml` and in `check-higher`; main's newest commit tagged; *Release* run before the tag
+    exists; a lightweight tag; the outputs unchecked; and both branches of a tag pushed meanwhile.
+  - **Lint:** actionlint 1.7.12 with shellcheck 0.11.0, their release binaries for macOS checked against their
+    published SHA-256 and deleted afterwards, found nothing in the six workflows, and shellcheck nothing in
+    `release.sh` and `release-test.sh`. Run on each `run:` script of `release.yml` and `tag.yml` by itself, shellcheck
+    found nothing in `tag.yml`'s and, in `release.yml`'s, only SC2153 (info) for `$LATEST`, which the job's env sets.
+    Locally, bash 3.2's `bash -n` passed both scripts and every `run:` script, and both workflows, and the copies
+    that the mistakes change, parsed as YAML.
+  - **On GitHub,** this only read: the documentation and gh's answers in Research findings, and this repository's
+    runs. Nothing was tagged, released or run.
 
 ## Status
 
