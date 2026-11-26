@@ -20,10 +20,10 @@ import logging
 from operator import methodcaller
 import time
 
-from .config import ConfigError, EngineConfig, SwitchSettings
+from .config import EngineConfig, SwitchSettings
 from .dns import DnsRecordType
 from .ewelink import SERVICE_TYPE
-from .hue_client import HueApiError, HueClient, HueTarget
+from .hue_client import HueApiError, HueClient, HueGroup, HueLight, HueTarget
 from .mdns import TRACE, MdnsListener, MdnsPacket
 from .press import SwitchEventKind, SwitchTracker, TrackedEvent, summarize
 from .targets import resolve
@@ -41,14 +41,18 @@ MISSING_SWITCH_QUERY_INTERVAL = 30.0
 """Seconds between the queries while a switch hasn't been seen on the LAN."""
 RESOLVE_RETRY_DELAY = 10.0
 """Seconds before the names are resolved again while the bridge isn't usable."""
+NO_TARGETS = "None of the lights, rooms and zones of this switch is on the Hue bridge."
+"""Why a press of a switch that has nothing left to toggle fails (decision 32)."""
 
 
 @dataclass(eq=False)
 class SwitchBinding:
-    """A switch with its resolved targets."""
+    """A switch with its resolved targets, and why its other entries resolve to nothing."""
 
     settings: SwitchSettings
     targets: list[HueTarget]
+    problems: list[str] = field(default_factory=list)
+    """The resolver's message for each entry that resolves to nothing; the switch toggles the others (decision 32)."""
     gate: asyncio.Lock = field(default_factory=asyncio.Lock)
     """Serializes the toggles of one switch, so that a quick double press reads the state that the first one left."""
     warned_not_detached: bool = False
@@ -98,23 +102,31 @@ def bindings_by_device_id(bindings: Iterable[SwitchBinding]) -> dict[str, Switch
 async def resolve_bindings(
     config: EngineConfig, hue: HueClient, logger: logging.Logger = _LOGGER
 ) -> list[SwitchBinding]:
-    """Resolves the configured light, room and zone names; waits for the bridge if it isn't usable yet, logging that
-    on ``logger``. Raises :class:`ConfigError` listing every name that doesn't resolve, and :class:`HueApiError` when
-    the bridge refuses."""
+    """Resolves the configured light, room and zone names of each switch on its own, so that an entry that resolves to
+    nothing never stops another switch: each binding has the targets that resolve and a message for each entry that
+    doesn't. Waits for the bridge if it isn't usable yet, logging that on ``logger``, and raises :class:`HueApiError`
+    when the bridge refuses."""
     while True:
         try:
             lights, groups = await hue.get_lights_and_groups()
-            errors: list[str] = []
-            bindings = [SwitchBinding(s, resolve(s, lights, groups, errors)) for s in config.switches]
-            if errors:
-                raise ConfigError("Invalid configuration:\n" + "\n".join("  - " + error for error in errors))
         except HueApiError as err:
             if not err.is_transient:
                 raise
             logger.warning("Hue bridge at %s not usable yet (%s); retrying in 10s.", config.hue.bridge_ip, err)
             await asyncio.sleep(RESOLVE_RETRY_DELAY)
         else:
-            return bindings
+            return [_bind(settings, lights, groups) for settings in config.switches]
+
+
+def _bind(settings: SwitchSettings, lights: list[HueLight], groups: list[HueGroup]) -> SwitchBinding:
+    problems: list[str] = []
+    targets = resolve(settings, lights, groups, problems)
+    return SwitchBinding(settings, targets, problems)
+
+
+def labels(targets: Iterable[HueTarget]) -> str:
+    """The targets' labels, as the log lines list them, or ``(none)``."""
+    return ", ".join(map(str, targets)) or "(none)"
 
 
 def _now() -> datetime:
@@ -151,7 +163,7 @@ class Runner:
         ended, so the client can be closed."""
         for binding in self._bindings.values():
             settings = binding.settings
-            _LOGGER.info("%s -> %s", settings.display_name, ", ".join(map(str, binding.targets)))
+            _LOGGER.info("%s -> %s", settings.display_name, labels(binding.targets))
             if not settings.device_key or settings.device_key.isspace():
                 _LOGGER.info(
                     "%s: no deviceKey configured, so every new state broadcast counts as a press (relay/setting "
@@ -312,6 +324,12 @@ class Runner:
                     self._notify(methodcaller("on_press_dropped", binding))
                     return
 
+                if not binding.targets:
+                    # Every entry of the switch resolves to nothing, so the press is reported and its toggle fails.
+                    _LOGGER.error("%s: could not toggle the lights: %s", name, NO_TARGETS)
+                    self._notify(methodcaller("on_toggle_failed", binding, NO_TARGETS))
+                    return
+
                 started = time.perf_counter()
                 result = await self._toggler.toggle(binding.targets)
                 elapsed = timedelta(seconds=time.perf_counter() - started)
@@ -326,7 +344,7 @@ class Runner:
                     "%s: turned %s %s in %s ms%s.",
                     name,
                     state.upper(),
-                    ", ".join(str(target) for target in binding.targets),
+                    labels(binding.targets),
                     elapsed // timedelta(milliseconds=1),
                     f" ({', '.join(notes)})" if notes else "",
                 )

@@ -39,6 +39,7 @@ from custom_components.sonoff2hue.const import (
 from custom_components.sonoff2hue.engine import mdns, toggler
 from custom_components.sonoff2hue.engine.config import EngineConfig, HueSettings, SwitchSettings
 from custom_components.sonoff2hue.engine.hue_client import CERTIFICATE_MISMATCH
+from custom_components.sonoff2hue.engine.runner import NO_TARGETS
 from custom_components.sonoff2hue.engine.status import PRESS_DROPPED, ServiceState
 from custom_components.sonoff2hue.engine.supervisor import KEY_REJECTED
 from custom_components.sonoff2hue.runtime import (
@@ -756,31 +757,69 @@ async def test_the_issues_of_a_removed_switch_go_with_it(
     assert issues(hass) == {}
 
 
-async def test_lights_rooms_or_zones_not_on_the_bridge_raise_an_issue_until_they_are(
+async def test_a_switchs_missing_lights_rooms_or_zones_raise_its_own_issue_until_they_are_found(
     hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
 ) -> None:
-    entry = paired(switch(lights=["Kitchen"]))
-    await start(hass, entry)
+    """Decision 32: the service runs, the switch toggles what is on the bridge, and its issue is a warning; the
+    configuration has no problem."""
+    entry = paired(switch(lights=["Ceiling", "Kitchen"], groups=["Garden"]), switch(OTHER_DEVICE_ID, None))
+    runtime_data = await start(hass, entry)
     await tick(freezer, 0.5)
 
-    issue = issues(hass)["invalid_config"]
-    assert (issue.translation_key, issue.severity, issue.is_fixable) == (
-        "invalid_config",
-        ir.IssueSeverity.ERROR,
-        False,
+    kitchen = f"{HALL}: no Hue light named 'Kitchen'. Known lights: 'Ceiling', 'Desk'"
+    garden = f"{HALL}: no Hue room or zone named 'Garden'. Known: 'room:Hall'"
+    service = runtime_data.status.service
+    assert (service.state, service.message, service.problems) == (
+        ServiceState.RUNNING,
+        "2 wall switches toggle 2 Hue lights, rooms and zones; 2 are missing.",
+        (kitchen, garden),
     )
-    assert issue.translation_placeholders == {
-        "message": "Some lights, rooms or zones were not found on the Hue bridge.",
-        "problems": f"- {HALL}: no Hue light named 'Kitchen'. Known lights: 'Ceiling', 'Desk'",
-    }
+    assert set(issues(hass)) == {f"missing_targets_{DEVICE_ID}"}
+    issue = issues(hass)[f"missing_targets_{DEVICE_ID}"]
+    assert (issue.translation_key, issue.severity, issue.is_fixable, issue.config_entry_id) == (
+        "missing_targets",
+        ir.IssueSeverity.WARNING,
+        False,
+        entry.entry_id,
+    )
+    assert issue.translation_placeholders == {"name": HALL, "problems": f"- {kitchen}\n- {garden}"}
     await check_texts(hass, issue)
 
+    lan.broadcast(1)
+    lan.broadcast(2)
+    await settle()
+
+    assert bridge.puts() == [("l1", True)]
+
     subentry = subentry_of(entry)
-    hass.config_entries.async_update_subentry(entry, subentry, data={**subentry.data, CONF_LIGHTS: ["Ceiling"]})
+    hass.config_entries.async_update_subentry(
+        entry, subentry, data={**subentry.data, CONF_LIGHTS: ["Ceiling"], CONF_GROUPS: ["Hall"]}
+    )
     await settle()
     await tick(freezer, 0.5)
 
     assert issues(hass) == {}
+
+
+async def test_a_switch_with_nothing_left_to_toggle_fires_its_presses_and_fails_each_toggle(
+    hass: HomeAssistant, lan: Lan, bridge: Bridge
+) -> None:
+    """Its presses reach automations as before, and each toggle event says why nothing was toggled."""
+    entry = paired(switch(lights=["Kitchen"]))
+    await start(hass, entry)
+    presses = async_capture_events(hass, EVENT_PRESS)
+    toggles = async_capture_events(hass, EVENT_TOGGLE)
+    device = dr.async_get(hass).async_get_device_by_identifier((DOMAIN, DEVICE_ID), entry.entry_id)
+    assert device is not None
+    hall = {"device_id": device.id, "switch_id": DEVICE_ID, "name": "Hall"}
+
+    lan.broadcast(1)
+    lan.broadcast(2)
+    await settle()
+
+    assert [event.data for event in presses] == [{**hall, "seq": 2}]
+    assert [event.data for event in toggles] == [{**hall, "result": "failed", "targets": [], "message": NO_TARGETS}]
+    assert bridge.puts() == []
 
 
 async def test_an_unpinned_certificate_raises_an_issue_until_one_is_pinned(
@@ -850,10 +889,17 @@ async def test_an_unexpected_configuration_problem_shows_its_message(
     await start(hass, entry)
     await tick(freezer, 0.5)
 
-    assert issues(hass)["invalid_config"].translation_placeholders == {
+    issue = issues(hass)["invalid_config"]
+    assert (issue.translation_key, issue.severity, issue.is_fixable) == (
+        "invalid_config",
+        ir.IssueSeverity.ERROR,
+        False,
+    )
+    assert issue.translation_placeholders == {
         "message": "The configuration has errors.",
         "problems": "- switches[0] ('Hall'): empty light/group name.",
     }
+    await check_texts(hass, issue)
 
 
 # Repair flows.
@@ -989,6 +1035,7 @@ async def test_the_switch_test_refuses_with_its_reasons(
 
 @pytest.mark.usefixtures("lan")
 async def test_the_switch_test_lists_the_targets_not_on_the_bridge(hass: HomeAssistant, bridge: Bridge) -> None:
+    """When none of them is: the runner would toggle nothing either."""
     runtime_data = await start(hass, paired(switch(lights=["Kitchen"], groups=["Garden"])))
 
     with pytest.raises(SwitchTestError) as caught:
@@ -1002,6 +1049,27 @@ async def test_the_switch_test_lists_the_targets_not_on_the_bridge(hass: HomeAss
     assert str(caught.value) == " ".join(problems)
     assert bridge.puts() == []
     assert bridge.closed == bridge.created - 1
+
+
+@pytest.mark.usefixtures("lan")
+async def test_the_switch_test_toggles_what_is_on_the_bridge_and_names_what_is_missing(
+    hass: HomeAssistant, bridge: Bridge, caplog: pytest.LogCaptureFixture
+) -> None:
+    """As the runner does (decision 32): the result and the log line name what is missing."""
+    caplog.set_level(logging.INFO, logger=INTEGRATION_LOGGER.name)
+    runtime_data = await start(hass, paired(switch(lights=["Ceiling", "Kitchen"], groups=["Garden", "Hall"])))
+
+    result = await runtime_data.async_test_toggle(DEVICE_ID)
+
+    kitchen = "no Hue light named 'Kitchen'. Known lights: 'Ceiling', 'Desk'"
+    garden = "no Hue room or zone named 'Garden'. Known: 'room:Hall'"
+    assert result == SwitchTestResult(
+        True, 2, 0, 0, 0, ("light 'Ceiling'", "group 'Hall'"), (f"{HALL}: {kitchen}", f"{HALL}: {garden}")
+    )
+    assert bridge.puts() == [("l1", True), ("g1", True)]
+    assert logged(caplog, INTEGRATION_LOGGER.name) == [
+        f"{HALL}: test from Home Assistant turned ON light 'Ceiling', group 'Hall'; 2 are missing: {kitchen}; {garden}"
+    ]
 
 
 @pytest.mark.usefixtures("lan")

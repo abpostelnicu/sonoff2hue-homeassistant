@@ -128,6 +128,7 @@ async def test_the_diagnostics_hold_the_configuration_the_status_the_lan_and_the
                     "detached": True,
                     "decode_error": None,
                     "targets": ["light 'Ceiling'"],
+                    "problems": [],
                     "last_action": {
                         "at": then,
                         "turned_on": True,
@@ -148,6 +149,7 @@ async def test_the_diagnostics_hold_the_configuration_the_status_the_lan_and_the
                     "detached": None,
                     "decode_error": None,
                     "targets": ["light 'Desk'"],
+                    "problems": [],
                     "last_action": None,
                     "last_error": {"at": then, "message": LIGHTS_DOWN},
                 },

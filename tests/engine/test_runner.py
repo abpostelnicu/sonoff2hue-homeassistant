@@ -12,11 +12,17 @@ from typing import Any
 import pytest
 
 from custom_components.sonoff2hue.engine import ewelink, mdns, runner, toggler
-from custom_components.sonoff2hue.engine.config import ConfigError, EngineConfig, HueSettings, SwitchSettings
+from custom_components.sonoff2hue.engine.config import EngineConfig, HueSettings, SwitchSettings
 from custom_components.sonoff2hue.engine.dns import DnsRecordType, build_query
 from custom_components.sonoff2hue.engine.hue_client import HueApiError, HueClient, HueTarget, HueTargetKind
 from custom_components.sonoff2hue.engine.mdns import MdnsListener, MdnsPacket
-from custom_components.sonoff2hue.engine.runner import Runner, RunnerObserver, SwitchBinding, resolve_bindings
+from custom_components.sonoff2hue.engine.runner import (
+    NO_TARGETS,
+    Runner,
+    RunnerObserver,
+    SwitchBinding,
+    resolve_bindings,
+)
 from custom_components.sonoff2hue.engine.toggler import ToggleResult
 
 from ..hue import InMemoryBridge, RecordedRequest
@@ -386,6 +392,36 @@ async def test_an_observer_without_overrides_uses_the_empty_defaults() -> None:
     await switch.ping_bridge()
 
     assert bridge.lights["l1"] is True
+
+
+async def test_a_switch_with_nothing_left_to_toggle_reports_its_presses_and_fails_each_toggle(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Every entry of the switch resolves to nothing (decision 32): the press is still reported, and its toggle fails
+    with a message that says why, without asking the bridge."""
+    caplog.set_level(logging.INFO, logger=runner.__name__)
+    bridge = LightBridge()
+    observer = RecordingObserver()
+    nothing = SwitchBinding(SwitchSettings(DEVICE_ID, "Hall", None, ["Porch"]), [], ["Hall (1000abcdef): no light"])
+    switch = create_runner(bridge.client(), observer, nothing)
+
+    switch.handle_packet(plain(100))
+    switch.handle_packet(plain(101))
+    switch.handle_packet(plain(102))
+    await switch.when_toggles_complete()
+
+    assert NO_TARGETS == "None of the lights, rooms and zones of this switch is on the Hue bridge."
+    assert observer.events == [
+        "press Hall seq=101",
+        f"toggle failed Hall: {NO_TARGETS}",
+        "press Hall seq=102",
+        f"toggle failed Hall: {NO_TARGETS}",
+    ]
+    assert bridge.requests == []
+    assert runner_log(caplog)[-2:] == [
+        (logging.INFO, "Hall (1000abcdef): wall switch operated (seq 102)."),
+        (logging.ERROR, f"Hall (1000abcdef): could not toggle the lights: {NO_TARGETS}"),
+    ]
 
 
 # Encrypted broadcasts, queued presses and the age of a press.
@@ -791,24 +827,34 @@ async def test_resolving_waits_for_the_bridge_while_its_errors_are_transient(cap
     ]
 
 
-async def test_resolving_lists_every_name_that_does_not_resolve() -> None:
+async def test_resolving_keeps_each_switchs_problems_to_itself() -> None:
+    """An entry that resolves to nothing is its switch's problem: the switch keeps the targets that resolve, and every
+    other switch resolves as if it weren't there."""
     bridge = InMemoryBridge(lambda request: (200, {"light": LIGHTS, "room": ROOMS}.get(request.path[18:], SUCCESS)))
     config = EngineConfig(
         HueSettings("bridge.test"),
         [
             SwitchSettings(DEVICE_ID, "Hall", None, ["Ceiling", "Nope"]),
             SwitchSettings(OTHER_DEVICE_ID, None, None, [], ["room:Garage"]),
+            SwitchSettings("1000555555", "Porch", None, ["Desk"], ["Hall"]),
         ],
     )
 
-    with pytest.raises(ConfigError) as err:
-        await resolve_bindings(config, bridge.client())
+    bindings = await resolve_bindings(config, bridge.client())
 
-    assert str(err.value) == (
-        "Invalid configuration:\n"
-        "  - Hall (1000abcdef): no Hue light named 'Nope'. Known lights: 'Ceiling', 'Desk'\n"
-        "  - 1000999999: no Hue room or zone named 'room:Garage'. Known: 'room:Hall'"
-    )
+    assert [(binding.settings, binding.targets, binding.problems) for binding in bindings] == [
+        (
+            config.switches[0],
+            [CEILING],
+            ["Hall (1000abcdef): no Hue light named 'Nope'. Known lights: 'Ceiling', 'Desk'"],
+        ),
+        (config.switches[1], [], ["1000999999: no Hue room or zone named 'room:Garage'. Known: 'room:Hall'"]),
+        (
+            config.switches[2],
+            [HueTarget(HueTargetKind.LIGHT, "l2", "Desk"), HueTarget(HueTargetKind.GROUPED_LIGHT, "g1", "Hall")],
+            [],
+        ),
+    ]
 
 
 async def test_resolving_gives_up_when_the_bridge_refuses() -> None:
@@ -983,6 +1029,28 @@ async def test_run_sends_its_first_ping_and_query_before_it_first_waits(
     assert transport.sent == [(QUERY, "192.0.2.1")]
     await _stop(running)
     await _stop(listening)
+
+
+async def test_run_names_what_each_switch_toggles(network: FakeNetwork, caplog: pytest.LogCaptureFixture) -> None:
+    """Also a switch that has nothing left to toggle (decision 32)."""
+    caplog.set_level(logging.INFO, logger=runner.__name__)
+    listener = MdnsListener(network.open, network.watch, clock=lambda: NOW)
+    nothing = SwitchBinding(SwitchSettings(OTHER_DEVICE_ID, None, "key", ["Porch"]), [], ["1000999999: no light"])
+    bindings = [hall(), nothing]
+    switch = Runner(EngineConfig(switches=[b.settings for b in bindings]), bindings, LightBridge().client())
+
+    running = asyncio.get_running_loop().create_task(switch.run(listener), eager_start=True)
+
+    assert runner_log(caplog)[:3] == [
+        (logging.INFO, "Hall (1000abcdef) -> light 'Ceiling'"),
+        (
+            logging.INFO,
+            "Hall (1000abcdef): no deviceKey configured, so every new state broadcast counts as a press (relay/setting "
+            "changes cannot be filtered).",
+        ),
+        (logging.INFO, "1000999999 -> (none)"),
+    ]
+    await _stop(running)
 
 
 async def test_a_broadcast_right_after_a_restart_of_the_socket_is_a_new_baseline(network: FakeNetwork) -> None:

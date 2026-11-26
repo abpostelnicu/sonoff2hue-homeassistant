@@ -182,21 +182,55 @@ async def test_running_names_the_switches_and_their_targets(time: VirtualTime) -
     tracker.close()
 
 
-async def test_running_again_with_the_same_message_changes_the_targets_but_not_since(time: VirtualTime) -> None:
+async def test_running_again_with_new_targets_publishes_them_without_moving_since(time: VirtualTime) -> None:
     hall = hall_switch()
     status = Status(time, EngineConfig(PAIRED, [hall]))
     status.tracker.set_running([binding(hall, CEILING)])
     await asyncio.sleep(1)
 
-    # The service didn't change, so neither does "since", and nothing is published.
+    # The service didn't change, so neither does "since"; the targets did, so a snapshot shows them.
+    status.tracker.set_running([binding(hall, DESK)])
+    await asyncio.sleep(1)
+    # Nothing changed at all: no snapshot.
     status.tracker.set_running([binding(hall, DESK)])
     await asyncio.sleep(1)
 
     snapshot = status.tracker.snapshot()
     assert snapshot.service.since == START
     assert snapshot.switches[0].targets == ("light 'Desk'",)
-    assert status.times == pytest.approx([0.5])
+    assert status.times == pytest.approx([0.5, 1.5])
+    assert status.published[-1][1].switches[0].targets == ("light 'Desk'",)
     status.tracker.close()
+
+
+async def test_missing_targets_are_their_switchs_problems_and_the_services(time: VirtualTime) -> None:
+    """The message says how many are missing (decision 32); a switch's problems show with it, and all of them as the
+    service's, in the configuration's order."""
+    hall, other = hall_switch(), SwitchSettings(OTHER, None, None, ["Desk", "Porch"], ["room:Garage"])
+    status = Status(time, EngineConfig(PAIRED, [hall, other]))
+    tracker = status.tracker
+    porch, garage = "1000999999: no Hue light named 'Porch'.", "1000999999: no Hue room or zone named 'room:Garage'."
+
+    tracker.set_running([binding(hall, CEILING), SwitchBinding(other, [DESK], [porch])])
+    assert (tracker.service.message, tracker.service.problems) == (
+        "2 wall switches toggle 2 Hue lights, rooms and zones; 1 is missing.",
+        (porch,),
+    )
+    await asyncio.sleep(1)
+    tracker.set_running([binding(hall, CEILING), SwitchBinding(other, [], [porch, garage])])
+
+    assert tracker.service == ServiceStatus(
+        State.RUNNING, "2 wall switches toggle 1 Hue light, room or zone; 2 are missing.", (porch, garage), at(1)
+    )
+    assert [(s.targets, s.problems) for s in tracker.snapshot().switches] == [
+        (("light 'Ceiling'",), ()),
+        ((), (porch, garage)),
+    ]
+
+    # Any other state forgets them too.
+    tracker.set_service(State.CONNECTING, "Connecting to the Hue bridge at 192.0.2.20.")
+    assert [(s.targets, s.problems) for s in tracker.snapshot().switches] == [(None, ()), (None, ())]
+    tracker.close()
 
 
 async def test_a_device_id_mapped_twice_is_refused_and_changes_nothing(time: VirtualTime) -> None:
@@ -305,8 +339,8 @@ async def test_switches_show_what_the_lan_says_about_their_devices(time: Virtual
 
     snapshot = status.tracker.snapshot()
     assert snapshot.switches == (
-        SwitchStatus("Hall", DEVICE, True, ADDRESS, at(10), at(10), True, None, None, None, None),
-        SwitchStatus("Unseen", OTHER, False, None, None, None, None, None, None, None, None),
+        SwitchStatus("Hall", DEVICE, True, ADDRESS, at(10), at(10), True, None, None, (), None, None),
+        SwitchStatus("Unseen", OTHER, False, None, None, None, None, None, None, (), None, None),
     )
     assert snapshot.lan == LanStatus(True, 2, at(20))
 

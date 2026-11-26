@@ -238,13 +238,14 @@ async def test_follows_the_configuration(time: VirtualTime, caplog: pytest.LogCa
     await reload(
         EngineConfig(HueSettings("bridge.test", app_key="key"), [SwitchSettings(DEVICE_ID, "Hall", None, ["Kitchen"])])
     )
-    await until(lambda: status.service.state == State.INVALID_CONFIG)
+    await until(lambda: status.service.state == State.RUNNING)
     assert any("no Hue light named 'Kitchen'" in problem for problem in status.service.problems)
 
     await reload(
         EngineConfig(HueSettings("bridge.test", app_key="key"), [SwitchSettings(DEVICE_ID, "Hall", None, ["Ceiling"])])
     )
-    await until(lambda: status.service.state == State.RUNNING)
+    await until(lambda: status.service.state == State.RUNNING and status.service.problems == ())
+    assert status.snapshot().switches[0].targets == ("light 'Ceiling'",)
     assert status.snapshot().hue.reachable is True
 
     assert running is not None
@@ -335,22 +336,34 @@ async def test_hue_settings_that_cannot_be_used_are_named(
     assert harness.status.service.problems == (problem,)
 
 
-async def test_lights_rooms_and_zones_that_are_not_on_the_bridge_are_listed(
-    start: Callable[..., Awaitable[Harness]],
+async def test_lights_rooms_and_zones_not_on_the_bridge_are_their_switchs_problems_and_the_rest_runs(
+    start: Callable[..., Awaitable[Harness]], caplog: pytest.LogCaptureFixture
 ) -> None:
-    harness = await start(EngineConfig(PAIRED, [hall("Ceiling", "Kitchen", groups=("room:Garage",))]))
-    await asyncio.sleep(60)
+    """Decision 32: the switch toggles what resolves, another switch runs as if nothing were missing, and each problem
+    is warned about."""
+    caplog.set_level(logging.INFO, logger=supervisor.__name__)
+    porch = SwitchSettings("1000999999", "Porch", None, ["Ceiling"])
+    harness = await start(EngineConfig(PAIRED, [hall("Ceiling", "Kitchen", groups=("room:Garage",)), porch]))
+    await asyncio.sleep(1)
 
+    kitchen = "Hall (1000abcdef): no Hue light named 'Kitchen'. Known lights: 'Ceiling'"
+    garage = "Hall (1000abcdef): no Hue room or zone named 'room:Garage'. Known: (none)"
     assert harness.status.history == [
         (0, State.CONNECTING, CONNECTING),
-        (0, State.INVALID_CONFIG, "Some lights, rooms or zones were not found on the Hue bridge."),
+        (0, State.RUNNING, "2 wall switches toggle 2 Hue lights, rooms and zones; 2 are missing."),
     ]
-    assert harness.status.service.problems == (
-        "Hall (1000abcdef): no Hue light named 'Kitchen'. Known lights: 'Ceiling'",
-        "Hall (1000abcdef): no Hue room or zone named 'room:Garage'. Known: (none)",
-    )
-    assert harness.status.snapshot().hue.reachable is True
-    assert harness.bridge.closed == 0  # the client is closed only when the supervisor stops
+    assert harness.status.service.problems == (kitchen, garage)
+    assert [(s.targets, s.problems) for s in harness.status.snapshot().switches] == [
+        (("light 'Ceiling'",), (kitchen, garage)),
+        (("light 'Ceiling'",), ()),
+    ]
+    assert supervisor_log(caplog) == [(logging.WARNING, kitchen), (logging.WARNING, garage)]
+
+    harness.broadcast(1)
+    harness.broadcast(2)
+    await asyncio.sleep(1)
+
+    assert harness.bridge.on is True
 
 
 async def test_the_bridge_is_tried_every_10_seconds_until_it_answers(

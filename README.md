@@ -222,8 +222,9 @@ another, with one command each. It also switches the lights that you add to it l
 Once saved, the switch works within seconds: sonoff2hue restarts its connection to the bridge with the new switch.
 
 The switch keeps the names of its lights, rooms and zones, or their ids where two have the same name, and finds them on
-the bridge by those, without regard to case. So when you rename one in the Hue app, the switch no longer finds it, and
-the repair *The configuration has problems* says so.
+the bridge by those, without regard to case. When it no longer finds one, for example because it was renamed or deleted
+in the Hue app, the switch goes on toggling the others, and the repair *Some lights, rooms or zones of … are missing*
+says which one and why. The other switches aren't affected.
 
 If the bridge can't list its lights, because it isn't paired or doesn't answer, choose *Try again* or *Enter them by
 hand*: light names or ids, and rooms and zones as `room:Name` or `zone:Name` (or ids), separated by commas. If the
@@ -263,7 +264,9 @@ device id as serial number.
 The Hue bridge's device:
 
 - *Status*: what sonoff2hue is doing: *Running*, *Connecting*, *Error*, *Invalid configuration* or *Not configured*. Its
-  attributes are the *Message*, the *Problems*, and *Since*, the time either of them or the state last changed.
+  attributes are the *Message*, the *Problems*, and *Since*, the time either of them or the state last changed. While it
+  runs, the *Message* counts the switches and what they toggle, such as "2 wall switches toggle 5 Hue lights, rooms
+  and zones; 1 is missing.", and the *Problems* say what is missing.
 - *Reachable*: *Reachable* or *Unreachable*, whether sonoff2hue could use the bridge when it last checked, and unknown
   before the first check. Its attributes are the bridge's *Address*, the *Message* while it is unreachable, and the
   time it was *Checked*.
@@ -282,13 +285,14 @@ Each switch's device:
 - *Online*: *Online* if the MINIR4M was heard in the last 5 minutes, else *Offline*, also when it was never heard. Its
   attributes are what sonoff2hue knows of it: its *Address*, *Last seen*, *Last press* and *Sequence number*, whether it
   is *Encrypted*, *Device key set*, *Detached relay*, and a *Decode error*.
-- *Test toggle*: a button that toggles the switch's lights, rooms and zones once, as a press does. If it can't, for
-  example because a light isn't on the bridge, the button reports why.
+- *Test toggle*: a button that toggles the switch's lights, rooms and zones once, as a press does: those that are on the
+  bridge, and the log line names the others. If it can't toggle any, for example because none of them is on the bridge,
+  the button reports why.
 
 *Reachable*, *eWeLink devices seen* and *Online* are diagnostic entities, and *Test toggle* a configuration entity.
-*Press* fires only while sonoff2hue runs the switches, which it starts once the bridge answers and the lights, rooms
-and zones of every switch are found on it. *Online*'s *Last press* counts every press that the LAN heard, also before
-that. After a restart or a reload, *Last action* is unknown until the next press.
+*Press* fires only while sonoff2hue runs the switches, which it starts once the bridge answers. *Online*'s *Last press*
+counts every press that the LAN heard, also before that. After a restart or a reload, *Last action* is unknown until
+the next press.
 
 When you give a switch another name or another MINIR4M, or pair another bridge, the devices and entities stay, with
 their entity ids, history and automations.
@@ -345,11 +349,15 @@ sonoff2hue reports these in Settings → System → Repairs:
 - *The Hue bridge's certificate changed*: the bridge's certificate isn't the pinned one, so sonoff2hue doesn't talk to
   it. Either the bridge was replaced or reset, or another device now has its address. For a replaced or reset bridge,
   select *Submit* in the repair and pair it again. Otherwise, *Reconfigure* with the bridge's new address.
-- *The configuration has problems*: the switches can't run as they are, and it lists why. Until it's fixed, no switch
-  toggles anything. For example, a light, room or zone isn't on the bridge, because it was renamed or deleted in the
-  Hue app, or a name matches several of them. Fix the switch with *Edit switch*. If you fix the name on the bridge
-  instead, reload the integration (⋮ → *Reload*): sonoff2hue looks the names up again only when it starts, or when its
-  bridge or its switches change.
+- *The configuration has problems*: the switches or the bridge's settings can't be used as they are, and it lists why,
+  such as a switch without any light, room or zone, or a device id that two switches have. Until it's fixed, no switch
+  toggles anything. Fix the switch with *Edit switch*, or pair the bridge again with *Reconfigure*.
+- *Some lights, rooms or zones of … are missing*: the switch can't toggle some of its lights, rooms or zones, and it
+  lists why: one isn't on the bridge, because it was renamed or deleted in the Hue app, a name matches several of them,
+  or a room or zone has no lights. The switch goes on toggling the others, and when none is left, each press fails.
+  The other switches aren't affected. Edit the switch to choose them again. If you fix them in the Hue app instead,
+  reload the integration (⋮ → *Reload*): sonoff2hue looks them up again when it starts, or when its bridge or its
+  switches change.
 - *… is not in detached relay mode*: the MINIR4M reports that its relay isn't detached, so the wall switch cuts the
   power to the lights. sonoff2hue can tell when it decrypts the announcements with the switch's device key. Turn on
   **Detach relay** in the eWeLink app; the repair goes away with the switch's next announcement.
@@ -386,7 +394,7 @@ information, the file has:
 
 - `config`: the bridge and the switches, as stored;
 - `status`: what sonoff2hue is doing, whether the bridge is reachable, and each switch with its MINIR4M, the lights,
-  rooms and zones found on the bridge, and its last action and error;
+  rooms and zones found on the bridge and the problems with those that aren't, and its last action and error;
 - `lan_devices`: every eWeLink device heard on the LAN, with its address, type, `seq`, last press and whether it is
   online;
 - `activity`: sonoff2hue's last 1,000 log lines, at the levels that the log shows. Turn on debug logging before you
@@ -423,6 +431,9 @@ look through it before you share it.
   - Check the bridge's *Status*. sonoff2hue runs the switches only while it is *Running*, and its *Message*, its
     *Problems* and Repairs say why it isn't. *Press* fires for each press that it acts on, and *Last action* says what
     came of it.
+  - Check Repairs for *Some lights, rooms or zones of … are missing*: the switch toggles only what it finds on the
+    bridge. When it finds none, *Last action* is *Failed*, with the *Message* "None of the lights, rooms and zones of
+    this switch is on the Hue bridge."
   - Check that nothing else toggles the same lights on each press, such as sonoff2hue in a second Home Assistant: two
     toggles per press leave the lights as they were.
 - **The lights toggle when you change something in the eWeLink app.** Add the switch's device key.

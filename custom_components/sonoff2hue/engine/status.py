@@ -108,6 +108,9 @@ class SwitchStatus:
     decode_error: str | None
     targets: tuple[str, ...] | None
     """The resolved targets, such as ``light 'Ceiling'``, while the bridge is running."""
+    problems: tuple[str, ...]
+    """While the bridge is running, the resolver's message for each of the switch's entries that resolves to nothing:
+    the switch toggles the others (decision 32)."""
     last_action: ToggleAction | None
     last_error: SwitchError | None
 
@@ -143,6 +146,7 @@ class StatusTracker(RunnerObserver):
         self._bridge = _bridge_identity(config.hue)
         # By the switches' device ids, casefolded.
         self._targets: dict[str, tuple[str, ...]] = {}
+        self._problems: dict[str, tuple[str, ...]] = {}
         self._last_actions: dict[str, ToggleAction] = {}
         self._last_errors: dict[str, SwitchError] = {}
         self._reachable: bool | None = None
@@ -170,7 +174,7 @@ class StatusTracker(RunnerObserver):
 
     def set_service(self, state: ServiceState, message: str | None, problems: Sequence[str] | None = None) -> None:
         """Sets the service's state; ``since`` moves only when the state, the message or the problems change. Any state
-        but running forgets the resolved targets."""
+        but running forgets the switches' resolved targets and problems."""
         problems = () if problems is None else tuple(problems)
         service = self._service
         if service.state == state and service.message == message and service.problems == problems:
@@ -179,21 +183,29 @@ class StatusTracker(RunnerObserver):
         self._service = ServiceStatus(state, message, problems, self._clock())
         if state != ServiceState.RUNNING:
             self._targets = {}
+            self._problems = {}
         self._schedule_publish()
 
     def set_running(self, bindings: Sequence[SwitchBinding]) -> None:
-        """The runner started with these resolved switches. Raises :class:`ValueError` when two of them have the same
-        device id, and changes nothing then."""
-        self._targets = {
-            key: tuple(map(str, binding.targets)) for key, binding in bindings_by_device_id(bindings).items()
-        }
+        """The runner runs these resolved switches: each switch's targets and problems, and the service's message and
+        problems, all of the switches' in their order. A snapshot follows when any of them changed. Raises
+        :class:`ValueError` when two of them have the same device id, and changes nothing then."""
+        by_device_id = bindings_by_device_id(bindings)
+        targets = {key: tuple(map(str, binding.targets)) for key, binding in by_device_id.items()}
+        problems = {key: tuple(binding.problems) for key, binding in by_device_id.items() if binding.problems}
+        if (targets, problems) != (self._targets, self._problems):
+            self._targets, self._problems = targets, problems
+            self._schedule_publish()
 
         count = sum(len(binding.targets) for binding in bindings)
-        self.set_service(
-            ServiceState.RUNNING,
+        missing = [problem for binding in bindings for problem in binding.problems]
+        message = (
             f"{len(bindings)} wall {'switch toggles' if len(bindings) == 1 else 'switches toggle'} {count} Hue "
-            f"{'light, room or zone' if count == 1 else 'lights, rooms and zones'}.",
+            f"{'light, room or zone' if count == 1 else 'lights, rooms and zones'}"
         )
+        if missing:
+            message += f"; {len(missing)} {'is' if len(missing) == 1 else 'are'} missing"
+        self.set_service(ServiceState.RUNNING, f"{message}.", missing)
 
     def set_bridge_reachability(self, reachable: bool, message: str | None) -> None:
         """Records a check of the bridge; the message is kept only while it isn't reachable."""
@@ -244,6 +256,7 @@ class StatusTracker(RunnerObserver):
                     None if device is None else device.detached,
                     None if device is None else device.decode_error,
                     self._targets.get(key),
+                    self._problems.get(key, ()),
                     self._last_actions.get(key),
                     self._last_errors.get(key),
                 )

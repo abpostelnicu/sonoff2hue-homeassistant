@@ -90,7 +90,7 @@ from .engine.hue_client import CERTIFICATE_MISMATCH, HueApiError, HueClient
 from .engine.lan_monitor import LanMonitor
 from .engine.mdns import MdnsListener
 from .engine.registry import DeviceRegistry
-from .engine.runner import RunnerObserver, SwitchBinding
+from .engine.runner import RunnerObserver, SwitchBinding, labels
 from .engine.status import PRESS_DROPPED, ServiceState, StatusSnapshot, StatusTracker
 from .engine.supervisor import BridgeSupervisor, HueClientFactory, create_hue_client
 from .engine.switch_rules import is_paired
@@ -118,6 +118,7 @@ ISSUE_CERTIFICATE_CHANGED: Final = "certificate_changed"
 ISSUE_INVALID_CONFIG: Final = "invalid_config"
 ISSUE_NOT_DETACHED: Final = "not_detached"
 ISSUE_DECODE_ERROR: Final = "decode_error"
+ISSUE_MISSING_TARGETS: Final = "missing_targets"
 
 TEST_NOT_PAIRED: Final = "Pair the Hue bridge first: reconfigure the sonoff2hue integration."
 """Why the switch test can't run while the bridge isn't paired, with how to pair it."""
@@ -156,7 +157,7 @@ def _switch(data: Mapping[str, Any]) -> SwitchSettings:
 
 @dataclass(frozen=True, slots=True)
 class SwitchTestResult:
-    """What the switch test's toggle did, how long it took, and the targets it toggled."""
+    """What the switch test's toggle did, how long it took, the targets it toggled, and why it missed the others."""
 
     turned_on: bool
     changed: int
@@ -164,11 +165,13 @@ class SwitchTestResult:
     failed: int
     elapsed_ms: int
     targets: tuple[str, ...]
+    problems: tuple[str, ...] = ()
+    """The resolver's message for each entry that resolves to nothing, which the test skips as the runner does."""
 
 
 class SwitchTestError(Exception):
-    """The switch test couldn't toggle; the message says why. For lights, rooms or zones that aren't on the bridge,
-    ``problems`` lists them, and the message joins them with spaces."""
+    """The switch test couldn't toggle; the message says why. When none of the switch's lights, rooms and zones is on
+    the bridge, ``problems`` lists why, and the message joins them with spaces."""
 
     def __init__(self, message: str, problems: Sequence[str] = ()) -> None:
         super().__init__(message)
@@ -292,10 +295,11 @@ class Sonoff2HueData:
             async_dispatcher_send(self.hass, SIGNAL_SUBENTRY_ADDED.format(entry_id), subentry)
 
     async def async_test_toggle(self, device_id: str) -> SwitchTestResult:
-        """The switch test: toggles the switch's lights, rooms and zones once, resolved with a client of its own from
-        the bridge's lights and groups as they are now, and logs it. Raises :class:`SwitchTestError` when no switch has
-        ``device_id``, when the bridge isn't paired, when its settings can't be used, when some targets aren't on the
-        bridge, and with the bridge's error."""
+        """The switch test: toggles the switch's lights, rooms and zones once, resolved as the runner resolves them, with
+        a client of its own, from the bridge's lights and groups as they are now, and logs it. An entry that resolves to
+        nothing is skipped, and the result and the log line name it. Raises :class:`SwitchTestError` when no switch has
+        ``device_id``, when the bridge isn't paired, when its settings can't be used, when none of the switch's targets
+        is on the bridge, and with the bridge's error."""
         config = self.config
         settings = config.find_switch(device_id.strip())
         if settings is None:
@@ -449,20 +453,24 @@ async def _run_after(previous: list[asyncio.Task[None]], supervisor: BridgeSuper
 
 
 async def _test(settings: SwitchSettings, hue: HueClient) -> SwitchTestResult:
-    errors: list[str] = []
+    problems: list[str] = []
     lights, groups = await hue.get_lights_and_groups()
-    targets = resolve(settings, lights, groups, errors)
-    if errors:
-        raise SwitchTestError(" ".join(errors), errors)
+    targets = resolve(settings, lights, groups, problems)
+    if problems and not targets:
+        raise SwitchTestError(" ".join(problems), problems)
 
     started = time.perf_counter()
     result = await HueToggler(hue, INTEGRATION_LOGGER).toggle(targets)
     elapsed = timedelta(seconds=time.perf_counter() - started)
+    name = settings.display_name
+    # The resolver's messages name the switch, which the line names first.
+    missing = "; ".join(problem.removeprefix(f"{name}: ") for problem in problems)
     INTEGRATION_LOGGER.info(
-        "%s: test from Home Assistant turned %s %s.",
-        settings.display_name,
+        "%s: test from Home Assistant turned %s %s%s",
+        name,
         "ON" if result.turned_on else "OFF",
-        ", ".join(str(target) for target in targets),
+        labels(targets),
+        f"; {len(problems)} {'is' if len(problems) == 1 else 'are'} missing: {missing}" if problems else ".",
     )
     return SwitchTestResult(
         result.turned_on,
@@ -471,6 +479,7 @@ async def _test(settings: SwitchSettings, hue: HueClient) -> SwitchTestResult:
         result.failed,
         elapsed // timedelta(milliseconds=1),
         tuple(str(target) for target in targets),
+        tuple(problems),
     )
 
 
@@ -486,9 +495,10 @@ def _issues_of(snapshot: StatusSnapshot) -> dict[str, _Issue]:
         issues[ISSUE_CERTIFICATE_CHANGED] = _Issue(ISSUE_CERTIFICATE_CHANGED, ir.IssueSeverity.ERROR, {}, fixable=True)
     service = snapshot.service
     if service.state is ServiceState.INVALID_CONFIG:
-        problems = "\n".join(f"- {problem}" for problem in service.problems)
         issues[ISSUE_INVALID_CONFIG] = _Issue(
-            ISSUE_INVALID_CONFIG, ir.IssueSeverity.ERROR, {"message": service.message or "", "problems": problems}
+            ISSUE_INVALID_CONFIG,
+            ir.IssueSeverity.ERROR,
+            {"message": service.message or "", "problems": _bullets(service.problems)},
         )
     for switch in snapshot.switches:
         name = SwitchSettings(switch.device_id, switch.name).display_name
@@ -500,7 +510,16 @@ def _issues_of(snapshot: StatusSnapshot) -> dict[str, _Issue]:
             issues[f"{ISSUE_DECODE_ERROR}_{switch.device_id}"] = _Issue(
                 ISSUE_DECODE_ERROR, ir.IssueSeverity.WARNING, {"name": name, "error": switch.decode_error}
             )
+        if switch.problems:
+            issues[f"{ISSUE_MISSING_TARGETS}_{switch.device_id}"] = _Issue(
+                ISSUE_MISSING_TARGETS, ir.IssueSeverity.WARNING, {"name": name, "problems": _bullets(switch.problems)}
+            )
     return issues
+
+
+def _bullets(lines: Sequence[str]) -> str:
+    """A markdown list, as an issue's description shows it."""
+    return "\n".join(f"- {line}" for line in lines)
 
 
 class _BusEvents(RunnerObserver):

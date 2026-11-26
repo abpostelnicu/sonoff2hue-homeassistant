@@ -13,6 +13,7 @@ import pytest
 from pytest_homeassistant.common import MockConfigEntry
 
 from custom_components.sonoff2hue.engine import toggler
+from custom_components.sonoff2hue.engine.runner import NO_TARGETS
 from custom_components.sonoff2hue.engine.status import PRESS_DROPPED
 from custom_components.sonoff2hue.engine.supervisor import KEY_REJECTED, NO_SWITCHES, NOT_PAIRED
 
@@ -56,16 +57,23 @@ def no_retry_delay(monkeypatch: pytest.MonkeyPatch) -> None:
         ),
         (paired(switch()), (403, UNAUTHORIZED), "error", KEY_REJECTED, []),
         (
-            paired(switch(lights=["Kitchen"])),
+            paired(switch(lights=["Ceiling", "Kitchen"])),
+            None,
+            "running",
+            "1 wall switch toggles 1 Hue light, room or zone; 1 is missing.",
+            [f"{HALL}: no Hue light named 'Kitchen'. Known lights: 'Ceiling', 'Desk'"],
+        ),
+        (
+            paired(switch(lights=[" "])),
             None,
             "invalid_config",
-            "Some lights, rooms or zones were not found on the Hue bridge.",
-            [f"{HALL}: no Hue light named 'Kitchen'. Known lights: 'Ceiling', 'Desk'"],
+            "The configuration has errors.",
+            ["switches[0] ('Hall'): empty light/group name."],
         ),
         (paired(), None, "not_configured", NO_SWITCHES, []),
         (paired(switch(), app_key=None), None, "not_configured", NOT_PAIRED, []),
     ],
-    ids=["running", "connecting", "error", "invalid config", "no switch", "not paired"],
+    ids=["running", "connecting", "error", "running with a missing light", "invalid config", "no switch", "not paired"],
 )
 async def test_status_shows_the_service(
     hass: HomeAssistant,
@@ -325,3 +333,21 @@ async def test_last_action_labels_a_target_whose_name_another_light_has_with_its
             "message": None,
         },
     )
+
+
+async def test_last_action_fails_with_the_reason_for_a_switch_with_nothing_left_to_toggle(
+    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+) -> None:
+    """None of its lights, rooms and zones is on the bridge (decision 32): each press fails, and says why."""
+    await start(hass, paired(switch(lights=["Kitchen"])))
+    pressed = dt_util.utcnow()
+
+    lan.broadcast(1)
+    lan.broadcast(2)
+    await tick(freezer, 0.5)
+
+    assert last_action(hass) == (
+        "failed",
+        {"changed": None, "unchanged": None, "failed": None, "targets": [], "message": NO_TARGETS},
+    )
+    assert state_of(hass, LAST_ACTION).attributes["at"] == pressed

@@ -44,6 +44,23 @@ async def test_test_toggle_toggles_the_lights_rooms_and_zones(
     ]
 
 
+async def test_test_toggle_toggles_what_is_on_the_bridge_without_an_error(
+    hass: HomeAssistant, lan: Lan, bridge: Bridge, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A light that isn't on the bridge is skipped, as a press skips it, and the log line names it (decision 32)."""
+    caplog.set_level(logging.INFO, logger=INTEGRATION_LOGGER.name)
+    await start(hass, paired(switch(lights=["Kitchen", "Ceiling"])))
+
+    await press(hass)
+
+    assert bridge.puts() == [("l1", True)]
+    lines = [record.getMessage() for record in caplog.records if record.name == INTEGRATION_LOGGER.name]
+    assert lines == [
+        f"{HALL}: test from Home Assistant turned ON light 'Ceiling'; 1 is missing: no Hue light named 'Kitchen'. "
+        "Known lights: 'Ceiling', 'Desk'"
+    ]
+
+
 @pytest.mark.parametrize(
     ("entry", "fault", "message"),
     [

@@ -3,9 +3,11 @@
 A :class:`BridgeSupervisor` runs one :class:`EngineConfig` (decision 21). It checks, in this order, that the bridge is
 paired, that a switch is configured, that :meth:`EngineConfig.validate_for_run` passes and that a Hue client can be made
 for the bridge's settings. Then it waits for the bridge, resolves the switches' lights, rooms and zones, and runs the
-:class:`Runner` on the config entry's mDNS listener, which the LAN monitor runs and keeps running. Each step is reported
-to the :class:`StatusTracker`, which is also the runner's observer. A check that fails holds its state until the
-configuration changes; an unexpected failure starts the bridge again 30 s later.
+:class:`Runner` on the config entry's mDNS listener, which the LAN monitor runs and keeps running. Each switch is resolved
+on its own: an entry that resolves to nothing is a problem of that switch, which toggles the others, and never stops
+another switch (decision 32). Each step is reported to the :class:`StatusTracker`, which is also the runner's observer.
+A check that fails holds its state until the configuration changes; an unexpected failure starts the bridge again 30 s
+later.
 
 Use, for the Home Assistant runtime (decision 23): run :meth:`BridgeSupervisor.run` as a background task. For each
 change of the configuration, call :meth:`BridgeSupervisor.config_changed`, cancel the task, and start a supervisor for
@@ -147,13 +149,6 @@ class BridgeSupervisor:
             try:
                 await self._wait_for_bridge(hue, settings.hue.bridge_ip or "")
                 bindings = await resolve_bindings(settings, hue, _LOGGER)
-            except ConfigError as err:
-                self._status.set_service(
-                    ServiceState.INVALID_CONFIG,
-                    "Some lights, rooms or zones were not found on the Hue bridge.",
-                    _problems_of(err),
-                )
-                await _wait_for_change()
             except HueApiError as err:
                 self._status.set_bridge_reachability(False, str(err))
                 self._status.set_service(ServiceState.ERROR, KEY_REJECTED if err.is_authentication_error else str(err))
@@ -163,6 +158,9 @@ class BridgeSupervisor:
 
             if _is_blank(settings.hue.certificate_sha256):
                 _LOGGER.warning(NOT_PINNED)
+            for binding in bindings:
+                for problem in binding.problems:
+                    _LOGGER.warning("%s", problem)
 
             self._status.set_running(bindings)
             observer = _Observer(self._status, self._report_key_rejected, self._observer)

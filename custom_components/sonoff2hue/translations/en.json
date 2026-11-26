@@ -362,6 +362,10 @@
     "decode_error": {
       "title": "Can't decode the broadcasts of {name}",
       "description": "{name}: cannot read the LAN payload ({error}); falling back to sequence numbers only."
+    },
+    "missing_targets": {
+      "title": "Some lights, rooms or zones of {name} are missing",
+      "description": "{name} can't toggle these, so its presses toggle only its other lights, rooms and zones:\n\n{problems}\n\nEdit the switch to choose them again. If you fix them in the Hue app instead, reload the sonoff2hue integration: it looks them up again when it starts, and when its bridge or its switches change."
     }
   },
   "entity": {
