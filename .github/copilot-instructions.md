@@ -103,10 +103,16 @@ On 2026-11-25 the user chose:
 - Commit messages: a subject of at most 72 characters, a capital first letter, an imperative verb ("Add", not "Added"
   or "Adds"), no trailing period, and a blank second line. No fixup!/squash!/WIP commits and no whitespace errors.
   Commit with `--no-gpg-sign` (the user's preference) and end the message with
-  `Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>`.
+  `Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>`. The global git config signs commits, so
+  rebase with `git -c commit.gpgsign=false rebase …`, or a rebase opens a passphrase prompt.
+- Write commit messages and pull requests' titles and bodies to files, and pass them with `git commit -F` and
+  `gh pr create --body-file`. macOS's /bin/bash 3.2 misparses `$(cat <<'EOF' …)` when the text has an apostrophe, and
+  has run backtick spans in it as commands. Never paste a local command's output into them, such as a test log: it
+  shows the checkout's path, which is private. GitHub keeps every revision of a pull request's description in its
+  public edit history, and only the owner can delete one, on the web page.
 - Stage your own files by explicit path; never use `git add -A` or `git commit -a`, which would pick up another
   agent's unfinished edits. Agents working in parallel each use their own git worktree under `.worktrees/` (add it to
-  `.git/info/exclude`) and their own branch (decision 13).
+  `.git/info/exclude`) and their own branch (decision 13). They don't use `git stash`, whose list all worktrees share.
 - Push new commits to a branch, open a pull request and wait for the checks. Then merge by fast-forwarding `main`
   (`git push origin <sha>:main`), which keeps the commit hashes; GitHub then marks the pull request as merged. A
   ruleset on `main` (id 28003079) requires *Lint*, *Test*, *All commits pass*, *hassfest*, *HACS* and *End-to-end*;
@@ -1006,6 +1012,23 @@ The eWeLink LAN protocol and the Hue API, from public sources:
   and still report errors, such as 207 for an unreachable light
   ([openhab/openhab-addons#15511](https://github.com/openhab/openhab-addons/issues/15511)).
 
+A MINIR4M that stops receiving multicast, measured on the user's network on 2026-11-26: the recorder's history, and a
+throwaway probe on a computer on the same subnet, which pinged the switch, sent it a unicast mDNS query every 20 s and
+listened to the group.
+- **The pattern:** one of the user's four switches went *Offline* about once an hour, 3 to 8 minutes past the hour, for
+  1 to 9 minutes each time overnight. That means it went 5 to 14 minutes without answering. The other three switches
+  never did.
+- **During such a time,** for at least 20 minutes on 2026-11-26:
+  - it answered none of the LAN monitor's multicast queries;
+  - it answered every ping and every legacy unicast query, from a port other than 5353, 139 of 139;
+  - it answered a direct unicast query sent from port 5353 (RFC 6762, section 5.5) by multicast, which every listener
+    on the group received, the engine's socket too.
+- **So** it still sends, its presses among it, but receives no multicast. That fits a station that misses the
+  access point's group traffic after the group key is renewed, which some access points do every hour by default.
+- **The catch-up queries** (decision 36) can't bridge it, as they are multicast. A direct unicast query to the switch's
+  last address would. That needs a new kind of query from the mDNS layer, which decision 30 freezes, so it waits for
+  the user's decision.
+
 Hue rooms and zones in CLIP v2 (decision 34), checked on 2026-11-26 in public sources, as Hue's own API reference needs
 a developer account: aiohue 4.9.2, the library of Home Assistant's Hue integration (home-assistant-libs/aiohue at
 edfdc8a: `aiohue/v2/models/room.py`, `zone.py`, `device.py`, `light.py` and `controllers/groups.py`); openhue-api, an
@@ -1289,6 +1312,24 @@ frontend 20261028.8 on GitHub, hassfest 2026.11.3 run from core's tag, and the c
 - The plan of decision 31 was approved on 2026-11-25, in session 88500144: rewrite the notes of Release 1.0.0, mark the
   README's installation, check again, submit to the catalog, watch the checks and record it all. Once it is merged:
   verify the listing, move the user's Home Assistant to the Marketplace's install, and record the inclusion.
+- The plan of decisions 32 to 36 was approved on 2026-11-26, in session 9d5a36e3, after a review of 1.0.0 on the user's
+  Home Assistant OS and against Home Assistant 2026.12.0b0. Its workstreams ran side by side, each with its own pull
+  request (decision 13):
+  - 32: renames and deletions (#47);
+  - 33: a moved bridge (#48), after 32;
+  - 34: rooms and zones (#45);
+  - 35: the beta canary (#43), then, once 2026.12.0 is out, the pins at the latest release and a required job for the
+    2026.11.3 minimum;
+  - 36: the small fixes (#44);
+  - then the live test.
+
+  On the way, two flaky tests were fixed (#46, #49). The user left out:
+  - device keys from SonoffLAN's cache;
+  - the standard `single_press` event type;
+  - curated release notes, issue forms and Dependabot;
+  - a slimmer copy of this file;
+  - README screenshots;
+  - a release.
 
 ## Environment observations
 
@@ -2251,6 +2292,39 @@ frontend 20261028.8 on GitHub, hassfest 2026.11.3 run from core's tag, and the c
     `VirtualTime` failed at 2 of them, 1234.5678 and 42.4242, each with this test.
   - **Fixed:** `elapsed`, and with it `utc()`, is rounded to the nanosecond. No test depends on less than a
     millisecond. With the fix, the 232 tests passed at all 12 values, and `scripts/check` passed with 1,528 tests.
+- 2026-11-26: the live test of decisions 32 to 36 on the user's Home Assistant OS 18.4 (Core 2026.11.3, Supervisor
+  2026.11.0). It was deployed by hand over SSH in the Terminal & SSH app, as before:
+  - the installed folder saved off the host and compared by SHA-256 with git;
+  - `main`'s 40 files staged on the host and compared the same way;
+  - the folders swapped, then `ha core check` and `ha core restart`, which took 22 and 27 s.
+  - **`main` at 2eaddc1** (decisions 32, 34, 35 and 36), deployed over 1.0.0's files from 2bec130:
+    - The entry loaded, and Status was running: "4 wall switches toggle 17 Hue lights, rooms and zones.", without
+      problems.
+    - No false press: each switch was *Online* with its `seq` as before the restart, and each *Press* kept its last
+      event.
+    - The log had no warning or error of the integration.
+    - The store of the remembered resources, `.storage/sonoff2hue.<entry id>`, held 17 resources for the 4 switches,
+      at version 1 and tagged with the bridge id.
+    - Two lights with one name, on one switch, were labelled with their ids in the runner's line and in *Last action*'s
+      targets. The log level was set to info for this with `logger.set_level`, the entry reloaded, and the level set
+      back to warning.
+  - **Without the multicast plugin** (decision 19; Supervisor 2027.02 disables it everywhere):
+    - `ha multicast options --enabled=false` removed it for 6 minutes.
+    - Meanwhile the integration still heard all 21 eWeLink devices, and each switch answered the LAN monitor's queries
+      and stayed *Online*.
+    - `ha multicast options --enabled` brought it back, and its mdns-repeater ran again on the `hassio` bridge.
+  - **`main` at cb4e0fc** (decision 33 too):
+    - The same results after the restart.
+    - The bridge answered, so no search started.
+  - **Online:** the recorder's history and a probe on the same subnet found one switch that stops receiving multicast
+    about once an hour, and with it answering the queries, while it still sends (Research findings).
+    - The catch-up queries of decision 36 don't bridge that. The README's Troubleshooting now describes it.
+    - The other three switches stayed *Online* throughout.
+    - The probe's direct queries, at 10:07 UTC, also made the switch answer the integration once.
+  - **Left for the user,** who must be there:
+    - real presses;
+    - a light renamed in the Hue app, followed and saved;
+    - the room or zone offer when editing a switch.
 
 ## Status
 
@@ -2293,3 +2367,13 @@ frontend 20261028.8 on GitHub, hassfest 2026.11.3 run from core's tag, and the c
 - [x] sonoff2hue follows the Hue bridge to a new address (decision 33): it looks for a bridge that stopped answering,
   with mDNS every 5 minutes and Signify's endpoint every 15; with the pinned certificate it saves the address that it
   finds for its bridge id, and without one a repair offers it; a host name is never replaced
+- [x] Two flaky tests made deterministic: the fake Hue bridge's shutdown (#46) and the virtual clock's elapsed time
+  (#49)
+- [ ] Live test of decisions 32 to 36 on the user's Home Assistant OS: `main` at cb4e0fc runs there, checked without
+  the multicast plugin too (Verification log); real presses, a rename in the Hue app and the room or zone offer wait for
+  the user
+- [ ] Home Assistant 2026.12 (decision 35, part 2): once 2026.12.0 is on PyPI, the pins at it and a required job for
+  the 2026.11.3 minimum
+- [ ] Proposed, for the user's decision: a direct unicast query to a late switch's last address, which a MINIR4M that
+  stops receiving multicast answers by multicast (Research findings); it adds a kind of query to the mDNS layer, which
+  decision 30 freezes

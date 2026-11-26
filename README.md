@@ -437,6 +437,12 @@ look through it before you share it.
   the last 5 minutes, or since it connected to the bridge. It asks for it every 30 seconds while it hasn't heard it
   since then, and while its last answer is more than 2½ minutes old, until it is *Offline*. Check that the MINIR4M has
   power and Wi-Fi, and its device id.
+- **A switch goes *Offline* for a few minutes, about once an hour.** The MINIR4M then still sends, so its presses toggle
+  the lights. But it stops receiving multicast, so it doesn't answer sonoff2hue's queries until it receives multicast
+  again. Some Wi-Fi access points cause this when they renew the network's group key, every hour by default on some.
+  In the access point's settings for that network, look for a group rekey interval (GTK rekeying) to lengthen or turn
+  off, or a multicast-to-unicast option (multicast enhancement) to turn on. A press right after sonoff2hue starts, in
+  such a time, only sets the switch's baseline.
 - **Presses don't toggle the lights.**
   - Check that the MINIR4M is in detached relay mode. With the device key, a press that toggles the relay is ignored as
     a relay change, and a repair says that the switch isn't detached.
