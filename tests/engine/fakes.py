@@ -15,6 +15,9 @@ class FakeTransport:
         self._local_addresses = frozenset(interfaces) if local_addresses is None else local_addresses
         self.failing = failing or set()
         self.sent: list[tuple[bytes, str]] = []
+        self.sent_to: list[tuple[bytes, str]] = []
+        """The direct queries, with the address each went to: :attr:`sent` has the multicast ones only."""
+        self.unreachable: set[str] = set()
         self.closed = False
 
     @property
@@ -29,6 +32,11 @@ class FakeTransport:
         if interface in self.failing:
             raise OSError(errno.ENETUNREACH, "Network is unreachable")
         self.sent.append((data, interface))
+
+    def send_to(self, data: bytes, address: str) -> None:
+        if address in self.unreachable:
+            raise OSError(errno.EHOSTUNREACH, "No route to host")
+        self.sent_to.append((data, address))
 
     def close(self) -> None:
         self.closed = True

@@ -213,6 +213,141 @@ async def test_a_config_change_changes_which_switches_can_be_late(time: VirtualT
     await stop(task)
 
 
+# The direct queries (decision 39). The MINIR4Ms answer as each query goes out: a switch heard at 243 s that then
+# misses the group's traffic is late at the look at 423 s.
+
+THIRD = "1000777777"
+"""A third made-up MINIR4M, which no switch maps."""
+ADDRESSES = {DEVICE: "10.0.0.5", OTHER: "10.0.0.6", THIRD: "10.0.0.7"}
+
+
+class Minir4ms:
+    """MINIR4Ms at addresses of their own, which answer the queries they receive with their state again, as they do:
+    each multicast query, unless they miss the group's traffic (:meth:`miss_multicast`), and each query sent straight to
+    their address. :attr:`direct` has when each direct query went out, and where."""
+
+    def __init__(self, lan: Lan, *device_ids: str) -> None:
+        self._lan = lan
+        self._device_ids = device_ids
+        self._deaf: set[str] = set()
+        self._gone: set[str] = set()
+        self.direct: list[tuple[float, str]] = []
+
+    def miss_multicast(self, *device_ids: str) -> None:
+        self._deaf.update(device_ids)
+
+    def go(self, device_id: str) -> None:
+        """It answers nothing from now on."""
+        self._gone.add(device_id)
+
+    def answer_multicast(self) -> None:
+        for device_id in self._device_ids:
+            if device_id not in self._deaf | self._gone:
+                self._answer(device_id)
+
+    def answer_direct(self, data: bytes, address: str) -> None:
+        assert data == QUERY
+        self.direct.append((self._lan.time.elapsed, address))
+        for device_id in self._device_ids:
+            if ADDRESSES[device_id] == address and device_id not in self._gone:
+                self._answer(device_id)  # by multicast, as the user's MINIR4M does
+
+    def _answer(self, device_id: str) -> None:
+        address = ADDRESSES[device_id]
+        self._lan.network.deliver(announcement(device_id, 1, "abc", "iv", ip=address), (address, 5353))
+
+
+async def among(lan: Lan, devices: Minir4ms) -> tuple[asyncio.Task[None], list[float]]:
+    """Runs the LAN monitor among ``devices``, which answer its first query too; gives its task and when its multicast
+    queries went out."""
+    task = asyncio.create_task(lan.monitor.run())
+    transport = await lan.network.next_open()
+    sent = query_times(transport, lan.time, devices.answer_multicast)
+    devices.answer_multicast()  # to the query that went out as the socket opened
+    send_to = transport.send_to
+
+    def direct(data: bytes, address: str) -> None:
+        send_to(data, address)
+        devices.answer_direct(data, address)
+
+    transport.send_to = direct  # type: ignore[method-assign]
+    return task, sent
+
+
+async def test_a_switch_that_misses_multicast_stays_online_by_answering_direct_queries(
+    time: VirtualTime, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.DEBUG, "custom_components.sonoff2hue.engine.lan_monitor")
+    lan = Lan(time, config=switches(DEVICE, OTHER))
+    devices = Minir4ms(lan, DEVICE, OTHER)
+    task, sent = await among(lan, devices)
+    await asyncio.sleep(300)
+    devices.miss_multicast(DEVICE)
+
+    await asyncio.sleep(910)
+
+    # Its answer to the multicast query at 363 s is lost; at 423 s it is late, and answers the direct query. From then on
+    # every third look finds it late, 180 s after it was last heard, well within the 5 minutes of Online.
+    assert sent == pytest.approx([0, 1, 3, 123, 243, 363, 423, 543, 603, 723, 783, 903, 963, 1083, 1143])
+    assert devices.direct == [(pytest.approx(t), "10.0.0.5") for t in (423, 603, 783, 963, 1143)]
+    for device_id in (DEVICE, OTHER):
+        device = lan.registry.find(device_id)
+        assert device is not None
+        assert lan.registry.is_online(device)
+    messages = [r.getMessage() for r in caplog.records if r.name == "custom_components.sonoff2hue.engine.lan_monitor"]
+    assert messages == ["1000abcdef: not heard for more than 150 s; asking it directly at 10.0.0.5."] * 5
+    await stop(task)
+
+
+async def test_each_late_switch_is_asked_at_its_own_address_and_an_unmapped_device_never(time: VirtualTime) -> None:
+    lan = Lan(time, config=switches(DEVICE, OTHER))
+    devices = Minir4ms(lan, DEVICE, OTHER, THIRD)
+    task, _ = await among(lan, devices)
+    await asyncio.sleep(300)
+    devices.miss_multicast(DEVICE, OTHER, THIRD)
+
+    await asyncio.sleep(400)
+
+    assert devices.direct == [(pytest.approx(t), address) for t in (423, 603) for address in ("10.0.0.5", "10.0.0.6")]
+    third = lan.registry.find(THIRD)
+    assert third is not None
+    assert not lan.registry.is_online(third)  # silent since 243 s
+    await stop(task)
+
+
+async def test_a_switch_that_answers_nothing_is_asked_directly_only_while_it_is_late(time: VirtualTime) -> None:
+    lan = Lan(time, config=switches(DEVICE))
+    devices = Minir4ms(lan, DEVICE)
+    task, sent = await among(lan, devices)
+    await asyncio.sleep(300)
+    devices.go(DEVICE)
+
+    await asyncio.sleep(610)
+
+    # Late from 423 s to 543 s, when it was heard 300 s before and still counts as online; offline after that.
+    assert sent == pytest.approx([0, 1, 3, 123, 243, 363, 423, 453, 483, 513, 543, 663, 783, 903])
+    assert devices.direct == [(pytest.approx(t), "10.0.0.5") for t in (423, 453, 483, 513, 543)]
+    await stop(task)
+
+
+async def test_a_late_switch_without_an_address_is_asked_by_multicast_only(time: VirtualTime) -> None:
+    lan = Lan(time, config=switches(DEVICE))
+    task = asyncio.create_task(lan.monitor.run())
+    transport = await lan.network.next_open()
+    sent = query_times(transport, time)
+    # Without SRV and A records, and from one of this host's addresses: a relay's copy, which gives no address.
+    lan.network.deliver(announcement(DEVICE, 1, "abc", "iv", ip=None), ("192.0.2.1", 5353))
+
+    await asyncio.sleep(250)
+
+    device = lan.registry.find(DEVICE)
+    assert device is not None
+    assert device.address is None
+    assert sent == pytest.approx([0, 1, 3, 123, 153, 183, 213, 243])
+    assert transport.sent_to == []
+    await stop(task)
+
+
 async def test_each_new_socket_rebaselines_and_queries_again(time: VirtualTime) -> None:
     lan = Lan(time)
     task = asyncio.create_task(lan.monitor.run())

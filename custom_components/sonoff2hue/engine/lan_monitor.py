@@ -9,19 +9,21 @@ Online (decision 36). It asks at 0, 1 and 3 s after each (re)start of the socket
 2 minutes have passed since its last query, and at each look while a configured switch that it heard before is late,
 not heard for more than 2 min 30 s but still online. Each query starts the 2 minutes again, so a look sends one query
 at most. While every switch answers, that is a query every 2 minutes; after a lost answer, one every 30 s until the
-switch is heard again, or offline.
+switch is heard again, or offline. At each of those looks the late switch is also asked directly, by unicast at its last
+address: a MINIR4M that misses the group's traffic for a while still receives that query, and answers it by multicast
+(decision 39).
 """
 
 import asyncio
 from datetime import timedelta
 import logging
 
-from .config import EngineConfig
+from .config import EngineConfig, SwitchSettings
 from .dns import DnsRecordType
 from .ewelink import SERVICE_TYPE
 from .mdns import MdnsListener, MdnsPacket
 from .press import SwitchTracker
-from .registry import DeviceRegistry
+from .registry import DeviceRegistry, LanDevice
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,8 +36,8 @@ CATCH_UP_INTERVAL = 30.0
 a switch is late."""
 CATCH_UP_AFTER = timedelta(seconds=150)
 """A configured switch that was heard before is late once it hasn't been heard for longer than this, 2 min 30 s: 30 s
-more than the 2 minutes between the queries, so its answer to the last one is missing. The catch-up queries give it
-more chances to answer within the 5 minutes that it stays online."""
+more than the 2 minutes between the queries, so its answer to the last one is missing. The catch-up queries, and the
+direct ones, give it more chances to answer within the 5 minutes that it stays online."""
 RETRY_DELAY = 10.0
 
 
@@ -47,13 +49,13 @@ class LanMonitor:
         self._listener = listener
         self._registry = registry
         self._tracker = SwitchTracker(config)
-        self._switch_ids = _switch_ids(config)
+        self._switches = tuple(config.switches)
 
     def config_changed(self, config: EngineConfig) -> None:
         """A fresh tracker picks up new device keys; its first broadcast per device is a baseline, never a press. From
         the next look on, the new configuration's switches are those that can be late."""
         self._tracker = SwitchTracker(config)
-        self._switch_ids = _switch_ids(config)
+        self._switches = tuple(config.switches)
 
     async def run(self) -> None:
         """Runs the listener and feeds the registry until cancelled. The registry is ``listening`` while the listener
@@ -89,25 +91,32 @@ class LanMonitor:
             listener.query(SERVICE_TYPE, DnsRecordType.PTR)
 
         # Then a look every 30 s, which asks once 2 minutes have passed since the last query, or while a switch is late.
-        # Each query starts the 2 minutes again, so no look sends two.
+        # Each query starts the 2 minutes again, so no look sends two. A late switch is also asked directly.
         waited = 0.0
         while True:
             await asyncio.sleep(CATCH_UP_INTERVAL)
             waited += CATCH_UP_INTERVAL
-            if waited >= QUERY_INTERVAL or self._is_a_switch_late():
+            late = self._late_switches()
+            if waited >= QUERY_INTERVAL or late:
                 listener.query(SERVICE_TYPE, DnsRecordType.PTR)
                 waited = 0.0
+            for switch, device in late:
+                if device.address is not None:
+                    _LOGGER.debug(
+                        "%s: not heard for more than %g s; asking it directly at %s.",
+                        switch.display_name,
+                        CATCH_UP_AFTER.total_seconds(),
+                        device.address,
+                    )
+                    listener.query_directly(SERVICE_TYPE, DnsRecordType.PTR, device.address)
 
-    def _is_a_switch_late(self) -> bool:
-        """Whether a configured switch that was heard before is late: not heard for more than 2 min 30 s, but still
-        online."""
+    def _late_switches(self) -> list[tuple[SwitchSettings, LanDevice]]:
+        """The configured switches that were heard before and are late, with what the registry knows of them: not heard
+        for more than 2 min 30 s, but still online."""
         registry = self._registry
-        for device_id in self._switch_ids:
-            device = registry.find(device_id)
+        late: list[tuple[SwitchSettings, LanDevice]] = []
+        for switch in self._switches:
+            device = registry.find(switch.normalized_device_id)
             if device is not None and registry.is_online(device) and not registry.heard_within(device, CATCH_UP_AFTER):
-                return True
-        return False
-
-
-def _switch_ids(config: EngineConfig) -> tuple[str, ...]:
-    return tuple(switch.normalized_device_id for switch in config.switches)
+                late.append((switch, device))
+        return late

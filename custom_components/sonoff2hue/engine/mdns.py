@@ -4,8 +4,9 @@ It shares UDP 5353 through SO_REUSEADDR and SO_REUSEPORT, so it sees every multi
 the unsolicited TXT updates of eWeLink devices. On Linux it is bound to the group, so that it receives multicast only
 (decision 19). It joins the group on the interfaces that are up, multicast-capable and not loopback, as their flags,
 hardware types and links show them, and rejoins after their IPv4 addresses change. The only packets it sends are the
-queries its users ask for. One listener serves several users: each adds a packet handler and a callback that runs
-whenever the socket was (re)created, as if each had a listener of its own.
+queries its users ask for: multicast on every joined interface, or straight to one address (decision 39). One listener
+serves several users: each adds a packet handler and a callback that runs whenever the socket was (re)created, as if
+each had a listener of its own.
 """
 
 import array
@@ -54,7 +55,8 @@ class MdnsPacket:
 
 
 class MulticastTransport(Protocol):
-    """An open mDNS socket: the interfaces it joined, this host's own addresses, and sending on one of them."""
+    """An open mDNS socket: the interfaces it joined, this host's own addresses, and sending on one of them or to one
+    address."""
 
     @property
     def interfaces(self) -> list[str]: ...
@@ -65,6 +67,9 @@ class MulticastTransport(Protocol):
 
     def send(self, data: bytes, interface: str) -> None:
         """Sends a multicast packet out of ``interface``; raises ``OSError``."""
+
+    def send_to(self, data: bytes, address: str) -> None:
+        """Sends a packet by unicast to ``address``, port 5353; raises ``OSError``."""
 
     def close(self) -> None: ...
 
@@ -173,6 +178,17 @@ class MdnsListener:
             except OSError as err:
                 _LOGGER.debug("mDNS query for %s on %s failed: %s", name, interface, _message(err))
 
+    def query_directly(self, name: str, record_type: int, address: str) -> None:
+        """Sends the same query by unicast to ``address``, port 5353, from the socket's own port: a direct unicast
+        query (RFC 6762, section 5.5), which a device that misses the group's traffic still receives (decision 39)."""
+        transport = self._transport
+        if transport is None:
+            return
+        try:
+            transport.send_to(build_query(name, record_type), address)
+        except OSError as err:
+            _LOGGER.debug("mDNS query for %s to %s failed: %s", name, address, _message(err))
+
     def _start(self, callback: StartedCallback) -> None:
         task = asyncio.get_running_loop().create_task(self._run_started(callback), eager_start=True)
         if not task.done():
@@ -270,6 +286,11 @@ class _SocketTransport:
     def send(self, data: bytes, interface: str) -> None:
         self._sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(interface))
         self._sock.sendto(data, (MULTICAST_ADDRESS, PORT))
+
+    def send_to(self, data: bytes, address: str) -> None:
+        # Bound to the group on Linux, the socket has no source address of its own, so the route to ``address`` gives
+        # it one, as an interface's does for multicast.
+        self._sock.sendto(data, (address, PORT))
 
     def close(self) -> None:
         self._transport.close()

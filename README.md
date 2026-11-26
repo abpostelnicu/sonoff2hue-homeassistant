@@ -430,19 +430,22 @@ look through it before you share it.
     virtual machine a bridged network adapter. If avahi-daemon runs on the host, keep its default
     `disallow-other-stacks=no` in `/etc/avahi/avahi-daemon.conf`.
   - A MINIR4M announces itself when its state changes, or when asked. sonoff2hue asks when it starts, then every 2
-    minutes, and every 30 seconds while a switch's last answer is more than 2½ minutes old, so operate the wall
-    switch, or wait.
+    minutes, and every 30 seconds, by multicast and at the switch's address, while a switch's last answer is more than
+    2½ minutes old, so operate the wall switch, or wait.
   - When sonoff2hue can't listen on the network, the log warns "mDNS socket error (…); retrying in 5s."
 - **A switch is *Offline*, or the log warns "Not seen on the LAN yet: …".** sonoff2hue hasn't heard that MINIR4M in
   the last 5 minutes, or since it connected to the bridge. It asks for it every 30 seconds while it hasn't heard it
   since then, and while its last answer is more than 2½ minutes old, until it is *Offline*. Check that the MINIR4M has
   power and Wi-Fi, and its device id.
-- **A switch goes *Offline* for a few minutes, about once an hour.** The MINIR4M then still sends, so its presses toggle
-  the lights. But it stops receiving multicast, so it doesn't answer sonoff2hue's queries until it receives multicast
-  again. Some Wi-Fi access points cause this when they renew the network's group key, every hour by default on some.
-  In the access point's settings for that network, look for a group rekey interval (GTK rekeying) to lengthen or turn
-  off, or a multicast-to-unicast option (multicast enhancement) to turn on. A press right after sonoff2hue starts, in
-  such a time, only sets the switch's baseline.
+- **A switch goes *Offline* for a few minutes, about once an hour.** Some MINIR4Ms stop receiving multicast for a while,
+  for example when the Wi-Fi access point renews the network's group key, every hour by default on some. Such a MINIR4M
+  still sends, so its presses toggle the lights, but it doesn't hear sonoff2hue's multicast queries. So when a switch's
+  last answer is more than 2½ minutes old, sonoff2hue also asks it at its address, which it does hear, and it answers;
+  with debug logging on, the log says "…: not heard for more than 150 s; asking it directly at …". If the switch still
+  goes *Offline*, it didn't answer at its address either. Check its Wi-Fi, and in the access point's settings for that
+  network, look for a group rekey interval (GTK rekeying) to lengthen or turn off, or a multicast-to-unicast option
+  (multicast enhancement) to turn on. A press right after sonoff2hue starts, in such a time, only sets the switch's
+  baseline.
 - **Presses don't toggle the lights.**
   - Check that the MINIR4M is in detached relay mode. With the device key, a press that toggles the relay is ignored as
     a relay change, and a repair says that the switch isn't detached.

@@ -84,6 +84,26 @@ async def test_queries_go_out_on_every_joined_interface(network: FakeNetwork, ca
     await _stop(task)
 
 
+async def test_a_direct_query_goes_by_unicast_to_one_address(
+    network: FakeNetwork, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.DEBUG)
+    listener = MdnsListener(network.open, network.watch)
+    listener.query_directly("_ewelink._tcp.local", DnsRecordType.PTR, "10.0.0.5")  # not open yet: nothing to send from
+    task = asyncio.create_task(listener.run())
+    transport = await network.next_open()
+    transport.unreachable.add("10.0.0.9")
+
+    listener.query_directly("_ewelink._tcp.local", DnsRecordType.PTR, "10.0.0.5")
+    listener.query_directly("_ewelink._tcp.local", DnsRecordType.PTR, "10.0.0.9")
+
+    # The multicast query's bytes, once, to the address alone (decision 39).
+    assert transport.sent_to == [(QUERY, "10.0.0.5")]
+    assert transport.sent == []
+    assert "mDNS query for _ewelink._tcp.local to 10.0.0.9 failed: No route to host" in caplog.text
+    await _stop(task)
+
+
 async def test_started_callbacks_run_for_every_socket_and_stop_with_it(network: FakeNetwork) -> None:
     listener = MdnsListener(network.open, network.watch)
     runs: list[str] = []
@@ -394,6 +414,32 @@ async def test_the_group_reaches_the_socket_and_its_queries_go_out_from_the_inte
         (False, ("127.0.0.1", port)),
         (True, ("127.0.0.1", port)),
     ]
+
+
+@ON_LINUX
+@pytest.mark.usefixtures("socket_enabled")
+async def test_a_direct_query_leaves_the_socket_bound_to_the_group_from_its_port(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    loop = asyncio.get_running_loop()
+    lo = InterfaceState("lo", up=True, multicast=True, loopback=True, ipv4=("127.0.0.1",))
+    monkeypatch.setattr(mdns, "interface_states", lambda: [lo])
+    monkeypatch.setattr(mdns, "multicast_interfaces", lambda states=None: ["127.0.0.1"])
+    with _wildcard_socket() as device:  # stands in for the MINIR4M's responder
+        port = device.getsockname()[1]
+        monkeypatch.setattr(mdns, "PORT", port)
+        device.setblocking(False)
+        listener = MdnsListener(network_watcher=lambda on_change: lambda: None)
+        task = asyncio.create_task(listener.run())
+        await until(lambda: listener.is_open)
+
+        listener.query_directly("_ewelink._tcp.local", DnsRecordType.PTR, "127.0.0.1")
+        query, sender = await asyncio.wait_for(loop.sock_recvfrom(device, 9000), 5)
+        await _stop(task)
+
+    # Bound to the group, the socket has no address of its own, so the route gives the query one; it leaves from the
+    # socket's port, as a direct unicast query does (RFC 6762, section 5.5, decision 39).
+    assert (query, sender) == (QUERY, ("127.0.0.1", port))
 
 
 @pytest.mark.usefixtures("socket_enabled")
