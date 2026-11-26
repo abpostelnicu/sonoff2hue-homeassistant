@@ -2637,6 +2637,19 @@ frontend 20261028.8 on GitHub, hassfest 2026.11.3 run from core's tag, and the c
     look 5 minutes after the time it shows, so it can be minutes old, as it was for all four switches at once during
     this watch. How long a switch has really been silent shows in the LAN monitor's debug lines, or in the diagnostics'
     `lan_devices`.
+- 2026-11-26: the Release agent's first dry run and release 1.1.0.
+  - **Dry run:** PR #53 was reviewed and closed without merging at 19:38 UTC. Its notes predated decision 39, and #54
+    recorded the fixes for the cloud agent's approval pause and the multicast test that times out in its sandbox.
+  - **Release PR:** #57, one commit 839693b (`Release 1.1.0`), was merged to `main` at 19:46 UTC. It raises the
+    manifest version and adds the release notes, and nothing else. The required PR checks passed.
+  - **Checks:** on the release branch, Ruff, formatting, mypy for Linux, all 236 release workflow tests and
+    `check-commits.sh` passed; pytest passed 1,533 tests with 3 platform-specific mDNS socket tests skipped on macOS.
+    *CI* passed on `main` (run 45886173401), including the tests and end-to-end job.
+  - **Workflows:** *Tag the release* (run 45886399181) tagged `v1.1.0` on 839693b; *Release* (run 45886436872)
+    published "sonoff2hue 1.1.0" at 19:49 UTC.
+  - **The Release:** neither a draft nor a pre-release; immutable and Latest; its notes match
+    `.github/release-notes/v1.1.0.md`; `gh release verify v1.1.0` verified the attestation. The Marketplace's source
+    archive holds the 40 files of `custom_components/sonoff2hue` at the tag, each with the same SHA-256.
 
 ## Status
 
@@ -2688,8 +2701,8 @@ frontend 20261028.8 on GitHub, hassfest 2026.11.3 run from core's tag, and the c
 - [x] The Release agent and `/release` (decision 38): the release procedure as the skill `release`, the custom agent
   *Release*, which follows it in VS Code, in Copilot CLI and on GitHub as Copilot cloud agent, and the cloud agent's
   setup steps. Its first dry run on GitHub chose 1.1.0, drafted its notes on the draft pull request #53, and paused at
-  a tool approval (Verification log). Left for the owner: look at the paused request in #53's session, then close #53
-  unmerged
+  a tool approval (Verification log). #53 was reviewed and closed without merging after #54 recorded the fixes for the
+  pause and the multicast test.
 - [x] Live test of decisions 32 to 36 on the user's Home Assistant OS: `main` at cb4e0fc runs there, checked without
   the multicast plugin too, and with real presses on 2026-11-26 (Verification log); the user chose to leave out the
   rename in the Hue app and the room or zone offer
@@ -2698,3 +2711,5 @@ frontend 20261028.8 on GitHub, hassfest 2026.11.3 run from core's tag, and the c
 - [x] A late switch is asked directly at its address (decision 39), as the user chose on 2026-11-26. `main` at 887c859
   runs on the user's Home Assistant OS, where the switch that misses the group's traffic was asked directly once, in
   the minutes past the hour, and stayed *Online* (Verification log)
+- [x] Release 1.1.0: the tag `v1.1.0` on 839693b and its immutable GitHub Release "sonoff2hue 1.1.0", Latest
+  (Verification log)
