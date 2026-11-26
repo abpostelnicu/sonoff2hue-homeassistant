@@ -459,6 +459,22 @@ Home Assistant 2026.11, checked on 2026-11-23 and 2026-11-24 in the developer do
   - It needs `asyncio_mode = "auto"`, `-p no:respx` and `pythonpath = ["."]`.
   - The `hass` fixture enables custom integrations, and helpers such as `MockConfigEntry` come from
     `pytest_homeassistant.common`.
+- **asyncio servers in a test's event loop** (2026-11-26; in Python 3.14.10's `asyncio`, on CPython's `3.14` and `main`
+  branches, and in pytest-homeassistant 2026.11.3). pytest-homeassistant runs every test's loop in debug mode
+  (`enable_event_loop_debug`, autouse), and its `hass` fixture fails a test, at its teardown, for each report to the
+  loop's exception handler meanwhile. In debug mode, and in 3.14 only then, a selector loop reports an incoming
+  connection whose transport couldn't be made, or whose TLS handshake failed: "Error on transport creation for incoming
+  connection". So a server in the test's own loop, such as the fake Hue bridge, can fail a test in two ways.
+  - A connection is accepted in one turn of the loop and gets its transport in the next. If `Server.close()` runs in
+    between, `Server._attach` fails its assertion (`AssertionError`), the accepted socket stays open, and the half-made
+    transport raises `TypeError` when it is collected (gh-109564). The fix, on the `3.14` branch since 2026-10-29,
+    closes such a connection instead; 3.14.10 and CI's 3.14.4 lack it. Removing the listening sockets' readers
+    (`loop.remove_reader`) and letting the loop turn once before `close()` leaves no connection between the two.
+  - A client that leaves while the server's side of its TLS handshake runs, as one cancelled while it connects does,
+    fails the handshake with `ConnectionResetError`. When the server closes its side first (`Server.abort_clients()`,
+    new in Python 3.13), the handshake ends quietly.
+  - On CPython's `main` branch, a transport that couldn't be made is also reported without debug mode, and its socket
+    closed (gh-155934).
 - **Config subentries.**
   - `ConfigFlow.async_get_supported_subentry_types` maps each type to a `ConfigSubentryFlow`. A subentry flow starts
     only with `user` or `reconfigure`, with no discovery and no reauthentication.
@@ -2041,6 +2057,38 @@ frontend 20261028.8 on GitHub, hassfest 2026.11.3 run from core's tag, and the c
     each, with 1,324, 1,356, 1,391 and 1,415 tests; and `scripts/e2e` passed its 45 checks, in 31.0 s before the
     rebase and 12.8 s after it: the switch of one light and one room got no offer, and the fake bridge got the PUTs as
     before.
+- 2026-11-26: `tests/test_switch_flow.py::test_adding_a_switch_with_the_fake_bridge` made deterministic (decision 12).
+  It passed but failed at its teardown: run alone on macOS, 4 of 60 times on `main` e600cb4 and 11 of 60 on d98754c,
+  each with an `AssertionError` in asyncio's `Server._attach`, which the `hass` fixture raised. None of the last 200
+  runs on GitHub's Linux runners had failed.
+  - **Cause:** the `fake_hue` fixture stops the fake bridge before the `hass` fixture stops the integration. Adding the
+    switch starts a bridge supervisor for the new configuration, whose new Hue client connects to the bridge
+    (`_wait_for_bridge`'s ping) as the test ends. asyncio accepts a connection in one turn of the event loop and makes
+    its transport in the next; when the bridge's `runner.cleanup()` closed the server in between, `Server._attach`
+    failed its assertion, which the loop, in debug mode, reported (Research findings, asyncio servers). In a traced
+    failing run, the test ended at the loop's turn 122, the bridge accepted the supervisor's connection at 127, and at
+    128 its server closed, before the transport was made.
+  - **Reproduced:** a throwaway pytest plugin held the integration's next request to the bridge, from the start of the
+    teardown, until the bridge's stop began, and had the stop go on in the turn of that connection's accept, ahead of
+    its transport. The test then failed 20 of 20 times.
+  - **Not chosen:** stopping the integration before the bridge. In a throwaway probe on a debug-mode loop, a client
+    cancelled 1 to 7 turns after it began to connect, while its TLS handshake with a running server went on, was
+    reported the same way, with `ConnectionResetError`: unloading the entries first would move the race, not end it.
+  - **Fixed:** `RunningBridge.stop()` (`tools/fake_hue/server.py`) removes the listening sockets' readers, lets the
+    connections accepted until then get their transports in one more turn, and closes the server. aiohttp then shuts
+    down the connections it serves, after their requests in progress, as before; the rest, such as one whose TLS
+    handshake hasn't finished, are aborted, and the stop waits until the server has closed. `start()` makes the server
+    itself, as aiohttp's `TCPSite` does, and keeps it. Every test of `fake_hue` and `fake_hue_pressed` stops the bridge
+    this way, and so does `python -m tools.fake_hue`. A test in `tests/tools/test_fake_hue.py` stops the bridge
+    between a connection's accept and its transport, with a client that never starts its handshake: with the old
+    stop, the loop reported the `AssertionError`, and the half-made transport raised `TypeError` when it was
+    collected; without the abort, the connection stayed open.
+  - **Checked:** with the plugin, the test passed 20 of 20 times, the interleaving forced each time, and run alone, 60
+    of 60. `test_a_zone_is_created_on_the_fake_bridge`, which also ends as a supervisor starts, passed 60 of 60 before
+    and after: in 20 forced runs, its supervisor had connected before the teardown. The new test passed 30 runs in a
+    row. `scripts/check` passed with 1,416 tests, 2 skipped, and `scripts/e2e` its 45 checks. Stopped by Ctrl+C with
+    an idle keep-alive connection and one that never started its TLS handshake, `python -m tools.fake_hue` exited
+    with 0 in 0.03 s, and closed the second.
 
 ## Status
 

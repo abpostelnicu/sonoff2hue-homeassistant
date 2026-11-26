@@ -331,13 +331,30 @@ class RunningBridge:
 
     bridge: FakeBridge
     runner: web.AppRunner
+    server: asyncio.Server
+    """The listening socket's server, which hands each connection to the runner's aiohttp server."""
     address: str
     """``host:port``, as sonoff2hue's bridge address."""
     fingerprint: str
     certificate_pem: bytes
 
     async def stop(self) -> None:
+        """Stops serving and closes every connection: a client that connects meanwhile, such as the integration while a
+        test ends, is refused or disconnected, and the event loop reports nothing, also in the debug mode of Home
+        Assistant's tests."""
+        # asyncio accepts a connection in one turn of the loop and makes its transport in the next, which fails when the
+        # server closed in between: an AssertionError in Server._attach in Python 3.14.10 (gh-109564). So the listening
+        # sockets aren't read any more, and the connections accepted until then get their transports in one more turn.
+        loop = asyncio.get_running_loop()
+        for listening in self.server.sockets:
+            loop.remove_reader(listening.fileno())
+        await asyncio.sleep(0)
+        self.server.close()
+        # aiohttp closes the connections it serves, after their requests in progress. The others, such as one whose TLS
+        # handshake hasn't finished, are aborted here: a client that left such a handshake later would be reported.
         await self.runner.cleanup()
+        self.server.abort_clients()
+        await self.server.wait_closed()
 
 
 async def start(bridge: FakeBridge, bind: str = "127.0.0.1", port: int = 0) -> RunningBridge:
@@ -345,11 +362,16 @@ async def start(bridge: FakeBridge, bind: str = "127.0.0.1", port: int = 0) -> R
     certificate_pem, key_pem = create_certificate()
     runner = web.AppRunner(create_app(bridge), access_log=None)
     await runner.setup()
-    site = web.TCPSite(runner, bind, port, ssl_context=ssl_context(certificate_pem, key_pem))
+    handler = runner.server
+    if handler is None:  # made by setup(), as aiohttp's own TCPSite expects
+        raise RuntimeError("aiohttp's runner has no server after its setup.")
     try:
-        await site.start()
+        # What aiohttp's TCPSite does, but the bridge keeps the server, for its stop.
+        server = await asyncio.get_running_loop().create_server(
+            handler, bind, port, ssl=ssl_context(certificate_pem, key_pem)
+        )
     except BaseException:
         await runner.cleanup()
         raise
-    host, actual_port = runner.addresses[0][:2]
-    return RunningBridge(bridge, runner, f"{host}:{actual_port}", fingerprint(certificate_pem), certificate_pem)
+    host, actual_port = server.sockets[0].getsockname()[:2]
+    return RunningBridge(bridge, runner, server, f"{host}:{actual_port}", fingerprint(certificate_pem), certificate_pem)

@@ -2,10 +2,14 @@
 the test endpoints and faults, its settings and its certificate."""
 
 import asyncio
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 import hashlib
 import json
 import re
+import select
+import socket
 
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
@@ -15,8 +19,8 @@ import pytest
 
 from custom_components.sonoff2hue.engine.hue_client import HueApiError, HueGroup, HueLight, HueTarget, HueTargetKind
 from tools.fake_hue.__main__ import OptionsError, options
-from tools.fake_hue.bridge import BRIDGE_ID, NAME, FakeIds, Fault
-from tools.fake_hue.server import HELP, create_certificate, fingerprint
+from tools.fake_hue.bridge import BRIDGE_ID, NAME, FakeBridge, FakeIds, Fault
+from tools.fake_hue.server import HELP, create_certificate, fingerprint, start
 
 from ..hue import FakeHueHost
 
@@ -465,6 +469,43 @@ async def test_a_fault_can_delay_its_answer(fake_hue: FakeHueHost) -> None:
     with pytest.raises(TimeoutError):
         async with asyncio.timeout(0.05):
             await fake_hue.request("GET", "api/0/config")
+
+
+@contextmanager
+def loop_reports() -> Iterator[list[str]]:
+    """What the event loop reports meanwhile, in debug mode, as in Home Assistant's tests, whose ``hass`` fixture fails
+    a test for each report."""
+    loop = asyncio.get_running_loop()
+    reports: list[str] = []
+    handler, debug = loop.get_exception_handler(), loop.get_debug()
+    loop.set_exception_handler(lambda _, context: reports.append(f"{context['message']}: {context.get('exception')!r}"))
+    loop.set_debug(True)
+    try:
+        yield reports
+    finally:
+        loop.set_exception_handler(handler)
+        loop.set_debug(debug)
+
+
+@pytest.mark.usefixtures("socket_enabled")
+async def test_stopping_closes_a_connection_accepted_just_before_and_reports_nothing() -> None:
+    """The event loop accepts a connection in one turn and makes its transport in the next. Here the bridge stops in
+    between, as when the integration connected to it while a test ended, and the client never starts its TLS
+    handshake."""
+    running = await start(FakeBridge())
+    host, port = running.address.rsplit(":", 1)
+    loop = asyncio.get_running_loop()
+    with loop_reports() as reports, socket.create_connection((host, int(port)), timeout=5) as client:
+        select.select(running.server.sockets, [], [], 5)  # the connection waits in the queue: the next turn accepts it
+        # A callback of that turn, which runs before the accept, wakes the test in the turn after it, ahead of the
+        # accepted connection's transport.
+        accepted = loop.create_future()
+        loop.call_soon(accepted.set_result, None)
+        await accepted
+        await running.stop()
+
+        assert reports == []
+        assert client.recv(1) == b""  # closed by the bridge
 
 
 def test_options_default_to_loopback_port_18443_and_a_released_link_button() -> None:
