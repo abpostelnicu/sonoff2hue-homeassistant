@@ -11,6 +11,7 @@ from homeassistant.helpers import entity_registry as er
 import pytest
 from pytest_homeassistant.common import MockConfigEntry
 
+from custom_components.sonoff2hue.const import DOMAIN
 from custom_components.sonoff2hue.runtime import INTEGRATION_LOGGER, TEST_NOT_PAIRED
 
 from .fakes import Bridge, Lan, paired, switch
@@ -75,5 +76,12 @@ async def test_test_toggle_fails_with_the_reason(
     with pytest.raises(HomeAssistantError) as caught:
         await press(hass)
 
-    assert str(caught.value) == message
+    # Translated, and its text is the switch test's message as it was, which the log and the frontend show (decision 36).
+    error = caught.value
+    assert (error.translation_domain, error.translation_key, error.translation_placeholders) == (
+        DOMAIN,
+        "test_toggle_failed",
+        {"message": message},
+    )
+    assert str(error) == message
     assert bridge.puts() == []

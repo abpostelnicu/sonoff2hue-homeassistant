@@ -480,5 +480,10 @@
         }
       }
     }
+  },
+  "exceptions": {
+    "test_toggle_failed": {
+      "message": "{message}"
+    }
   }
 }
