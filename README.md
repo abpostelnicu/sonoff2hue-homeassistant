@@ -650,9 +650,11 @@ follows the procedure in `.github/skills/release/SKILL.md`.
   then checks the published Release and records it.
 - **On GitHub, without your computer:** start Copilot cloud agent with the *Release* agent, from the Agents page of
   github.com or GitHub Mobile, by assigning an issue to Copilot, or with
-  `gh agent-task create "/release 1.2.0" --custom-agent release`. It opens a draft release pull request. Approve its
-  workflow runs if GitHub asks, mark it ready for review, and merge it with *Squash and merge*: once CI has passed on
-  `main`, the release is published. Then `/release check 1.2.0` checks it and records it.
+  `gh agent-task create "/release 1.2.0" --custom-agent release`. It opens a draft release pull request. A session can
+  stop to ask you to approve a tool, in its conversation on github.com or GitHub Mobile: approve or deny it there, and
+  it goes on. Then approve the pull request's workflow runs if GitHub asks, mark it ready for review, rename it
+  `Release 1.2.0` if it's titled otherwise, and merge it with *Squash and merge*: once CI has passed on `main`, the
+  release is published. Then `/release check 1.2.0` checks it and records it.
 - **`--dry-run`** stops at a draft pull request that adds only the notes, so that merging it would release nothing.
   Close it without merging.
 

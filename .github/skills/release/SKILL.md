@@ -56,6 +56,11 @@ Anything else in the request is a question for the owner, not a reason to change
 - **On GitHub, as Copilot cloud agent.** You work on the branch that the session gave you, and you can only push to
   it. You can't merge, push to main, push tags or publish anything. Go through steps 1 to 6, then end with the report
   of step 10; for `check`, step 9 and the report. The owner merges, and the merge publishes the release.
+  - A tool call that Copilot's safety review doesn't approve waits for the owner in the session's conversation, and
+    the session pauses if nobody answers.
+  - So use git, the repository's scripts and the GitHub MCP server's read tools, and change the pull request only with
+    your progress reports, which push your commits and write its description.
+  - Don't edit the pull request with any other tool, its title included.
 - **In VS Code or Copilot CLI,** on the owner's machine, with git and gh signed in as the owner. Go through every step.
   Ask the owner before step 7, the merge, which can't be undone.
 
@@ -74,7 +79,8 @@ The repository's rules for commits and pull requests hold in both:
   history too (`git fetch --unshallow origin`, or `git fetch origin main --depth=1000`).
 - **The released versions** are the tags `vX.Y.Z` of the published GitHub Releases, neither drafts nor
   pre-releases, as *Release* counts them: `.github/scripts/release.sh released abpostelnicu/sonoff2hue-homeassistant`.
-  Where gh can't reach GitHub, use the GitHub MCP server's release tools. A git tag alone isn't a release.
+  On GitHub, gh's token isn't allowed to list the Releases (HTTP 403): use the GitHub MCP server's `list_releases`
+  instead. A git tag alone isn't a release.
 - **The previous release**, P, is the highest released version.
 - **main's manifest version:** `custom_components/sonoff2hue/manifest.json` at `origin/main`. Normally it is P.
 - **The minimum Home Assistant version:** `hacs.json` at `origin/main`.
@@ -182,6 +188,9 @@ The memory isn't changed here: step 9 records the release once it is published.
 **The checks:**
 - Run `scripts/check`. On macOS, mypy needs `--platform linux`, as the memory's Environment observations say: run
   the other steps and `.venv/bin/python -m mypy --platform linux`.
+- On GitHub, multicast doesn't get through in the session, so one test of the mDNS socket times out there:
+  - run `scripts/check --deselect tests/engine/test_mdns.py::test_the_group_reaches_the_socket_and_its_queries_go_out_from_the_interface`;
+  - say so in the pull request: its *CI* runs every test.
 - Run `.github/scripts/check-commits.sh origin/main..HEAD`.
 
 **The commit:** one, titled `Release X.Y.Z`. Its body says that it raises the version and adds the notes, and that
@@ -196,16 +205,17 @@ merging it publishes the GitHub Release "sonoff2hue X.Y.Z" once *CI* passes on m
   - the pull requests left open;
   - how the version was chosen;
   - the line **Merging this publishes the release, which can't be undone.**
-- On GitHub, your session has opened the pull request: give it this title and body, and leave it a draft. Tell the
-  owner what is left:
+- On GitHub, your session has opened the pull request. Write this body with your progress report, and leave it a
+  draft. Copilot gives it its title, which you don't change. Tell the owner what is left:
   - approve its workflow runs, if GitHub asks;
   - mark it ready for review;
+  - rename it `Release X.Y.Z` if Copilot titled it otherwise;
   - merge it with *Squash and merge*, which makes it the single commit `Release X.Y.Z` on main.
 - Locally, `gh pr create --title "Release X.Y.Z" --body-file <file>`.
 
-**A dry run** keeps the pull request a draft, titles it "Release X.Y.Z (dry run)", and starts its body with **Dry run:
-close this pull request without merging it.** Its body says which line of the manifest the release would change. Stop
-there and report.
+**A dry run** keeps the pull request a draft and starts its body with **Dry run: close this pull request without
+merging it.** Its title is "Release X.Y.Z (dry run)" (on GitHub, the owner renames it if Copilot titled it
+otherwise). Its body says which line of the manifest the release would change. Stop there and report.
 
 On GitHub, you're done: go to step 10.
 
@@ -236,8 +246,9 @@ The merge starts *CI* on main. When it passes, *Tag the release* tags the commit
 
 Locally after step 8, and for `/release check X.Y.Z` locally or on GitHub. The release commit is the commit of main
 that added the notes: `git log -1 --format=%H --diff-filter=A origin/main -- .github/release-notes/vX.Y.Z.md`. On
-GitHub, where gh isn't signed in, read the Release, the tag and the commit with the GitHub MCP server's tools, and
-report a check that can't run there, such as the attestation, as not run, for the owner to run locally.
+GitHub, where gh's token isn't allowed to read the Releases, read the Release, the tag and the commit with the GitHub
+MCP server's tools, and report a check that can't run there, such as the attestation, as not run, for the owner to run
+locally.
 
 - **The Release:** `gh release view vX.Y.Z --json name,tagName,isDraft,isPrerelease,publishedAt,url,body`.
   - Its name is "sonoff2hue X.Y.Z".
