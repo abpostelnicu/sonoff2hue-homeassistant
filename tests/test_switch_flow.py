@@ -84,25 +84,37 @@ KEY_WARNING = (
 
 
 def light(resource_id: str, name: str | None, *, on: bool = False) -> dict[str, Any]:
-    return {"id": resource_id, "type": "light", "metadata": {"name": name}, "on": {"on": on}}
+    """A light, owned by a device of its own, ``device-<id>``."""
+    owner = {"rid": f"device-{resource_id}", "rtype": "device"}
+    return {"id": resource_id, "type": "light", "owner": owner, "metadata": {"name": name}, "on": {"on": on}}
 
 
-def group(kind: str, resource_id: str, name: str, *, grouped: bool = True) -> dict[str, Any]:
+def group(kind: str, resource_id: str, name: str, *lights: str, grouped: bool = True) -> dict[str, Any]:
+    """A room of the devices of these lights, or a zone of these lights."""
+    if kind == "room":
+        children = [{"rid": f"device-{light_id}", "rtype": "device"} for light_id in lights]
+    else:
+        children = [{"rid": light_id, "rtype": "light"} for light_id in lights]
     services = [{"rid": f"grouped-{resource_id}", "rtype": "grouped_light"}] if grouped else []
-    return {"id": resource_id, "type": kind, "metadata": {"name": name}, "services": services}
+    return {"id": resource_id, "type": kind, "metadata": {"name": name}, "children": children, "services": services}
 
 
 class HueBridge(Bridge):
     """The runtime's bridge in memory (``tests/fakes.py``), with the fake Hue bridge's lights, rooms and zones in
-    ``resources``, which a test may change; ``fail`` and ``hold`` work on their lists too."""
+    ``resources``, which a test may change: the living room holds the ceiling light and the floor lamp, and the zone
+    downstairs all three lights. ``fail`` and ``hold`` work on their lists too, and the zones that a POST creates join
+    ``resources["zone"]``."""
 
     def __init__(self) -> None:
         super().__init__()
         self.resources: dict[str, list[Any]] = {
             "light": [light("l1", "Ceiling", on=True), light("l2", "Floor lamp"), light("l3", "Hallway")],
-            "room": [group("room", "r1", "Living room")],
-            "zone": [group("zone", "z1", "Downstairs")],
+            "room": [group("room", "r1", "Living room", "l1", "l2")],
+            "zone": [group("zone", "z1", "Downstairs", "l1", "l2", "l3")],
         }
+
+    def _zones(self) -> list[dict[str, Any]]:
+        return self.resources.setdefault("zone", [])
 
     def _now(self, request: RecordedRequest) -> tuple[int, str]:
         status, body = super()._now(request)
@@ -299,6 +311,9 @@ async def shown(hass: HomeAssistant, result: SubentryFlowResult) -> SubentryFlow
     given = set(result.get("description_placeholders") or {})
     for key in [*keys, *(key for key in optional if key in texts)]:
         assert key in texts, f"{key} is missing from translations/en.json"
+        # The frontend formats texts as ICU messages, where an apostrophe right before a brace starts quoted text, so
+        # "Use room '{group}'" would show "Use room {group}".
+        assert "'{" not in texts[key], f"{key} puts an apostrophe before a placeholder, which the frontend shows as is"
         used = {field for _, field, _, _ in string.Formatter().parse(texts[key]) if field}
         assert used <= given, f"{key} uses {sorted(used - given)}, which the flow doesn't give"
     return result
@@ -828,6 +843,10 @@ async def test_adding_a_switch_with_the_fake_bridge(hass: HomeAssistant, lan: La
 
     result = await go(hass, result, form(name=" Hall ", lights=["0", "2"], rooms=["0"]))
 
+    assert (result["type"], result["step_id"]) == (FlowResultType.MENU, "zone_offer")
+    assert result["description_placeholders"] == {"zone": "Hall", "lights": "Ceiling, Hallway"}
+    result = await choose(hass, result, "keep_lights")
+
     assert (result["type"], result["title"], result["description"]) == (FlowResultType.CREATE_ENTRY, "Hall", "added")
     assert result["description_placeholders"] == {"switch": "Hall"}
     assert switches_of(entry) == [
@@ -864,6 +883,12 @@ async def test_editing_a_switch_with_the_fake_bridge(hass: HomeAssistant, https_
     result = await go(
         hass, result, form(name="Hall lights", lights=["1", "2"], zones=["0"], advanced={"key_mode": "keep"})
     )
+
+    assert (result["step_id"], result["description_placeholders"]) == (
+        "zone_offer",
+        {"zone": "Hall lights", "lights": "Hallway, Floor lamp"},
+    )
+    result = await choose(hass, result, "keep_lights")
 
     assert (result["type"], result["reason"], result["description_placeholders"]) == (
         FlowResultType.ABORT,
@@ -905,6 +930,9 @@ async def test_the_picker_lists_names_states_and_rooms_without_lights(hass: Home
     assert options(result, "rooms") == [("0", "Kitchen (r1) — no lights"), ("1", "Kitchen (r2)")]
     assert options(result, "zones") == [("0", "Kitchen")]
     result = await go(hass, result, form(lights=["1", "2", "3"], rooms=["1"], zones=["0"]))
+
+    assert result["description_placeholders"] == {"zone": DEVICE, "lights": "Desk, l3, Lamp"}
+    result = await choose(hass, result, "keep_lights")
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     entry = hass.config_entries.async_entries(DOMAIN)[0]
@@ -1250,6 +1278,352 @@ async def test_an_unexpected_failure_while_checking_the_switch(
     assert switches_of(entry) == []
 
 
+# A room or zone in place of many lights (decision 34).
+
+
+def saved(entry: MockConfigEntry) -> tuple[list[str], list[str]]:
+    """The lights and the rooms and zones of the entry's only switch."""
+    [(_, _, data)] = switches_of(entry)
+    return data[CONF_LIGHTS], data[CONF_GROUPS]
+
+
+def posts(hue: HueBridge) -> list[Any]:
+    """The bodies of the zones that the flow asked the bridge to create."""
+    return [json.loads(request.body or "") for request in hue.requests if request.method == "POST"]
+
+
+async def offered(hass: HomeAssistant, entry: MockConfigEntry, **chosen: Any) -> SubentryFlowResult:
+    """What the settings form of a new switch shows once ``chosen`` is submitted."""
+    return await go(hass, await settings_for(hass, entry), form(**chosen))
+
+
+async def test_the_room_of_exactly_the_chosen_lights_is_offered_in_their_place(hass: HomeAssistant) -> None:
+    entry = await loaded(hass)
+
+    result = await offered(hass, entry, name="Hall", lights=["0", "1"])
+
+    assert (result["type"], result["step_id"], result["menu_options"]) == (
+        FlowResultType.MENU,
+        "group_offer",
+        ["use_room", "keep_lights"],
+    )
+    assert result["description_placeholders"] == {"group": "Living room", "lights": "Ceiling, Floor lamp"}
+    assert switches_of(entry) == []
+    result = await choose(hass, result, "use_room")
+
+    assert (result["type"], result["title"], result["description_placeholders"]) == (
+        FlowResultType.CREATE_ENTRY,
+        "Hall",
+        {"switch": "Hall"},
+    )
+    assert switches_of(entry) == [
+        (
+            "Hall",
+            DEVICE,
+            {
+                CONF_DEVICE_ID: DEVICE,
+                CONF_NAME: "Hall",
+                CONF_DEVICE_KEY: None,
+                CONF_LIGHTS: [],
+                CONF_GROUPS: ["room:Living room"],
+            },
+        )
+    ]
+
+
+async def test_the_zone_of_exactly_the_chosen_lights_is_offered_in_their_place(hass: HomeAssistant) -> None:
+    entry = await loaded(hass)
+
+    result = await offered(hass, entry, lights=["2", "0", "1"])
+
+    assert (result["step_id"], result["menu_options"], result["description_placeholders"]) == (
+        "group_offer",
+        ["use_zone", "keep_lights"],
+        {"group": "Downstairs", "lights": "Ceiling, Floor lamp, Hallway"},
+    )
+    result = await choose(hass, result, "use_zone")
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert saved(entry) == ([], ["zone:Downstairs"])
+
+
+async def test_a_zone_of_the_lights_is_created_when_no_room_or_zone_holds_exactly_them(
+    hass: HomeAssistant, hue: HueBridge
+) -> None:
+    entry = await loaded(hass)
+
+    result = await offered(hass, entry, name="Hall", lights=["0", "2"])
+
+    assert (result["type"], result["step_id"], result["menu_options"]) == (
+        FlowResultType.MENU,
+        "zone_offer",
+        ["create_zone", "keep_lights"],
+    )
+    assert result["description_placeholders"] == {"zone": "Hall", "lights": "Ceiling, Hallway"}
+    assert posts(hue) == []
+    result = await choose(hass, result, "create_zone")
+
+    assert (result["type"], result["title"]) == (FlowResultType.CREATE_ENTRY, "Hall")
+    assert posts(hue) == [
+        {
+            "children": [{"rid": "l1", "rtype": "light"}, {"rid": "l3", "rtype": "light"}],
+            "metadata": {"name": "Hall", "archetype": "other"},
+        }
+    ]
+    assert [(zone["id"], zone["metadata"]["name"]) for zone in hue.resources["zone"]] == [
+        ("z1", "Downstairs"),
+        ("z2", "Hall"),
+    ]
+    assert saved(entry) == ([], ["zone:Hall"])
+
+
+@pytest.mark.parametrize(
+    ("name", "zone"),
+    [
+        ("Living room", "Living room 2"),
+        (" downstairs ", "downstairs 2"),
+        ("", DEVICE),
+        ("The ceiling light and the hallway's", "The ceiling light and the hallwa"),
+    ],
+)
+async def test_a_new_zone_is_named_after_the_switch_with_a_number_when_a_room_or_zone_has_that_name(
+    hass: HomeAssistant, hue: HueBridge, name: str, zone: str
+) -> None:
+    entry = await loaded(hass)
+
+    result = await offered(hass, entry, name=name, lights=["0", "2"])
+
+    assert result["description_placeholders"]["zone"] == zone
+    result = await choose(hass, result, "create_zone")
+
+    assert [body["metadata"]["name"] for body in posts(hue)] == [zone]
+    assert saved(entry) == ([], [f"zone:{zone}"])
+
+
+@pytest.mark.parametrize("step", ["group_offer", "zone_offer"])
+async def test_keeping_the_lights_saves_the_switch_as_it_was_chosen(
+    hass: HomeAssistant, hue: HueBridge, step: str
+) -> None:
+    entry = await loaded(hass)
+    lights = ["0", "1"] if step == "group_offer" else ["0", "2"]
+
+    result = await offered(hass, entry, name="Hall", lights=lights)
+
+    assert result["step_id"] == step
+    result = await choose(hass, result, "keep_lights")
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert saved(entry) == (["Ceiling", "Floor lamp"] if step == "group_offer" else ["Ceiling", "Hallway"], [])
+    assert posts(hue) == []
+
+
+@pytest.mark.parametrize("choice", ["retry_zone", "keep_lights"])
+async def test_a_zone_that_the_bridge_refuses_says_why_and_offers_to_try_again(
+    hass: HomeAssistant, hue: HueBridge, choice: str
+) -> None:
+    entry = await loaded(hass)
+    refusal = '{"errors":[{"description":"invalid value, for parameter, name"}],"data":[]}'
+    hue.fail("/clip/v2/resource/zone", 400, refusal, count=1, method="POST")
+    result = await offered(hass, entry, name="Hall", lights=["0", "2"])
+
+    result = await choose(hass, result, "create_zone")
+
+    assert (result["type"], result["step_id"], result["menu_options"]) == (
+        FlowResultType.MENU,
+        "zone_failed",
+        ["retry_zone", "keep_lights"],
+    )
+    assert result["description_placeholders"] == {
+        "error": "Hue bridge returned 400 Bad Request for POST /clip/v2/resource/zone: invalid value, for parameter, name"
+    }
+    assert (switches_of(entry), [zone["id"] for zone in hue.resources["zone"]]) == ([], ["z1"])
+    result = await choose(hass, result, choice)
+
+    if choice == "keep_lights":
+        assert result["type"] is FlowResultType.CREATE_ENTRY
+        assert saved(entry) == (["Ceiling", "Hallway"], [])
+        return
+    assert (result["step_id"], result["description_placeholders"]) == (
+        "zone_offer",
+        {"zone": "Hall", "lights": "Ceiling, Hallway"},
+    )
+    result = await choose(hass, result, "create_zone")
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert saved(entry) == ([], ["zone:Hall"])
+    assert len(posts(hue)) == 2
+
+
+async def test_trying_again_offers_the_zone_that_a_failed_attempt_made_after_all(
+    hass: HomeAssistant, hue: HueBridge
+) -> None:
+    """The bridge made the zone, but its answer didn't come: trying again offers that zone instead of a second."""
+    entry = await loaded(hass)
+    hue.fail("/clip/v2/resource/zone", 503, count=1, method="POST")
+    result = await choose(hass, await offered(hass, entry, name="Hall", lights=["0", "2"]), "create_zone")
+
+    assert result["description_placeholders"] == {
+        "error": "Hue bridge returned 503 Service Unavailable for POST /clip/v2/resource/zone"
+    }
+    hue.resources["zone"].append(group("zone", "z9", "Hall", "l1", "l3"))
+    result = await choose(hass, result, "retry_zone")
+
+    assert (result["step_id"], result["menu_options"], result["description_placeholders"]) == (
+        "group_offer",
+        ["use_zone", "keep_lights"],
+        {"group": "Hall", "lights": "Ceiling, Hallway"},
+    )
+    result = await choose(hass, result, "use_zone")
+
+    assert saved(entry) == ([], ["zone:Hall"])
+    assert len(posts(hue)) == 1
+
+
+async def test_an_unexpected_failure_while_creating_the_zone(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    async def fail(self: HueClient, name: str, light_ids: list[str]) -> HueGroup:
+        raise RuntimeError(UNEXPECTED)
+
+    entry = await loaded(hass)
+    result = await offered(hass, entry, name="Hall", lights=["0", "2"])
+    monkeypatch.setattr(HueClient, "create_zone", fail)
+
+    result = await choose(hass, result, "create_zone")
+
+    assert (result["step_id"], result["description_placeholders"]) == ("zone_failed", {"error": UNEXPECTED})
+    [record] = [record for record in caplog.records if record.name == switch_flow.__name__]
+    assert (record.levelno, record.getMessage()) == (logging.ERROR, "Creating the zone Hall on the Hue bridge failed.")
+    assert record.exc_info is not None
+    assert switches_of(entry) == []
+
+
+async def test_the_switchs_rooms_and_zones_stay_next_to_the_room_in_place_of_its_lights(hass: HomeAssistant) -> None:
+    entry = await loaded(hass)
+
+    result = await offered(hass, entry, lights=["0", "1"], zones=["0"])
+
+    assert result["description_placeholders"] == {"group": "Living room", "lights": "Ceiling, Floor lamp"}
+    result = await choose(hass, result, "use_room")
+
+    assert saved(entry) == ([], ["zone:Downstairs", "room:Living room"])
+
+
+async def test_nothing_is_offered_when_the_switch_has_the_room_of_exactly_its_lights(hass: HomeAssistant) -> None:
+    entry = await loaded(hass)
+
+    result = await offered(hass, entry, lights=["0", "1"], rooms=["0"])
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert saved(entry) == (["Ceiling", "Floor lamp"], ["room:Living room"])
+
+
+@pytest.mark.parametrize("chosen", [{"rooms": ["0"]}, {"lights": ["0"]}, {"lights": ["2"], "zones": ["0"]}])
+async def test_a_switch_of_no_or_one_single_light_is_saved_without_an_offer(
+    hass: HomeAssistant, chosen: dict[str, list[str]]
+) -> None:
+    result = await offered(hass, await loaded(hass), **chosen)
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+
+
+async def test_editing_a_switch_offers_the_room_of_its_lights(hass: HomeAssistant) -> None:
+    entry = await loaded(hass, switch(DEVICE, "Hall", key=KEY, lights=["ceiling", "Floor lamp"]))
+    result = await settings_for(hass, entry, DEVICE, edit=DEVICE)
+
+    result = await go(hass, result, form(name="Hall", lights=["0", "1"], advanced={"key_mode": "keep"}))
+
+    assert (result["step_id"], result["description_placeholders"]) == (
+        "group_offer",
+        {"group": "Living room", "lights": "Ceiling, Floor lamp"},
+    )
+    result = await choose(hass, result, "use_room")
+
+    assert (result["type"], result["reason"], result["description_placeholders"]) == (
+        FlowResultType.ABORT,
+        "saved",
+        {"switch": "Hall"},
+    )
+    assert switches_of(entry) == [
+        (
+            "Hall",
+            DEVICE,
+            {
+                CONF_DEVICE_ID: DEVICE,
+                CONF_NAME: "Hall",
+                CONF_DEVICE_KEY: KEY,
+                CONF_LIGHTS: [],
+                CONF_GROUPS: ["room:Living room"],
+            },
+        )
+    ]
+
+
+async def test_typed_lights_get_the_offer_once_the_bridge_names_them(hass: HomeAssistant, hue: HueBridge) -> None:
+    entry = await loaded(hass)
+    hue.fail("/clip/v2/resource/light", 503)
+    result = await choose(hass, await manual(hass, await start(hass, entry), DEVICE), "typed")
+    hue.heal()
+
+    result = await go(hass, result, form(light_names="floor lamp, Ceiling", group_names="zone:Downstairs"))
+
+    assert (result["step_id"], result["description_placeholders"]) == (
+        "group_offer",
+        {"group": "Living room", "lights": "Floor lamp, Ceiling"},
+    )
+    result = await choose(hass, result, "use_room")
+
+    assert saved(entry) == ([], ["zone:Downstairs", "room:Living room"])
+
+
+async def test_a_room_gone_by_the_time_it_is_chosen_is_reported_on_the_form(
+    hass: HomeAssistant, hue: HueBridge
+) -> None:
+    entry = await loaded(hass)
+    result = await offered(hass, entry, name="Hall", lights=["0", "1"])
+    hue.resources["room"] = []
+
+    result = await choose(hass, result, "use_room")
+
+    assert (result["type"], result["step_id"], result["errors"]) == (
+        FlowResultType.FORM,
+        "settings",
+        {"base": "not_saved"},
+    )
+    assert result["description_placeholders"]["base_error"] == (
+        f"Hall ({DEVICE}): no Hue room or zone named 'room:Living room'. Known: 'zone:Downstairs'"
+    )
+    assert switches_of(entry) == []
+
+
+async def test_closing_the_dialog_while_the_zone_is_created_saves_nothing(hass: HomeAssistant, hue: HueBridge) -> None:
+    entry = await loaded(hass)
+    result = await offered(hass, entry, name="Hall", lights=["0", "2"])
+    held = hue.hold("/clip/v2/resource/zone")
+
+    creating = asyncio.create_task(
+        hass.config_entries.subentries.async_configure(result["flow_id"], {"next_step_id": "create_zone"})
+    )
+    await until(lambda: bool(posts(hue)))
+    hass.config_entries.subentries.async_abort(result["flow_id"])
+    held.set()
+
+    with pytest.raises(UnknownFlow):
+        await creating
+    assert switches_of(entry) == []
+
+
+async def test_a_zone_is_created_on_the_fake_bridge(hass: HomeAssistant, https_hue: FakeHueHost) -> None:
+    entry = await paired_with(hass, https_hue)
+    result = await go(hass, await settings_for(hass, entry), form(name="Hall", lights=["0", "2"]))
+
+    result = await choose(hass, result, "create_zone")
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert saved(entry) == ([], ["zone:Hall"])
+    assert await https_hue.get_text("_fake/posts") == "zone 'Hall' (Ceiling, Hallway)\n"
+
+
 # Another switch, or the edited one, changed meanwhile.
 
 
@@ -1383,6 +1757,44 @@ async def test_the_frontend_gets_each_step_over_http(
     step = await send(form(name="Hall", lights=["0"], advanced={"key_mode": "keep", "new_device_key": "hidden"}))
     assert (step["type"], step["reason"]) == ("abort", "saved")
     assert switches_of(entry)[0][2][CONF_DEVICE_KEY] is None
+
+
+async def test_the_offer_reaches_the_frontend_over_http_without_the_key(
+    hass: HomeAssistant, hass_client: ClientSessionGenerator, hue: HueBridge
+) -> None:
+    assert await async_setup_component(hass, "config", {})
+    client = await hass_client()
+    entry = await loaded(hass, switch(DEVICE, "Hall", key=KEY, lights=["Ceiling", "Hallway"]))
+    path = "/api/config/config_entries/subentries/flow"
+    response = await client.post(
+        path, json={"handler": [entry.entry_id, SUBENTRY_SWITCH], "subentry_id": subentry(entry, DEVICE).subentry_id}
+    )
+    flow_id = (await response.json())["flow_id"]
+    steps: list[dict[str, Any]] = []
+    for user_input in (
+        {"next_step_id": "keep"},
+        form(name="Hall", lights=["0", "2"], advanced={"key_mode": "keep"}),
+        {"next_step_id": "create_zone"},
+    ):
+        response = await client.post(f"{path}/{flow_id}", json=user_input)
+        assert response.status == 200, await response.text()
+        steps.append(await response.json())
+
+    assert [(step["type"], step.get("step_id") or step.get("reason")) for step in steps] == [
+        ("form", "settings"),
+        ("menu", "zone_offer"),
+        ("abort", "saved"),
+    ]
+    assert steps[1]["menu_options"] == ["create_zone", "keep_lights"]
+    assert steps[1]["description_placeholders"] == {"zone": "Hall", "lights": "Ceiling, Hallway"}
+    assert KEY not in json.dumps(steps)
+    assert switches_of(entry)[0][2] == {
+        CONF_DEVICE_ID: DEVICE,
+        CONF_NAME: "Hall",
+        CONF_DEVICE_KEY: KEY,
+        CONF_LIGHTS: [],
+        CONF_GROUPS: ["zone:Hall"],
+    }
 
 
 async def test_a_new_switch_is_answered_over_http_without_its_key(

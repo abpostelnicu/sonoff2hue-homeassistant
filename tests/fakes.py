@@ -94,14 +94,16 @@ def relay(detached: bool) -> dict[str, Any]:
 
 class Bridge(InMemoryBridge):
     """A Hue bridge in memory, with the lights Ceiling (l1) and Desk (l2) and the room Hall (r1), which switches both
-    through its grouped light g1. It records the requests, and how many clients were made for it and closed. ``hold``
-    keeps the answers to requests for a path until the test releases them."""
+    through its grouped light g1, and the zones that ``POST /clip/v2/resource/zone`` creates, which it lists and gives
+    by id. It records the requests, and how many clients were made for it and closed. ``hold`` keeps the answers to
+    requests for a path until the test releases them."""
 
     def __init__(self) -> None:
         super().__init__(self._answer)
         self.on = {"l1": False, "l2": False}
         self.created = 0
         self.closed = 0
+        self.zones: list[dict[str, Any]] = []
         self._faults: list[list[Any]] = []
         self._held: dict[str, asyncio.Event] = {}
 
@@ -118,9 +120,12 @@ class Bridge(InMemoryBridge):
     async def close(self) -> None:
         self.closed += 1
 
-    def fail(self, path: str, status: int, body: str = "{}", count: int | None = None) -> None:
-        """Answers the next ``count`` requests for ``path``, or all of them, with ``status`` and ``body``."""
-        self._faults.append([path, status, body, count])
+    def fail(
+        self, path: str, status: int, body: str = "{}", count: int | None = None, method: str | None = None
+    ) -> None:
+        """Answers the next ``count`` requests for ``path``, or all of them, with ``status`` and ``body``; only those
+        with ``method``, when it is given."""
+        self._faults.append([path, status, body, count, method])
 
     def heal(self) -> None:
         self._faults.clear()
@@ -142,12 +147,37 @@ class Bridge(InMemoryBridge):
         await held.wait()
         return self._now(request)
 
+    def _zones(self) -> list[dict[str, Any]]:
+        """The zones that it lists, and that a POST adds to."""
+        return self.zones
+
+    def _create_zone(self, request: RecordedRequest) -> str:
+        """Adds a zone of the POST's children, named as its metadata says, with a grouped light; its id is z1, z2, …"""
+        zones = self._zones()
+        zone_id = f"z{len(zones) + 1}"
+        body = json.loads(request.body or "")
+        zones.append(
+            {
+                "id": zone_id,
+                "type": "zone",
+                "metadata": body["metadata"],
+                "children": body["children"],
+                "services": [{"rid": f"grouped-{zone_id}", "rtype": "grouped_light"}],
+            }
+        )
+        return zone_id
+
     def _now(self, request: RecordedRequest) -> tuple[int, str]:
         for fault in self._faults:
-            path, status, body, count = fault
-            if path == request.path and count != 0:
+            path, status, body, count, method = fault
+            if path == request.path and count != 0 and method in (None, request.method):
                 fault[3] = None if count is None else count - 1
                 return status, body
+        if request.method == "POST" and request.path == "/clip/v2/resource/zone":
+            return 200, json.dumps({"errors": [], "data": [{"rid": self._create_zone(request), "rtype": "zone"}]})
+        if request.path.startswith("/clip/v2/resource/zone/"):
+            zone_id = request.path.rsplit("/", 1)[-1]
+            return 200, json.dumps({"errors": [], "data": [zone for zone in self._zones() if zone["id"] == zone_id]})
         if request.method == "PUT":
             target = request.path.rsplit("/", 1)[-1]
             for light in ["l1", "l2"] if target == "g1" else [target]:
@@ -162,7 +192,7 @@ class Bridge(InMemoryBridge):
             "/clip/v2/resource/room": [
                 {"id": "r1", "metadata": {"name": "Hall"}, "services": [{"rid": "g1", "rtype": "grouped_light"}]}
             ],
-            "/clip/v2/resource/zone": [],
+            "/clip/v2/resource/zone": self._zones(),
             "/clip/v2/resource/grouped_light": [{"id": "g1", "on": {"on": any(self.on.values())}}],
         }[request.path]
         return 200, json.dumps({"errors": [], "data": data})

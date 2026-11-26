@@ -254,6 +254,31 @@
             "save": "Save without checking",
             "settings": "Try again"
           }
+        },
+        "group_offer": {
+          "title": "Use a room or zone?",
+          "description": "\"{group}\" on the Hue bridge has exactly the lights you chose: {lights}.\n\nA room or zone switches all its lights at once, with one command, and also switches any light added to it later in the Hue app.",
+          "menu_options": {
+            "use_room": "Use room \"{group}\"",
+            "use_zone": "Use zone \"{group}\"",
+            "keep_lights": "Keep the lights"
+          }
+        },
+        "zone_offer": {
+          "title": "Create a zone?",
+          "description": "No room or zone on the Hue bridge has exactly the lights you chose: {lights}. sonoff2hue can create a zone of them on the bridge.\n\nA room or zone switches all its lights at once, with one command, and also switches any light added to it later in the Hue app.",
+          "menu_options": {
+            "create_zone": "Create zone \"{zone}\" on the bridge",
+            "keep_lights": "Keep the lights"
+          }
+        },
+        "zone_failed": {
+          "title": "Couldn't create the zone",
+          "description": "{error}",
+          "menu_options": {
+            "retry_zone": "Try again",
+            "keep_lights": "Keep the lights"
+          }
         }
       },
       "progress": {

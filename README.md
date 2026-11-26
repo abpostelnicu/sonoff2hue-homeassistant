@@ -202,6 +202,23 @@ Then, in *Switch settings*:
   whether it is on or off, and a room or zone without lights says "no lights".
 - *Advanced*: the device key, described below.
 
+When the switch would toggle two or more single lights, sonoff2hue offers a room or zone in their place before it
+saves the switch:
+
+- If a room or zone on the bridge has exactly those lights, *Use room "…"* (or *Use zone "…"*) saves the switch with
+  it instead of the lights.
+- Otherwise, *Create zone "…" on the bridge* creates a zone of those lights and saves the switch with it. The zone is
+  named after the switch, or after its device id without a name: cut to the bridge's 32 characters, and with " 2",
+  " 3" and so on when a room or zone has that name already. If the bridge refuses the zone or can't be reached,
+  *Couldn't create the zone* says why, with *Try again* and *Keep the lights*.
+- *Keep the lights* saves the switch with the lights as you chose them.
+
+The switch's other rooms and zones stay. Nothing is offered when one of them has exactly those lights already, and
+editing a switch offers the same, so a switch of single lights can move to a room or zone.
+
+Tip: a room or zone switches all its lights at once, with one command, where single lights are switched one after
+another, with one command each. It also switches the lights that you add to it later in the Hue app.
+
 Once saved, the switch works within seconds: sonoff2hue restarts its connection to the bridge with the new switch.
 
 The switch keeps the names of its lights, rooms and zones, or their ids where two have the same name, and finds them on
