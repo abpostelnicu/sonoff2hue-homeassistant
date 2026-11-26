@@ -230,12 +230,12 @@ class HomeAssistant:
             raise StepError(f"GET {path} answered {status}: {answer}")
         return answer
 
-    async def wait_for_log(self, *texts: str) -> None:
-        """Waits until its log since it last started has each of ``texts``."""
+    async def wait_for_log(self, *texts: str, times: int = 1) -> None:
+        """Waits until its log since it last started has each of ``texts``, each at least ``times`` times."""
         while True:
             self._check_running()
             log = await self.error_log()
-            if all(text in log for text in texts):
+            if all(log.count(text) >= times for text in texts):
                 return
             await asyncio.sleep(POLL_INTERVAL)
 

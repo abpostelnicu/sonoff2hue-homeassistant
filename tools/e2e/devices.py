@@ -55,16 +55,17 @@ class FakeHueBridge:
     async def get(self, path: str) -> str:
         return await self._request("GET", path)
 
-    async def post(self, path: str) -> str:
-        return await self._request("POST", path)
+    async def post(self, path: str, params: dict[str, str] | None = None) -> str:
+        return await self._request("POST", path, params)
 
     async def puts(self) -> list[str]:
         """Every PUT it got, in order: what each switched, such as ``light 'Hallway' on``."""
         return (await self.get("/_fake/puts")).splitlines()
 
-    async def _request(self, method: str, path: str) -> str:
+    async def _request(self, method: str, path: str, params: dict[str, str] | None = None) -> str:
         # Its certificate is made at each start, and only the integration pins it.
-        async with self._session.request(method, f"https://{self.address}{path}", ssl=False) as response:
+        url = f"https://{self.address}{path}"
+        async with self._session.request(method, url, params=params, ssl=False) as response:
             text = await response.text()
             if response.status >= 300:
                 raise StepError(f"The fake Hue bridge answered {method} {path} with {response.status}: {text}")

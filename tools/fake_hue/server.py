@@ -4,7 +4,7 @@ The Hue API calls that sonoff2hue makes: ``GET /api/0/config`` (anonymous), pair
 ``hue-application-key`` header ``GET /clip/v2/resource/{light,room,zone,grouped_light,bridge}``, one of them by its id
 (``GET /clip/v2/resource/{type}/{id}``), ``PUT /clip/v2/resource/{light,grouped_light}/{id}`` with
 ``{"on":{"on":true}}``, and ``POST /clip/v2/resource/zone``, which creates a zone of lights. The test endpoints under
-``/_fake/`` need no key.
+``/_fake/`` need no key; ``rename`` and ``delete`` change a light, room or zone as the Hue app does.
 """
 
 import asyncio
@@ -37,6 +37,9 @@ HELP = """Fake Hue bridge: test-only endpoints
   GET  /_fake/requests     every request to the Hue API, with its status
   POST /_fake/reset        all lights off, the zones that POSTs created gone, the logs cleared, link button released;
                            application keys stay
+  POST /_fake/rename/{id}?name=<name>
+                           rename the light, room or zone with that id
+  POST /_fake/delete/{id}  delete the light, room or zone with that id, as the Hue app does
 
 """
 
@@ -60,6 +63,8 @@ def create_app(bridge: FakeBridge) -> web.Application:
     app.router.add_get("/_fake/posts", _posts)
     app.router.add_get("/_fake/requests", _requests)
     app.router.add_post("/_fake/reset", _reset)
+    app.router.add_post("/_fake/rename/{id}", _rename)
+    app.router.add_post("/_fake/delete/{id}", _delete)
     return app
 
 
@@ -225,6 +230,33 @@ async def _reset(request: web.Request) -> web.Response:
     return web.Response(status=204)
 
 
+async def _rename(request: web.Request) -> web.Response:
+    """Renames a light, room or zone: 200 with what it was and its new name, 400 without a name or with one that a real
+    bridge would refuse, 404 for an unknown id."""
+    resource_id = request.match_info["id"]
+    name = request.query.get("name", "")
+    if not name.strip():
+        return _text("Give the new name as ?name=<name>.\n", 400)
+    try:
+        described = request.app[_BRIDGE].rename(resource_id, name)
+    except RefusedError as err:
+        return _text(f"Not renamed: {err}.\n", 400)
+    if described is None:
+        return _text(f"No light, room or zone has the id '{resource_id}'.\n", 404)
+    _LOGGER.info("Renamed %s to '%s'.", described, name)
+    return _text(f"Renamed {described} to '{name}'.\n")
+
+
+async def _delete(request: web.Request) -> web.Response:
+    """Deletes a light, room or zone: 200 with what it was, 404 for an unknown id."""
+    resource_id = request.match_info["id"]
+    described = request.app[_BRIDGE].delete(resource_id)
+    if described is None:
+        return _text(f"No light, room or zone has the id '{resource_id}'.\n", 404)
+    _LOGGER.info("Deleted %s.", described)
+    return _text(f"Deleted {described}.\n")
+
+
 def _app_key(request: web.Request) -> str | None:
     values = request.headers.getall(_APP_KEY_HEADER, [])
     return values[0] if len(values) == 1 else None
@@ -259,8 +291,8 @@ def _json(body: Any, status: int = 200) -> web.Response:
     )
 
 
-def _text(text: str) -> web.Response:
-    return web.Response(text=text, content_type="text/plain", charset="utf-8")
+def _text(text: str, status: int = 200) -> web.Response:
+    return web.Response(text=text, status=status, content_type="text/plain", charset="utf-8")
 
 
 # HTTPS.

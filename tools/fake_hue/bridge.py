@@ -1,5 +1,5 @@
-"""The fake bridge's state: its lights, the devices that own them, its rooms and zones, the application keys it issued,
-its link button, and the logs of the requests, PUTs and POSTs it answered."""
+"""The fake bridge's state: its lights, the devices that own them, its rooms and zones, which tests can rename and
+delete, the application keys it issued, its link button, and the logs of the requests, PUTs and POSTs it answered."""
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -113,7 +113,8 @@ class Fault:
 class FakeBridge:
     """Three lights, each owned by a device of its own, a room of devices and a zone of lights, all off at the start;
     the application keys it issued; its link button; and the requests it answered. As on a real bridge, a room or zone
-    is on while any of its lights is on, and switching it switches all of them."""
+    is on while any of its lights is on, and switching it switches all of them. Tests can rename and delete the lights,
+    rooms and zones, as the Hue app does; they stay so until the fake bridge starts again."""
 
     link_button_always_pressed: bool = False
     clock: Callable[[], float] = time.monotonic
@@ -148,7 +149,8 @@ class FakeBridge:
                 [ceiling, floor_lamp, hallway],
             ),
         ]
-        self._fixed_groups = len(self._groups)
+        self._own_group_ids = frozenset(group.id for group in self._groups)
+        self._zones_created = 0
 
     @staticmethod
     def public_config() -> dict[str, Any]:
@@ -237,6 +239,42 @@ class FakeBridge:
         _append(self._puts, f"{target} {_on_off(on)}")
         return True
 
+    def rename(self, resource_id: str, name: str) -> str | None:
+        """Renames the light, room or zone with this id, which keeps its id, its owner and its children; returns how it
+        was described before, such as ``light 'Hallway'``, or ``None`` when there's none with that id. Raises
+        :class:`RefusedError` for a room's or zone's name of more than 32 characters, as a real bridge would."""
+        resource = self._find(resource_id)
+        if resource is None:
+            return None
+        if isinstance(resource, _Group) and len(name) > MAX_NAME_LENGTH:
+            raise RefusedError(f"a room's or zone's name has 1 to {MAX_NAME_LENGTH} characters")
+        described = _describe(resource)
+        resource.name = name
+        return described
+
+    def delete(self, resource_id: str) -> str | None:
+        """Deletes the light, room or zone with this id, as the Hue app does. A light goes with its device: out of the
+        rooms, whose children are devices, and out of the zones, whose children are lights. A room or zone takes its
+        grouped light with it, and leaves its lights and devices. Returns how it was described, or ``None`` when there's
+        none with that id."""
+        resource = self._find(resource_id)
+        if resource is None:
+            return None
+        if isinstance(resource, _Light):
+            self._lights.remove(resource)
+            for group in self._groups:
+                if resource in group.lights:
+                    group.lights.remove(resource)
+                if resource.device_id in group.devices:
+                    group.devices.remove(resource.device_id)
+        else:
+            self._groups.remove(resource)
+        return _describe(resource)
+
+    def _find(self, resource_id: str) -> _Light | _Group | None:
+        resources: list[_Light | _Group] = [*self._lights, *self._groups]
+        return next((resource for resource in resources if resource.id == resource_id), None)
+
     def record_rejected_put(self, path: str, status: int, reason: str) -> None:
         _append(self._puts, f"rejected PUT {path}: {status} {reason}")
 
@@ -264,7 +302,10 @@ class FakeBridge:
                 raise RefusedError(f"no light with the id '{child.get('rid')}'")
             if light not in lights:
                 lights.append(light)
-        number = len(self._groups) + 1
+        # Numbered after the bridge's own room and zone and every zone created since the start or the last reset, so that
+        # no id is used twice, even after a deletion.
+        self._zones_created += 1
+        number = len(self._own_group_ids) + self._zones_created
         zone = _Group(FakeIds.group(number), "zone", name, archetype, FakeIds.grouped_light(number), lights)
         self._groups.append(zone)
         _append(self._posts, f"zone '{name}' ({', '.join(light.name for light in lights)})")
@@ -308,10 +349,11 @@ class FakeBridge:
 
     def reset(self) -> None:
         """Turns every light off, removes the zones that POSTs created, clears the logs and releases the link button.
-        Issued application keys stay valid."""
+        Issued application keys stay valid, and so do the renames and deletions of its own lights, room and zone."""
         for light in self._lights:
             light.on = False
-        del self._groups[self._fixed_groups :]
+        self._groups = [group for group in self._groups if group.id in self._own_group_ids]
+        self._zones_created = 0
         self._puts.clear()
         self._posts.clear()
         self._requests.clear()
@@ -330,6 +372,11 @@ class FakeBridge:
 
 def _on_off(on: bool) -> str:
     return "on" if on else "off"
+
+
+def _describe(resource: _Light | _Group) -> str:
+    """A light, room or zone as the logs name it, such as ``room 'Living room'``."""
+    return f"light '{resource.name}'" if isinstance(resource, _Light) else f"{resource.type} '{resource.name}'"
 
 
 def _lines(lines: list[str]) -> str:

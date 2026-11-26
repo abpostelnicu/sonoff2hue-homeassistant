@@ -521,6 +521,10 @@ scripts/develop lights     # the fake bridge's lights, rooms and zones, and ever
 - The fake Hue bridge listens on https://127.0.0.1:18443, with its link button always pressed: pairing with
   `127.0.0.1:18443` succeeds at once. It makes a new certificate at every start, so pair again after restarting it.
   Its log is `.dev/fake-hue.log`; `FAKE_HUE_PORT` and `FAKE_HUE_BIND` change where it listens.
+  `https://127.0.0.1:18443/_fake/` lists its test endpoints. `POST /_fake/rename/{id}?name=…` and
+  `POST /_fake/delete/{id}` change a light, room or zone as the Hue app does, until the fake bridge starts again, so
+  you can watch the integration follow a rename or skip what is gone. The ids are fixed: `FakeIds` in
+  `tools/fake_hue/bridge.py`.
 - `scripts/develop press` sends the eWeLink announcements of a press of the made-up MINIR4M `1000abcdef`
   (`SONOFF2HUE_DEV_DEVICE` chooses another): the last `seq` again, then the next, which `.dev/seq` keeps. Their
   multicast TTL is 0, so they loop back to this machine and never reach the network. They come from
@@ -554,8 +558,11 @@ scripts/e2e
   from the bridge's lists.
 - It presses the switch twice and checks what the fake bridge was asked to switch (on, then off), the integration's
   `sonoff2hue_press` and `sonoff2hue_toggle` events, its status in its diagnostics, its entities *Status*, *Last
-  action* and *Press*, and its log. Then it restarts Home Assistant: the switch's last `seq` again must be no press, and
-  the next one a press.
+  action* and *Press*, and its log. Then it renames the light on the fake bridge, as the Hue app does, and restarts
+  Home Assistant: the integration must follow the rename and save the light's new name in the switch, the switch's
+  last `seq` again must be no press, and the next one a press that switches the light by its new name. Last, it
+  deletes the light: the next press must switch the room and leave the light out, *Status* must stay running and name
+  the missing light, Repairs must list the switch's issue, and the press after that must switch the room alone.
 - Once `.dev/venv` exists, it takes about 15 seconds. A pass deletes `.dev/e2e`. A failure prints the integration's
   lines of Home Assistant's log and keeps the folder: `hass.log` (Home Assistant's output), `fake-hue.log` and
   `config/home-assistant.log*`.

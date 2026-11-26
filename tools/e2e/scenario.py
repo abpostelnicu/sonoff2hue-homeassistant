@@ -1,8 +1,9 @@
 """The end-to-end test's steps: Home Assistant and the integration set up as a user sets them up, a switch added, two
-presses, a restart, and a press after it."""
+presses, a light renamed on the bridge, a restart, which follows the rename, a press after it, and a light deleted on the
+bridge, with the presses after that."""
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 import contextlib
 from dataclasses import dataclass
 import os
@@ -34,8 +35,21 @@ from custom_components.sonoff2hue.const import (
 )
 from custom_components.sonoff2hue.engine.supervisor import NO_SWITCHES
 from custom_components.sonoff2hue.sensor import ACTION_TURNED_OFF, ACTION_TURNED_ON
+from tools.fake_hue.bridge import FakeIds
 
-from . import DEVICE_ID, LIGHT, POLL_INTERVAL, ROOM, SWITCH_NAME, TARGETS, StepError, puts, within
+from . import (
+    DEVICE_ID,
+    LIGHT,
+    POLL_INTERVAL,
+    RENAMED_LIGHT,
+    ROOM,
+    SWITCH_NAME,
+    TARGETS,
+    StepError,
+    puts,
+    targets,
+    within,
+)
 from .checks import Checks, Event, Events
 from .devices import FakeHueBridge, SimulatedSwitch
 from .hass import HomeAssistant, WebSocket
@@ -97,6 +111,8 @@ class EndToEnd:
         self._entry_id: str | None = None
         self._flow_changes = Events()
         """The announcements that a flow changed (``data_entry_flow_progressed``), of any flow."""
+        self._expected_problems: list[str] = []
+        """The integration's warnings and errors that a step causes on purpose, which the log may hold."""
 
     async def run(self) -> bool:
         """Runs every step, stops Home Assistant and the fake bridge, and reports; ``True`` if every check passed."""
@@ -134,13 +150,15 @@ class EndToEnd:
             await self._add_switch(websocket)
             await self._wait_until_running()
             await self._press_twice(websocket)
+            await self._rename_light()
             await self._restart(websocket)
         finally:
             await websocket.close()
         websocket = await self.hass.websocket()
         try:
-            await self._wait_until_running()
+            await self._follow_the_rename(websocket)
             await self._press_after_restart(websocket)
+            await self._delete_light(websocket)
         finally:
             await websocket.close()
 
@@ -322,22 +340,38 @@ class EndToEnd:
             f"the integration's status, in its diagnostics, is running: {service['message']} ({elapsed:.1f} s)"
         )
 
-    async def _wait_for_status(self, state: str) -> dict[str, Any]:
-        """Waits until the integration's status, ``entry.runtime_data.status``, has ``state``, as its diagnostics show it
-        (decision 26), and returns its service: state, message and problems."""
+    async def _wait_for_status(self, state: str, problems: list[str] | None = None) -> dict[str, Any]:
+        """Waits until the integration's status, ``entry.runtime_data.status``, has ``state``, and ``problems`` if given,
+        as its diagnostics show it (decision 26), and returns its service: state, message and problems."""
         service: dict[str, Any] | None = None
         try:
             async with asyncio.timeout(STATUS_TIMEOUT):
                 while True:
                     if (status := await self._status()) is not None:
                         current: dict[str, Any] = status["service"]
-                        if (service := current)["state"] == state:
+                        service = current
+                        if current["state"] == state and (problems is None or current["problems"] == problems):
                             return current
                     await asyncio.sleep(POLL_INTERVAL)
         except TimeoutError:
+            wanted = state if problems is None else f"{state} with the problems {problems}"
             raise StepError(
-                f"The integration's status isn't {state} within {STATUS_TIMEOUT:g} s; its diagnostics show {service}."
+                f"The integration's status isn't {wanted} within {STATUS_TIMEOUT:g} s; its diagnostics show {service}."
             ) from None
+
+    async def _wait_for_issues(self, websocket: WebSocket) -> list[dict[str, Any]]:
+        """The integration's repair issues, as the WebSocket command ``repairs/list_issues`` lists them, once there is
+        one: the runtime raises them from the status's published snapshots, up to 500 ms after a change. None if none
+        comes within the status's timeout, for the check to report."""
+        issues: list[dict[str, Any]] = []
+        with contextlib.suppress(TimeoutError):
+            async with asyncio.timeout(STATUS_TIMEOUT):
+                while not issues:
+                    listed = await websocket.command({"type": "repairs/list_issues"})
+                    issues = [issue for issue in listed["issues"] if issue["domain"] == DOMAIN]
+                    if not issues:
+                        await asyncio.sleep(POLL_INTERVAL)
+        return issues
 
     async def _wait_for_device(self, seq: int) -> None:
         """Waits until the LAN monitor has the switch's broadcast of ``seq``, as the diagnostics' devices show it."""
@@ -363,9 +397,15 @@ class EndToEnd:
         status: dict[str, Any] | None = None if diagnostics is None else diagnostics["status"]
         return status
 
-    async def _check_status(self, turned_on: bool) -> None:
-        """The status after a toggle: running, and the switch online at its address, in detached mode, with its targets
-        and its last toggle, without an error."""
+    async def _check_status(
+        self,
+        turned_on: bool,
+        expected_targets: list[str] = TARGETS,
+        problems: Sequence[str] = (),
+        error: str | None = None,
+    ) -> None:
+        """The status after a toggle: running, and the switch online at its address, in detached mode, with its targets,
+        its problems, its last toggle and its last error, none by default."""
         status = await self._status()
         switches = [] if status is None else status["switches"]
         actual = (
@@ -378,14 +418,16 @@ class EndToEnd:
                 switches[0]["address"],
                 switches[0]["detached"],
                 switches[0]["targets"],
+                switches[0]["problems"],
                 (switches[0]["last_action"] or {}).get("turned_on"),
-                switches[0]["last_error"],
+                (switches[0]["last_error"] or {}).get("message"),
             )
         )
         self.checks.expect_equal(
             f"the status in the diagnostics: running; the switch online at {SWITCH_ADDRESS}, detached, with its targets, "
-            f"its last toggle {'on' if turned_on else 'off'} and no error",
-            ("running", DEVICE_ID, True, SWITCH_ADDRESS, True, TARGETS, turned_on, None),
+            f"{'its problems' if problems else 'no problem'}, its last toggle {'on' if turned_on else 'off'} and "
+            f"{'its last error' if error else 'no error'}",
+            ("running", DEVICE_ID, True, SWITCH_ADDRESS, True, expected_targets, list(problems), turned_on, error),
             actual,
         )
 
@@ -476,9 +518,49 @@ class EndToEnd:
         elapsed = checks.timed("the restart", started)
         checks.ok(f"started again, it has finished starting ({elapsed:.1f} s since the restart)")
 
+    async def _rename_light(self) -> None:
+        """Renames the switch's light on the bridge, as the Hue app does, while Home Assistant runs. The integration
+        remembers which light the switch's entry found, so it follows the rename when it resolves the switch next, here
+        at its start after the restart (decision 32)."""
+        checks = self.checks
+        checks.step(f"Rename the light {LIGHT} to {RENAMED_LIGHT} on the fake Hue bridge, as the Hue app does")
+        answer = await self.fake.post(f"/_fake/rename/{FakeIds.HALLWAY}", {"name": RENAMED_LIGHT})
+        checks.expect_equal(
+            "the fake bridge renamed it", f"Renamed light '{LIGHT}' to '{RENAMED_LIGHT}'.", answer.strip()
+        )
+
+    async def _follow_the_rename(self, websocket: WebSocket) -> None:
+        """At its start after the restart, the integration finds the light by the id that it remembered, saves the new
+        name in the switch's subentry, and the bridge restarts once for it: the second runner of this start resolves the
+        new name by itself. The test waits for that runner before it presses the switch."""
+        checks = self.checks
+        checks.step(f"After the restart: the integration follows the rename and saves {RENAMED_LIGHT} in the switch")
+        renamed = (
+            f"{DISPLAY_NAME}: light '{LIGHT}' was renamed to '{RENAMED_LIGHT}' on the Hue bridge; saved the new name."
+        )
+        async with within(STATUS_TIMEOUT, "The integration didn't save the light's new name and restart the bridge"):
+            await self.hass.wait_for_log(renamed, RESTARTING)
+            await self.hass.wait_for_log(LISTENING, times=2)
+        checks.ok("it logged the rename, then restarted the bridge, whose runner listens again")
+        await self._wait_until_running()
+
+        diagnostics = await self._diagnostics()
+        switches = [] if diagnostics is None else diagnostics["config"]["switches"]
+        checks.expect_equal(
+            "the switch is saved with the light's new name, and the room as before",
+            [(DEVICE_ID, SWITCH_NAME, [RENAMED_LIGHT], [f"room:{ROOM}"])],
+            [(item["device_id"], item["name"], item["lights"], item["groups"]) for item in switches],
+        )
+        subentries = await websocket.command({"type": "config_entries/subentries/list", "entry_id": self._entry_id})
+        checks.expect_equal(
+            "the entry has the switch as its only subentry, as before",
+            [(SUBENTRY_SWITCH, SWITCH_NAME, DEVICE_ID)],
+            [(item["subentry_type"], item["title"], item["unique_id"]) for item in subentries],
+        )
+
     async def _press_after_restart(self, websocket: WebSocket) -> None:
         """A restart starts from a new baseline, so the switch's first broadcast after it, here its last seq again, is
-        never a press, and the next seq is one."""
+        never a press, and the next seq is one. It toggles the renamed light by its new name."""
         checks = self.checks
         checks.step("After the restart: the switch announces its last seq again (4), then the next (5)")
         events = await _subscribe(websocket)
@@ -486,16 +568,86 @@ class EndToEnd:
         await self._announce([4, 5], events)
         checks.timed("a press after the restart", started)
 
-        self._check_events(events, [5], [True])
-        await self._check_status(turned_on=True)
+        self._check_events(events, [5], [True], targets(RENAMED_LIGHT))
+        await self._check_status(turned_on=True, expected_targets=targets(RENAMED_LIGHT))
         await self._check_entities(websocket, turned_on=True, seq=5)
         checks.expect_equal(
-            "the fake bridge got no PUT for the repeated seq 4, and the PUTs of one toggle, on, for seq 5",
-            puts(on=True) + puts(on=False) + puts(on=True),
+            "the fake bridge got no PUT for the repeated seq 4, and the PUTs of one toggle, on, for seq 5, to the renamed "
+            "light",
+            puts(on=True) + puts(on=False) + puts(on=True, light=RENAMED_LIGHT),
             await self.fake.puts(),
         )
         # The runner's own word: the repeated seq was the switch's state, a baseline.
         await self._expect_logged(LISTENING, f"{DISPLAY_NAME}: online at {SWITCH_ADDRESS} (seq 4;")
+
+    async def _delete_light(self, websocket: WebSocket) -> None:
+        """Deletes the switch's light on the bridge, as the Hue app does. The next press toggles the room, and the
+        bridge's 404 for the light has the integration resolve the switch again at once: the status runs on with the
+        problem, and the repair names it. The press after that toggles the room alone (decision 32)."""
+        checks = self.checks
+        checks.step(
+            f"Delete the light {RENAMED_LIGHT} on the fake Hue bridge, then press the wall switch: seq 6, then 7"
+        )
+        answer = await self.fake.post(f"/_fake/delete/{FakeIds.HALLWAY}")
+        checks.expect_equal("the fake bridge deleted it", f"Deleted light '{RENAMED_LIGHT}'.", answer.strip())
+        not_switched = (
+            f"Could not switch light '{RENAMED_LIGHT}' off: Hue bridge returned 404 Not Found for PUT "
+            f"/clip/v2/resource/light/{FakeIds.HALLWAY}"
+        )
+        missing = f"{DISPLAY_NAME}: no Hue light named '{RENAMED_LIGHT}'. Known lights: 'Ceiling', 'Floor lamp'"
+        self._expected_problems += [not_switched, missing]
+
+        events = await _subscribe(websocket)
+        started = time.monotonic()
+        await self._announce([6], events)
+        self._check_events(events, [6], [False], targets(RENAMED_LIGHT), (1, 0, 1))
+        service = await self._wait_for_status("running", [missing])
+        checks.expect_equal(
+            "the status runs on, and says what is missing",
+            ("1 wall switch toggles 1 Hue light, room or zone; 1 is missing.", [missing]),
+            (service["message"], service["problems"]),
+        )
+        listed = await self._wait_for_issues(websocket)
+        checks.expect_equal(
+            "Repairs has the switch's issue, a warning with the problem",
+            [
+                (
+                    f"missing_targets_{DEVICE_ID}",
+                    "warning",
+                    "missing_targets",
+                    {"name": DISPLAY_NAME, "problems": f"- {missing}"},
+                )
+            ],
+            [
+                (issue["issue_id"], issue["severity"], issue["translation_key"], issue["translation_placeholders"])
+                for issue in listed
+            ],
+        )
+
+        events = await _subscribe(websocket)
+        await self._announce([7], events)
+        checks.timed("the presses after the deletion", started)
+        self._check_events(events, [7], [True], targets(None), (1, 0, 0))
+        await self._check_status(
+            turned_on=True,
+            expected_targets=targets(None),
+            problems=[missing],
+            error="1 of 2 lights could not be switched.",
+        )
+        await self._check_entities(websocket, turned_on=True, seq=7)
+        checks.expect_equal(
+            "the fake bridge refused the PUT to the deleted light, and got the room's of both toggles: off, then on",
+            puts(on=True)
+            + puts(on=False)
+            + puts(on=True, light=RENAMED_LIGHT)
+            + [
+                f"rejected PUT /clip/v2/resource/light/{FakeIds.HALLWAY}: 404 no light with the id '{FakeIds.HALLWAY}'",
+                f"room '{ROOM}' off",
+                f"room '{ROOM}' on",
+            ],
+            await self.fake.puts(),
+        )
+        await self._expect_logged(not_switched, missing, f"{DISPLAY_NAME} -> group '{ROOM}'")
 
     async def _announce(self, seqs: list[int], events: Events) -> None:
         """Sends the switch's announcements and waits until the last one's press has been toggled, or until it is clear
@@ -519,7 +671,15 @@ class EndToEnd:
         for line in lines:
             self.checks.expect(f'the integration logged "{line}…"', line in log)
 
-    def _check_events(self, events: Events, presses: list[int], turned_on: list[bool]) -> None:
+    def _check_events(
+        self,
+        events: Events,
+        presses: list[int],
+        turned_on: list[bool],
+        expected_targets: list[str] = TARGETS,
+        counts: tuple[int, int, int] = (2, 0, 0),
+    ) -> None:
+        """Each press, followed by its toggle with the targets and the counts of changed, unchanged and failed ones."""
         checks = self.checks
         order = [EVENT_PRESS, EVENT_TOGGLE] * len(presses)
         count = (
@@ -540,7 +700,7 @@ class EndToEnd:
         toggles = events.of(EVENT_TOGGLE)
         checks.expect_equal(
             f"{EVENT_TOGGLE} events: toggled, turned on: {', '.join(str(on).lower() for on in turned_on)}",
-            [(DEVICE_ID, RESULT_TOGGLED, on, TARGETS, 2, 0, 0) for on in turned_on],
+            [(DEVICE_ID, RESULT_TOGGLED, on, expected_targets, *counts) for on in turned_on],
             [
                 tuple(data.get(key) for key in (ATTR_SWITCH_ID, ATTR_RESULT, ATTR_TURNED_ON, ATTR_TARGETS))
                 + tuple(data.get(key) for key in (ATTR_CHANGED, ATTR_UNCHANGED, ATTR_FAILED))
@@ -564,7 +724,7 @@ class EndToEnd:
         checks.timed("the stop", started)
         for log in self._logs() if self._entry_id is not None else []:
             if log.exists():
-                problems = _integration_problems(log)
+                problems = _integration_problems(log, self._expected_problems)
                 checks.expect(
                     f"{log.name} has no warning or error of the integration, nor an error about it",
                     not problems,
@@ -637,10 +797,10 @@ def _expect_step(result: dict[str, Any], result_type: str, step_id: str | None) 
         raise StepError(f"The flow should be at {result_type} {step_id or ''}, but is at {shown}.")
 
 
-def _integration_problems(log: Path) -> list[str]:
+def _integration_problems(log: Path, expected: Sequence[str] = ()) -> list[str]:
     """The integration's warnings and errors in a Home Assistant log, other errors that name it, and the reports of
-    Home Assistant's frame helper about it. A log in which no line of the integration's is recognized is one too: its
-    lines would have been missed."""
+    Home Assistant's frame helper about it, but for the lines that hold one of ``expected``, which a step caused on
+    purpose. A log in which no line of the integration's is recognized is one too: its lines would have been missed."""
     problems = []
     seen = False
     for line in _read(log):
@@ -654,7 +814,7 @@ def _integration_problems(log: Path) -> list[str]:
             (ours and level in {"WARNING", "ERROR", "CRITICAL"})
             or (level in {"ERROR", "CRITICAL"} and DOMAIN in line)
             or "custom integration 'sonoff2hue'" in line
-        ):
+        ) and not any(text in line for text in expected):
             problems.append(line)
     if not seen:
         problems.append("No line of the integration was recognized in it: the scan doesn't know the log's format.")

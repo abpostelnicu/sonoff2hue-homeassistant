@@ -448,8 +448,134 @@ async def test_help_lists_the_test_endpoints(fake_hue: FakeHueHost) -> None:
         "GET  /_fake/puts",
         "GET  /_fake/posts",
         "POST /_fake/reset",
+        "POST /_fake/rename/{id}?name=<name>",
+        "POST /_fake/delete/{id}",
     ):
         assert endpoint in text
+
+
+async def test_a_light_and_a_room_can_be_renamed_as_in_the_hue_app(fake_hue: FakeHueHost) -> None:
+    """They keep their ids, their owner and their children, and the next listings and PUTs name them anew."""
+    hue = fake_hue.hue_client(await fake_hue.pair())
+    try:
+        renamed = await fake_hue.request("POST", f"_fake/rename/{FakeIds.HALLWAY}", params={"name": "Hallway lamp"})
+        lounge = await fake_hue.request("POST", f"_fake/rename/{FakeIds.LIVING_ROOM}", params={"name": "Lounge"})
+
+        assert renamed == (200, "Renamed light 'Hallway' to 'Hallway lamp'.\n")
+        assert lounge == (200, "Renamed room 'Living room' to 'Lounge'.\n")
+        lights, groups = await hue.get_lights_and_groups()
+        assert [(light.id, light.name) for light in lights] == [
+            (FakeIds.CEILING, "Ceiling"),
+            (FakeIds.FLOOR_LAMP, "Floor lamp"),
+            (FakeIds.HALLWAY, "Hallway lamp"),
+        ]
+        assert [(group.id, group.name, group.light_ids) for group in groups] == [
+            (FakeIds.LIVING_ROOM, "Lounge", frozenset({FakeIds.CEILING, FakeIds.FLOOR_LAMP})),
+            (FakeIds.DOWNSTAIRS, "Downstairs", frozenset({FakeIds.CEILING, FakeIds.FLOOR_LAMP, FakeIds.HALLWAY})),
+        ]
+        await hue.set_on(HueTarget(HueTargetKind.LIGHT, FakeIds.HALLWAY, "Hallway lamp"), True)
+        assert await fake_hue.get_text("_fake/puts") == "light 'Hallway lamp' on\n"
+    finally:
+        await hue.close()
+
+
+async def test_a_deleted_light_goes_with_its_device_from_its_rooms_and_zones(fake_hue: FakeHueHost) -> None:
+    """As in the Hue app: the room's children no longer have the light's device, the zone's no longer the light, and its
+    PUTs get 404."""
+    headers = {"hue-application-key": await fake_hue.pair()}
+    hue = fake_hue.hue_client(headers["hue-application-key"])
+    try:
+        deleted = await fake_hue.request("POST", f"_fake/delete/{FakeIds.CEILING}")
+
+        assert deleted == (200, "Deleted light 'Ceiling'.\n")
+        answers = {
+            kind: json.loads((await fake_hue.request("GET", f"clip/v2/resource/{kind}", headers=headers))[1])["data"]
+            for kind in ("light", "room", "zone")
+        }
+        assert [light["id"] for light in answers["light"]] == [FakeIds.FLOOR_LAMP, FakeIds.HALLWAY]
+        assert [group["children"] for group in answers["room"] + answers["zone"]] == [
+            [{"rid": FakeIds.FLOOR_LAMP_DEVICE, "rtype": "device"}, {"rid": FakeIds.DIMMER_SWITCH, "rtype": "device"}],
+            [{"rid": FakeIds.FLOOR_LAMP, "rtype": "light"}, {"rid": FakeIds.HALLWAY, "rtype": "light"}],
+        ]
+        _, groups = await hue.get_lights_and_groups()
+        assert [group.light_ids for group in groups] == [
+            frozenset({FakeIds.FLOOR_LAMP}),
+            frozenset({FakeIds.FLOOR_LAMP, FakeIds.HALLWAY}),
+        ]
+        assert await fake_hue.get_text("_fake/lights") == (
+            "light 'Floor lamp' off\nlight 'Hallway' off\nroom 'Living room' off (Floor lamp)\n"
+            "zone 'Downstairs' off (Floor lamp, Hallway)\n"
+        )
+        with pytest.raises(HueApiError) as caught:
+            await hue.set_on(HueTarget(HueTargetKind.LIGHT, FakeIds.CEILING, "Ceiling"), True)
+        assert caught.value.status == 404
+    finally:
+        await hue.close()
+
+
+async def test_a_deleted_room_takes_its_grouped_light_and_leaves_its_lights(fake_hue: FakeHueHost) -> None:
+    hue = fake_hue.hue_client(await fake_hue.pair())
+    try:
+        deleted = await fake_hue.request("POST", f"_fake/delete/{FakeIds.LIVING_ROOM}")
+
+        assert deleted == (200, "Deleted room 'Living room'.\n")
+        lights, groups = await hue.get_lights_and_groups()
+        assert len(lights) == 3
+        assert [group.id for group in groups] == [FakeIds.DOWNSTAIRS]
+        assert set(await hue.get_grouped_light_states()) == {FakeIds.DOWNSTAIRS_LIGHTS}
+        with pytest.raises(HueApiError) as caught:
+            await hue.set_on(HueTarget(HueTargetKind.GROUPED_LIGHT, FakeIds.LIVING_ROOM_LIGHTS, "Living room"), True)
+        assert caught.value.status == 404
+    finally:
+        await hue.close()
+
+
+async def test_zones_created_after_a_deletion_get_new_ids_and_a_reset_removes_only_them(fake_hue: FakeHueHost) -> None:
+    """A deletion doesn't make an id free again, and a reset leaves the bridge's own room and zone, deleted or renamed
+    as they were."""
+    hue = fake_hue.hue_client(await fake_hue.pair())
+    try:
+        first = await hue.create_zone("Hall", [FakeIds.HALLWAY])
+        await fake_hue.request("POST", f"_fake/delete/{FakeIds.LIVING_ROOM}")
+        await fake_hue.request("POST", f"_fake/delete/{first.id}")
+        second = await hue.create_zone("Porch", [FakeIds.CEILING])
+        await fake_hue.request("POST", f"_fake/rename/{FakeIds.DOWNSTAIRS}", params={"name": "Ground floor"})
+
+        assert (first.id, second.id) == (FakeIds.group(3), FakeIds.group(4))
+        assert (await fake_hue.request("POST", "_fake/reset"))[0] == 204
+        _, groups = await hue.get_lights_and_groups()
+        assert [(group.id, group.name) for group in groups] == [(FakeIds.DOWNSTAIRS, "Ground floor")]
+        assert (await hue.create_zone("Hall", [FakeIds.HALLWAY])).id == FakeIds.group(3)
+    finally:
+        await hue.close()
+
+
+@pytest.mark.parametrize(
+    ("path", "params", "status", "answer"),
+    [
+        (f"_fake/rename/{FakeIds.CEILING}", {}, 400, "Give the new name as ?name=<name>.\n"),
+        (f"_fake/rename/{FakeIds.CEILING}", {"name": " "}, 400, "Give the new name as ?name=<name>.\n"),
+        (
+            f"_fake/rename/{FakeIds.LIVING_ROOM}",
+            {"name": "x" * 33},
+            400,
+            "Not renamed: a room's or zone's name has 1 to 32 characters.\n",
+        ),
+        ("_fake/rename/nope", {"name": "Porch"}, 404, "No light, room or zone has the id 'nope'.\n"),
+        ("_fake/delete/nope", {}, 404, "No light, room or zone has the id 'nope'.\n"),
+        (
+            f"_fake/delete/{FakeIds.CEILING_DEVICE}",
+            {},
+            404,
+            f"No light, room or zone has the id '{FakeIds.CEILING_DEVICE}'.\n",
+        ),
+    ],
+)
+async def test_renaming_or_deleting_needs_a_known_id_and_a_name(
+    fake_hue: FakeHueHost, path: str, params: dict[str, str], status: int, answer: str
+) -> None:
+    assert await fake_hue.request("POST", path, params=params) == (status, answer)
+    assert await fake_hue.get_text("_fake/lights") == ALL_OFF
 
 
 async def test_faults_answer_the_requests_they_match_then_go(fake_hue: FakeHueHost) -> None:
