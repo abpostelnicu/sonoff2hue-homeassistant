@@ -186,10 +186,11 @@ def flow_log(caplog: pytest.LogCaptureFixture) -> list[tuple[int, str]]:
 
 @pytest.fixture(autouse=True)
 def setup_entry() -> Iterator[AsyncMock]:
-    """The config entry's setup and unload, which these tests don't check (``test_runtime.py`` does)."""
+    """The config entry's setup and unload, which these tests don't check (``test_runtime.py`` does). Like them, the
+    stand-ins return None (decision 36)."""
     with (
-        patch("custom_components.sonoff2hue.async_setup_entry", return_value=True) as setup,
-        patch("custom_components.sonoff2hue.async_unload_entry", return_value=True),
+        patch("custom_components.sonoff2hue.async_setup_entry", return_value=None) as setup,
+        patch("custom_components.sonoff2hue.async_unload_entry", return_value=None),
     ):
         yield setup
 

@@ -12,7 +12,7 @@ PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.E
 """The entity platforms (decision 25). They are set up once the runtime runs, and unloaded before it stops."""
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: Sonoff2HueConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: Sonoff2HueConfigEntry) -> None:
     """Starts the runtime of the one bridge (decision 23), its update listener and the platforms."""
     runtime = Sonoff2HueData.create(hass, entry)
     entry.runtime_data = runtime
@@ -22,12 +22,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: Sonoff2HueConfigEntry) -
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     entry.async_on_unload(async_track_devices(hass, entry))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: Sonoff2HueConfigEntry) -> bool:
-    """Unloads the platforms; the runtime stops after them."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+async def async_unload_entry(hass: HomeAssistant, entry: Sonoff2HueConfigEntry) -> None:
+    """Unloads the platforms; the runtime stops after them. A platform that fails to unload raises Home Assistant's
+    translated ``ConfigEntryError`` (decision 36)."""
+    await hass.config_entries.async_unload_platforms_or_raise(entry, PLATFORMS)
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: Sonoff2HueConfigEntry) -> None:
