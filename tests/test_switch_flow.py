@@ -54,7 +54,7 @@ from custom_components.sonoff2hue.const import (
 )
 from custom_components.sonoff2hue.engine.config import SwitchSettings
 from custom_components.sonoff2hue.engine.ewelink import EwelinkAnnouncement
-from custom_components.sonoff2hue.engine.hue_client import HueClient, HueLight
+from custom_components.sonoff2hue.engine.hue_client import HueClient, HueGroup, HueLight
 from custom_components.sonoff2hue.engine.press import SwitchEvent, SwitchEventKind, TrackedEvent, TrackerUpdate
 from custom_components.sonoff2hue.engine.registry import DeviceRegistry
 from custom_components.sonoff2hue.engine.supervisor import create_hue_client
@@ -1208,7 +1208,7 @@ async def test_bridge_settings_that_cannot_be_used_ask_to_pair_it(hass: HomeAssi
 UNEXPECTED = "The client failed unexpectedly."
 
 
-async def broken(self: HueClient) -> list[HueLight]:
+async def broken(self: HueClient) -> tuple[list[HueLight], list[HueGroup]]:
     raise RuntimeError(UNEXPECTED)
 
 
@@ -1216,7 +1216,7 @@ async def test_an_unexpected_failure_while_listing_the_lights(
     hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     entry = await loaded(hass)
-    monkeypatch.setattr(HueClient, "get_lights", broken)
+    monkeypatch.setattr(HueClient, "get_lights_and_groups", broken)
 
     result = await manual(hass, await start(hass, entry), DEVICE)
 
@@ -1235,7 +1235,7 @@ async def test_an_unexpected_failure_while_checking_the_switch(
 ) -> None:
     entry = await loaded(hass)
     result = await settings_for(hass, entry)
-    monkeypatch.setattr(HueClient, "get_lights", broken)
+    monkeypatch.setattr(HueClient, "get_lights_and_groups", broken)
 
     result = await go(hass, result, form(lights=["0"]))
 

@@ -103,8 +103,7 @@ async def resolve_bindings(
     the bridge refuses."""
     while True:
         try:
-            lights = await hue.get_lights()
-            groups = await hue.get_groups()
+            lights, groups = await hue.get_lights_and_groups()
             errors: list[str] = []
             bindings = [SwitchBinding(s, resolve(s, lights, groups, errors)) for s in config.switches]
             if errors:

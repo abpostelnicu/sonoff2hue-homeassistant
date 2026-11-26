@@ -152,9 +152,7 @@ def _clean_references(values: Sequence[str], field: str, errors: Errors) -> list
 class HueResources(Protocol):
     """What the checks read from the bridge; :class:`~.hue_client.HueClient` has it."""
 
-    async def get_lights(self) -> list[HueLight]: ...
-
-    async def get_groups(self) -> list[HueGroup]: ...
+    async def get_lights_and_groups(self) -> tuple[list[HueLight], list[HueGroup]]: ...
 
 
 type ConnectHue = Callable[[HueSettings], AbstractAsyncContextManager[HueResources]]
@@ -180,8 +178,7 @@ async def check_targets(
         return TargetCheck([], [NOT_PAIRED])
     try:
         async with connect(hue) as client:
-            lights = await client.get_lights()
-            groups = await client.get_groups()
+            lights, groups = await client.get_lights_and_groups()
     except HueApiError as err:
         return TargetCheck([], [f"The Hue bridge could not be reached, so the light names were not checked ({err})."])
     except ConfigError as err:
@@ -222,8 +219,7 @@ async def load_resources(hue: HueSettings, connect: ConnectHue) -> Resources:
         raise ResourcesError(409, PAIR_FIRST)
     try:
         async with connect(hue) as client:
-            lights = await client.get_lights()
-            groups = await client.get_groups()
+            lights, groups = await client.get_lights_and_groups()
     except HueApiError as err:
         raise ResourcesError(502, str(err)) from err
     except ConfigError as err:

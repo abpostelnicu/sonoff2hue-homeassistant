@@ -135,8 +135,7 @@ async def test_hue_client_reads_the_lights_rooms_and_zones(fake_hue: FakeHueHost
     hue = fake_hue.hue_client(await fake_hue.pair())
     try:
         await hue.ping()
-        lights = await hue.get_lights()
-        groups = await hue.get_groups()
+        lights, groups = await hue.get_lights_and_groups()
         light_states = await hue.get_light_states()
         grouped_states = await hue.get_grouped_light_states()
     finally:
@@ -148,11 +147,56 @@ async def test_hue_client_reads_the_lights_rooms_and_zones(fake_hue: FakeHueHost
         HueLight(FakeIds.HALLWAY, "Hallway", False),
     ]
     assert groups == [
-        HueGroup(FakeIds.LIVING_ROOM, "Living room", "room", FakeIds.LIVING_ROOM_LIGHTS),
-        HueGroup(FakeIds.DOWNSTAIRS, "Downstairs", "zone", FakeIds.DOWNSTAIRS_LIGHTS),
+        HueGroup(
+            FakeIds.LIVING_ROOM,
+            "Living room",
+            "room",
+            FakeIds.LIVING_ROOM_LIGHTS,
+            frozenset({FakeIds.CEILING, FakeIds.FLOOR_LAMP}),
+        ),
+        HueGroup(
+            FakeIds.DOWNSTAIRS,
+            "Downstairs",
+            "zone",
+            FakeIds.DOWNSTAIRS_LIGHTS,
+            frozenset({FakeIds.CEILING, FakeIds.FLOOR_LAMP, FakeIds.HALLWAY}),
+        ),
     ]
     assert light_states == {FakeIds.CEILING: False, FakeIds.FLOOR_LAMP: False, FakeIds.HALLWAY: False}
     assert grouped_states == {FakeIds.LIVING_ROOM_LIGHTS: False, FakeIds.DOWNSTAIRS_LIGHTS: False}
+
+
+async def test_devices_own_the_lights_a_room_holds_devices_and_a_zone_lights(fake_hue: FakeHueHost) -> None:
+    """As a real bridge lists them: each light names its device as its owner, and a room's children are devices, the
+    living room's dimmer switch too, which owns no light; a zone's children are lights."""
+    headers = {"hue-application-key": await fake_hue.pair()}
+
+    answers = {
+        kind: json.loads((await fake_hue.request("GET", f"clip/v2/resource/{kind}", headers=headers))[1])["data"]
+        for kind in ("light", "room", "zone")
+    }
+
+    assert [(light["id"], light["owner"]) for light in answers["light"]] == [
+        (FakeIds.CEILING, {"rid": FakeIds.CEILING_DEVICE, "rtype": "device"}),
+        (FakeIds.FLOOR_LAMP, {"rid": FakeIds.FLOOR_LAMP_DEVICE, "rtype": "device"}),
+        (FakeIds.HALLWAY, {"rid": FakeIds.HALLWAY_DEVICE, "rtype": "device"}),
+    ]
+    [room] = answers["room"]
+    assert room["children"] == [
+        {"rid": FakeIds.CEILING_DEVICE, "rtype": "device"},
+        {"rid": FakeIds.FLOOR_LAMP_DEVICE, "rtype": "device"},
+        {"rid": FakeIds.DIMMER_SWITCH, "rtype": "device"},
+    ]
+    [zone] = answers["zone"]
+    assert zone["children"] == [
+        {"rid": FakeIds.CEILING, "rtype": "light"},
+        {"rid": FakeIds.FLOOR_LAMP, "rtype": "light"},
+        {"rid": FakeIds.HALLWAY, "rtype": "light"},
+    ]
+    assert [group["services"] for group in (room, zone)] == [
+        [{"rid": FakeIds.LIVING_ROOM_LIGHTS, "rtype": "grouped_light"}],
+        [{"rid": FakeIds.DOWNSTAIRS_LIGHTS, "rtype": "grouped_light"}],
+    ]
 
 
 async def test_switching_a_light_and_a_room_switches_their_lights(fake_hue: FakeHueHost) -> None:

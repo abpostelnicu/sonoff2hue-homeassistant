@@ -43,13 +43,10 @@ class FakeBridge:
         self.opened = 0
         self.closed = 0
 
-    async def get_lights(self) -> list[HueLight]:
+    async def get_lights_and_groups(self) -> tuple[list[HueLight], list[HueGroup]]:
         if self.error is not None:
             raise self.error
-        return self.lights
-
-    async def get_groups(self) -> list[HueGroup]:
-        return self.groups
+        return self.lights, self.groups
 
     def connect(self, hue: HueSettings) -> AbstractAsyncContextManager[HueResources]:
         @asynccontextmanager

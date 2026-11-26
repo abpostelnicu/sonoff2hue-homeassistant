@@ -202,7 +202,8 @@ async def test_toggling_a_light_and_a_room_of_the_fake_bridge_switches_them_on_t
         # What the engine does for a switch mapped to the light 'Hallway' and the room 'Living room'.
         settings = SwitchSettings("1000abcdef", lights=["Hallway"], groups=["Living room"])
         errors: list[str] = []
-        targets = resolve(settings, await hue.get_lights(), await hue.get_groups(), errors)
+        lights, groups = await hue.get_lights_and_groups()
+        targets = resolve(settings, lights, groups, errors)
         assert errors == []
         switch = HueToggler(hue, LOGGER)
 

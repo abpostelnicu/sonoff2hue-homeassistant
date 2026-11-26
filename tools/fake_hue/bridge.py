@@ -1,5 +1,5 @@
-"""The fake bridge's state: its lights, rooms and zones, the application keys it issued, its link button, and the logs
-of the requests and PUTs it answered."""
+"""The fake bridge's state: its lights, the devices that own them, its rooms and zones, the application keys it issued,
+its link button, and the logs of the requests and PUTs it answered."""
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -29,27 +29,43 @@ class FakeIds:
     LIVING_ROOM_LIGHTS = "33333333-0000-4000-8000-000000000001"
     DOWNSTAIRS_LIGHTS = "33333333-0000-4000-8000-000000000002"
     BRIDGE = "44444444-0000-4000-8000-000000000001"
+    CEILING_DEVICE = "55555555-0000-4000-8000-000000000001"
+    FLOOR_LAMP_DEVICE = "55555555-0000-4000-8000-000000000002"
+    HALLWAY_DEVICE = "55555555-0000-4000-8000-000000000003"
+    DIMMER_SWITCH = "55555555-0000-4000-8000-000000000004"
+    """The living room's dimmer switch, a device that owns no light."""
 
 
 @dataclass
 class _Light:
     id: str
     name: str
+    device_id: str
     on: bool = False
 
 
 @dataclass
 class _Group:
+    """A room, whose children are devices, or a zone, whose children are lights."""
+
     id: str
     type: str
     name: str
     archetype: str
     grouped_light_id: str
     lights: list[_Light]
+    devices: list[str] = field(default_factory=list)
+    """A room's children: the devices of its lights, and others."""
 
     @property
     def on(self) -> bool:
         return any(light.on for light in self.lights)
+
+    @property
+    def children(self) -> list[dict[str, str]]:
+        if self.type == "room":
+            return [{"rid": device_id, "rtype": "device"} for device_id in self.devices]
+        return [{"rid": light.id, "rtype": "light"} for light in self.lights]
 
 
 @dataclass
@@ -68,9 +84,9 @@ class Fault:
 
 @dataclass
 class FakeBridge:
-    """Three lights, a room and a zone, all off at the start; the application keys it issued; its link button; and the
-    requests it answered. As on a real bridge, a room or zone is on while any of its lights is on, and switching it
-    switches all of them."""
+    """Three lights, each owned by a device of its own, a room of devices and a zone of lights, all off at the start;
+    the application keys it issued; its link button; and the requests it answered. As on a real bridge, a room or zone
+    is on while any of its lights is on, and switching it switches all of them."""
 
     link_button_always_pressed: bool = False
     clock: Callable[[], float] = time.monotonic
@@ -81,9 +97,9 @@ class FakeBridge:
     _link_button_pressed_until: float = float("-inf")
 
     def __post_init__(self) -> None:
-        ceiling = _Light(FakeIds.CEILING, "Ceiling")
-        floor_lamp = _Light(FakeIds.FLOOR_LAMP, "Floor lamp")
-        hallway = _Light(FakeIds.HALLWAY, "Hallway")
+        ceiling = _Light(FakeIds.CEILING, "Ceiling", FakeIds.CEILING_DEVICE)
+        floor_lamp = _Light(FakeIds.FLOOR_LAMP, "Floor lamp", FakeIds.FLOOR_LAMP_DEVICE)
+        hallway = _Light(FakeIds.HALLWAY, "Hallway", FakeIds.HALLWAY_DEVICE)
         self._lights = [ceiling, floor_lamp, hallway]
         self._groups = [
             _Group(
@@ -93,6 +109,7 @@ class FakeBridge:
                 "living_room",
                 FakeIds.LIVING_ROOM_LIGHTS,
                 [ceiling, floor_lamp],
+                [FakeIds.CEILING_DEVICE, FakeIds.FLOOR_LAMP_DEVICE, FakeIds.DIMMER_SWITCH],
             ),
             _Group(
                 FakeIds.DOWNSTAIRS,
@@ -142,6 +159,7 @@ class FakeBridge:
                     {
                         "id": light.id,
                         "type": "light",
+                        "owner": {"rid": light.device_id, "rtype": "device"},
                         "metadata": {"name": light.name, "archetype": "classic_bulb"},
                         "on": {"on": light.on},
                     }
@@ -153,6 +171,7 @@ class FakeBridge:
                         "id": group.id,
                         "type": group.type,
                         "metadata": {"name": group.name, "archetype": group.archetype},
+                        "children": group.children,
                         "services": [{"rid": group.grouped_light_id, "rtype": "grouped_light"}],
                     }
                     for group in self._groups

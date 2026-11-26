@@ -5,6 +5,7 @@ import asyncio
 from collections.abc import Callable
 import errno
 import hashlib
+import json
 import socket
 from typing import Any
 
@@ -469,11 +470,14 @@ async def test_the_lights_rooms_and_zones() -> None:
     client = InMemoryBridge(respond).client()
 
     assert await client.get_lights() == [HueLight("l1", "Lamp", True), HueLight("l2", "l2", False)]
-    assert await client.get_groups() == [
-        HueGroup("r1", "Hall", "room", "g1"),
-        HueGroup("r2", "r2", "room", None),
-        HueGroup("z1", "Upstairs", "zone", "g2"),
-    ]
+    assert await client.get_lights_and_groups() == (
+        [HueLight("l1", "Lamp", True), HueLight("l2", "l2", False)],
+        [
+            HueGroup("r1", "Hall", "room", "g1"),
+            HueGroup("r2", "r2", "room", None),
+            HueGroup("z1", "Upstairs", "zone", "g2"),
+        ],
+    )
     assert await client.get_light_states() == {"l1": True}
     assert await client.get_grouped_light_states() == {"g1": False, "g2": True}
 
@@ -526,3 +530,111 @@ async def test_a_failure_names_the_reason_of_the_status_line() -> None:
         await client.ping()
 
     assert str(failure.value) == "Hue bridge returned 503 Bridge busy for GET /clip/v2/resource/bridge"
+
+
+# The lights that rooms and zones hold.
+
+
+async def test_a_room_holds_the_lights_of_its_devices_and_a_zone_the_lights_it_lists(fake_hue: FakeHueHost) -> None:
+    """The fake bridge's living room holds the devices of the ceiling light and the floor lamp, and a dimmer switch,
+    which owns no light; the zone downstairs lists all three lights. The answers that list the lights, rooms and zones
+    say it all, without another request."""
+    client = fake_hue.hue_client(await fake_hue.pair())
+    try:
+        lights, groups = await client.get_lights_and_groups()
+    finally:
+        await client.close()
+
+    assert [light.id for light in lights] == [FakeIds.CEILING, FakeIds.FLOOR_LAMP, FakeIds.HALLWAY]
+    assert [(group.name, group.light_ids) for group in groups] == [
+        ("Living room", frozenset({FakeIds.CEILING, FakeIds.FLOOR_LAMP})),
+        ("Downstairs", frozenset({FakeIds.CEILING, FakeIds.FLOOR_LAMP, FakeIds.HALLWAY})),
+    ]
+    requests = (await fake_hue.get_text("_fake/requests")).splitlines()
+    assert [line[13:] for line in requests] == [
+        "POST /api 200",
+        "GET /clip/v2/resource/light 200",
+        "GET /clip/v2/resource/room 200",
+        "GET /clip/v2/resource/zone 200",
+    ]
+
+
+def child(rtype: str, rid: str) -> dict[str, str]:
+    return {"rid": rid, "rtype": rtype}
+
+
+async def test_the_lights_of_a_room_or_zone_are_those_of_its_children() -> None:
+    """A child holds the lights it is, owns or groups: a light, a device's lights by their owner, and a room's or
+    zone's lights, once even when the groups refer to each other; any other child holds none."""
+    data = {
+        "light": [
+            {"id": "l1", "owner": child("device", "d1")},
+            {"id": "l2", "owner": child("device", "d1")},
+            {"id": "l3", "owner": child("device", "d3")},
+            {"id": "l4", "owner": child("bridge", "x1")},
+            {"id": "l5", "owner": None},
+        ],
+        "room": [
+            {"id": "r1", "children": [child("device", "d1"), child("device", "d2"), child("device", "x1")]},
+            {"id": "r2", "children": [child("light", "l5"), child("device", "d3")]},
+            {"id": "r3", "children": None},
+        ],
+        "zone": [
+            {"id": "z1", "children": [child("light", "l3"), child("room", "r1"), child("motion", "m1")]},
+            {"id": "z2", "children": [child("zone", "z3"), child("device", "d3")]},
+            {"id": "z3", "children": [child("zone", "z2"), child("light", "l1"), child("room", "r9")]},
+        ],
+    }
+
+    def respond(request: RecordedRequest) -> tuple[int, str]:
+        return 200, json.dumps({"data": data[request.path.removeprefix("/clip/v2/resource/")]})
+
+    _, groups = await InMemoryBridge(respond).client().get_lights_and_groups()
+
+    assert {(group.kind, group.id): set(group.light_ids) for group in groups} == {
+        ("room", "r1"): {"l1", "l2"},
+        ("room", "r2"): {"l3", "l5"},
+        ("room", "r3"): set(),
+        ("zone", "z1"): {"l1", "l2", "l3"},
+        ("zone", "z2"): {"l1", "l3"},
+        ("zone", "z3"): {"l1", "l3"},
+    }
+
+
+@pytest.mark.parametrize(
+    ("resource_type", "resource"),
+    [
+        ("light", '{"id":"l1","owner":[]}'),
+        ("light", '{"id":"l1","owner":{"rtype":"device"}}'),
+        ("light", '{"id":"l1","owner":{"rid":"d1","rtype":7}}'),
+        ("room", '{"id":"r1","children":{}}'),
+        ("room", '{"id":"r1","children":[null]}'),
+        ("room", '{"id":"r1","children":[{"rid":"d1"}]}'),
+        ("zone", '{"id":"z1","children":[{"rid":"","rtype":"light"}]}'),
+    ],
+)
+async def test_a_malformed_owner_or_child_is_unexpected(resource_type: str, resource: str) -> None:
+    def respond(request: RecordedRequest) -> tuple[int, str]:
+        return 200, f'{{"data":[{resource}]}}' if request.path.endswith(f"/{resource_type}") else '{"data":[]}'
+
+    with pytest.raises(HueApiError) as failure:
+        await InMemoryBridge(respond).client().get_lights_and_groups()
+
+    assert str(failure.value) == f"Unexpected response from the Hue bridge for '{resource_type}'."
+    assert failure.value.is_transient
+
+
+async def test_a_room_with_a_malformed_child_from_the_fake_bridge_is_unexpected(fake_hue: FakeHueHost) -> None:
+    client = fake_hue.hue_client(await fake_hue.pair())
+    fake_hue.fail(
+        Fault("/clip/v2/resource/room", status=200, body='{"errors":[],"data":[{"id":"r1","children":[{"rid":"d1"}]}]}')
+    )
+
+    try:
+        with pytest.raises(HueApiError) as failure:
+            await client.get_lights_and_groups()
+    finally:
+        await client.close()
+
+    assert str(failure.value) == "Unexpected response from the Hue bridge for 'room'."
+    assert (failure.value.status, failure.value.is_transient) == (None, True)

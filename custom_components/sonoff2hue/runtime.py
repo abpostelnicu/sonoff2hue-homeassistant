@@ -450,7 +450,8 @@ async def _run_after(previous: list[asyncio.Task[None]], supervisor: BridgeSuper
 
 async def _test(settings: SwitchSettings, hue: HueClient) -> SwitchTestResult:
     errors: list[str] = []
-    targets = resolve(settings, await hue.get_lights(), await hue.get_groups(), errors)
+    lights, groups = await hue.get_lights_and_groups()
+    targets = resolve(settings, lights, groups, errors)
     if errors:
         raise SwitchTestError(" ".join(errors), errors)
 

@@ -210,11 +210,8 @@ class Bridge:
     lights: list[HueLight]
     groups: list[HueGroup]
 
-    async def get_lights(self) -> list[HueLight]:
-        return self.lights
-
-    async def get_groups(self) -> list[HueGroup]:
-        return self.groups
+    async def get_lights_and_groups(self) -> tuple[list[HueLight], list[HueGroup]]:
+        return self.lights, self.groups
 
     def connect(self, hue: HueSettings) -> AbstractAsyncContextManager[HueResources]:
         @asynccontextmanager

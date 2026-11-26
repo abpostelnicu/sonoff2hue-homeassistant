@@ -78,12 +78,14 @@ class HueLight:
 @dataclass(frozen=True, slots=True)
 class HueGroup:
     """A room or zone; its name is its id when the bridge gives it none. ``grouped_light_id`` is the resource that
-    switches all its lights, ``None`` for a room or zone without lights."""
+    switches all its lights, ``None`` for a room or zone without lights. ``light_ids`` are the ids of the lights it
+    holds (:meth:`HueClient.get_lights_and_groups`)."""
 
     id: str
     name: str
     kind: str
     grouped_light_id: str | None
+    light_ids: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -330,15 +332,16 @@ class HueClient:
         self._transport = transport_factory(url, certificate_sha256, None)
 
     async def get_lights(self) -> list[HueLight]:
-        return [
-            HueLight(light.id, light.name if light.name is not None else light.id, bool(light.on))
-            for light in await self._resources("light")
-        ]
+        return [_light(light) for light in await self._resources("light")]
 
-    async def get_groups(self) -> list[HueGroup]:
-        rooms = await self._resources("room")
-        zones = await self._resources("zone")
-        return [_group(room, "room") for room in rooms] + [_group(zone, "zone") for zone in zones]
+    async def get_lights_and_groups(self) -> tuple[list[HueLight], list[HueGroup]]:
+        """The lights, then the rooms and zones, each with the lights it holds (``HueGroup.light_ids``): the lights
+        among its children, those of the devices among them, which each light's owner names, and those of the rooms and
+        zones among them. A room's children are devices, and a zone's are lights."""
+        lights = await self._related("light")
+        rooms = await self._related("room")
+        zones = await self._related("zone")
+        return [_light(light.resource) for light in lights], _groups(lights, rooms, zones)
 
     async def get_light_states(self) -> dict[str, bool]:
         return _states(await self._resources("light"))
@@ -361,11 +364,13 @@ class HueClient:
         await self._transport.close()
 
     async def _resources(self, resource_type: str) -> list[_Resource]:
-        data = await self._send("GET", f"clip/v2/resource/{resource_type}", resource_type)
-        try:
-            return [_Resource.parse(item) for item in data]
-        except ValueError as err:
-            raise _unexpected(resource_type) from err
+        return _parse(await self._get(resource_type), _Resource.parse, resource_type)
+
+    async def _related(self, resource_type: str) -> list[_Related]:
+        return _parse(await self._get(resource_type), _Related.parse, resource_type)
+
+    async def _get(self, resource_type: str) -> list[dict[str, Any]]:
+        return await self._send("GET", f"clip/v2/resource/{resource_type}", resource_type)
 
     async def _send(self, method: str, path: str, resource_type: str, body: bytes | None = None) -> list[Any]:
         """Sends a request and returns the data of the bridge's answer. Raises :class:`HueApiError` when there is no
@@ -484,13 +489,15 @@ class _Envelope:
 
 
 @dataclass(frozen=True, slots=True)
-class _Service:
+class _Reference:
+    """A reference to another resource, such as a service, a child or an owner: its id and its type."""
+
     rid: str
     rtype: str
 
     @classmethod
-    def parse(cls, service: dict[str, Any]) -> Self:
-        return cls(_text(service, "rid"), _text(service, "rtype"))
+    def parse(cls, reference: dict[str, Any]) -> Self:
+        return cls(_text(reference, "rid"), _text(reference, "rtype"))
 
 
 @dataclass(frozen=True, slots=True)
@@ -498,7 +505,7 @@ class _Resource:
     id: str
     name: str | None
     on: bool | None
-    services: list[_Service]
+    services: list[_Reference]
 
     @classmethod
     def parse(cls, resource: dict[str, Any]) -> Self:
@@ -509,8 +516,35 @@ class _Resource:
             _text(resource, "id"),
             _field(_field(resource, "metadata", dict) or {}, "name", str),
             None if on is None else on["on"],
-            [_Service.parse(service) for service in _objects(resource, "services")],
+            [_Reference.parse(service) for service in _objects(resource, "services")],
         )
+
+
+@dataclass(frozen=True, slots=True)
+class _Related:
+    """A light, room or zone with what relates it to other resources: its owner, such as a light's device, and its
+    children, such as a room's devices or a zone's lights."""
+
+    resource: _Resource
+    owner: _Reference | None
+    children: list[_Reference]
+
+    @classmethod
+    def parse(cls, resource: dict[str, Any]) -> Self:
+        owner = _field(resource, "owner", dict)
+        return cls(
+            _Resource.parse(resource),
+            None if owner is None else _Reference.parse(owner),
+            [_Reference.parse(child) for child in _objects(resource, "children")],
+        )
+
+
+def _parse[T](items: list[dict[str, Any]], parse: Callable[[dict[str, Any]], T], resource_type: str) -> list[T]:
+    """The resources of an answer's data, each read by ``parse``; a malformed one makes the answer unexpected."""
+    try:
+        return [parse(item) for item in items]
+    except ValueError as err:
+        raise _unexpected(resource_type) from err
 
 
 def _states(resources: list[_Resource]) -> dict[str, bool]:
@@ -518,6 +552,40 @@ def _states(resources: list[_Resource]) -> dict[str, bool]:
     return {resource.id: resource.on for resource in resources if resource.on is not None}
 
 
-def _group(resource: _Resource, kind: str) -> HueGroup:
+def _light(resource: _Resource) -> HueLight:
+    return HueLight(resource.id, resource.name if resource.name is not None else resource.id, bool(resource.on))
+
+
+def _groups(lights: list[_Related], rooms: list[_Related], zones: list[_Related]) -> list[HueGroup]:
+    """The rooms, then the zones, each with the lights it holds: the lights among its children, the lights that a
+    device among them owns, and the lights of a room or zone among them. A child of another kind holds no lights."""
+    owned: dict[str, set[str]] = {}
+    for light in lights:
+        if light.owner is not None and light.owner.rtype == "device":
+            owned.setdefault(light.owner.rid, set()).add(light.resource.id)
+    groups = [("room", room) for room in rooms] + [("zone", zone) for zone in zones]
+    children = {(kind, group.resource.id): group.children for kind, group in groups}
+
+    def held(kind: str, group_id: str) -> frozenset[str]:
+        found: set[str] = set()
+        seen = {(kind, group_id)}
+        pending = list(children[kind, group_id])
+        while pending:
+            child = pending.pop()
+            key = (child.rtype, child.rid)
+            if child.rtype == "light":
+                found.add(child.rid)
+            elif child.rtype == "device":
+                found |= owned.get(child.rid, set())
+            elif key in children and key not in seen:
+                seen.add(key)
+                pending += children[key]
+        return frozenset(found)
+
+    return [_group(group.resource, kind, held(kind, group.resource.id)) for kind, group in groups]
+
+
+def _group(resource: _Resource, kind: str, light_ids: frozenset[str]) -> HueGroup:
     grouped_light = next((service.rid for service in resource.services if service.rtype == "grouped_light"), None)
-    return HueGroup(resource.id, resource.name if resource.name is not None else resource.id, kind, grouped_light)
+    name = resource.name if resource.name is not None else resource.id
+    return HueGroup(resource.id, name, kind, grouped_light, light_ids)
