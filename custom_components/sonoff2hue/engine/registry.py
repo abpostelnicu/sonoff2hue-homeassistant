@@ -11,7 +11,8 @@ from datetime import UTC, datetime, timedelta
 from .press import SwitchEventKind, TrackerUpdate, summarize
 
 ONLINE_WINDOW = timedelta(minutes=5)
-"""A device counts as online when it was heard within this window (the LAN monitor queries every 2 min)."""
+"""A device counts as online when it was heard within this window. The LAN monitor asks every 2 min, and every 30 s
+while a configured switch hasn't been heard for more than 2 min 30 s (decision 36)."""
 
 
 def _now() -> datetime:
@@ -75,8 +76,13 @@ class DeviceRegistry:
     def last_packet_at(self) -> datetime | None:
         return self._last_packet_at
 
+    def heard_within(self, device: LanDevice, window: timedelta) -> bool:
+        """Whether ``device`` was last heard at most ``window`` before the registry's clock's time."""
+        return self._clock() - device.last_seen_at <= window
+
     def is_online(self, device: LanDevice) -> bool:
-        return self._clock() - device.last_seen_at <= ONLINE_WINDOW
+        """Whether ``device`` was heard within :data:`ONLINE_WINDOW`, the last 5 minutes."""
+        return self.heard_within(device, ONLINE_WINDOW)
 
     def snapshot(self) -> list[LanDevice]:
         """The devices in the order of their casefolded ids."""

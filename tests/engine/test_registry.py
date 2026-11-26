@@ -183,6 +183,23 @@ def test_is_online_within_five_minutes_of_the_last_broadcast() -> None:
     assert registry.is_online(device)
 
 
+def test_heard_within_counts_from_the_last_broadcast_a_repeat_included() -> None:
+    clock = Clock()
+    registry = DeviceRegistry(clock)
+    tracker = SwitchTracker(EngineConfig())
+    feed(registry, tracker, announcement(DEVICE, 1, "abc", "iv"), seconds=10)
+    feed(registry, tracker, announcement(DEVICE, 1, "abc", "iv"), seconds=20)
+    (device,) = registry.snapshot()
+    window = timedelta(seconds=150)
+
+    clock.now = START + timedelta(seconds=20) + window
+    assert registry.heard_within(device, window)
+    clock.now += timedelta(microseconds=1)
+    assert not registry.heard_within(device, window)
+    assert registry.heard_within(device, ONLINE_WINDOW)
+    assert registry.is_online(device)
+
+
 def test_last_packet_at_counts_every_packet() -> None:
     registry = DeviceRegistry(Clock())
     tracker = SwitchTracker(EngineConfig())

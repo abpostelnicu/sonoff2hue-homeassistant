@@ -2,9 +2,11 @@
 
 import asyncio
 from collections.abc import AsyncIterator, Callable
+from datetime import timedelta
 import errno
 import json
 import logging
+import math
 from typing import Any
 
 import pytest
@@ -22,6 +24,8 @@ from .test_mdns import QUERY
 from .test_press import KEY, minir4m_json
 
 DEVICE = "1000abcdef"
+OTHER = "1000999999"
+"""Another made-up MINIR4M."""
 SENDER = ("10.0.0.5", 5353)
 Kind = SwitchEventKind
 
@@ -33,29 +37,59 @@ async def time() -> AsyncIterator[VirtualTime]:
     virtual.restore()
 
 
+def switches(*device_ids: str) -> EngineConfig:
+    """A configuration with a switch for each of ``device_ids``."""
+    return EngineConfig(switches=[SwitchSettings(device_id=device_id, lights=["Lamp"]) for device_id in device_ids])
+
+
 class Lan:
     """A LAN monitor on a fake network, with its registry, all on virtual time."""
 
-    def __init__(self, time: VirtualTime, watch: NetworkWatcher | None = None) -> None:
+    def __init__(
+        self, time: VirtualTime, watch: NetworkWatcher | None = None, config: EngineConfig | None = None
+    ) -> None:
         self.time = time
         self.network = FakeNetwork()
         self.listener = MdnsListener(self.network.open, watch or self.network.watch, clock=time.utc)
         self.registry = DeviceRegistry(time.utc)
-        self.monitor = LanMonitor(self.listener, self.registry, EngineConfig())
+        self.monitor = LanMonitor(self.listener, self.registry, config or EngineConfig())
         self.events: list[Kind | None] = []
         self.registry.add_changed_callback(lambda device: self.events.append(device.last_event))
 
-    def broadcast(self, seq: int, data: str = "abc", iv: str = "iv") -> None:
-        self.network.deliver(announcement(DEVICE, seq, data, iv), SENDER)
+    def broadcast(self, seq: int, data: str = "abc", iv: str = "iv", device_id: str = DEVICE) -> None:
+        self.network.deliver(announcement(device_id, seq, data, iv), SENDER)
 
     def broadcast_encrypted(self, seq: int, **params: Any) -> None:
         data, iv = ewelink.encrypt(json.dumps(minir4m_json(**params), separators=(",", ":")), KEY)
         self.broadcast(seq, data, iv)
 
 
-def query_times(transport: FakeTransport, time: VirtualTime) -> list[float]:
-    """When each query went out on the transport's working interface, in seconds of virtual time. Call it as the
-    socket opens: the queries sent so far went out then, before the started callbacks first waited."""
+class Answers:
+    """The MINIR4Ms that answer each query as it goes out, with their state again, as they do. An answer can be lost:
+    :meth:`lose` drops a device's next answers, and :meth:`stop` all of them."""
+
+    def __init__(self, lan: Lan, *device_ids: str) -> None:
+        self._lan = lan
+        self._lost: dict[str, float] = dict.fromkeys(device_ids, 0)
+
+    def lose(self, device_id: str, count: int) -> None:
+        self._lost[device_id] = count
+
+    def stop(self, device_id: str) -> None:
+        self._lost[device_id] = math.inf
+
+    def __call__(self) -> None:
+        for device_id, lost in self._lost.items():
+            if lost > 0:
+                self._lost[device_id] = lost - 1
+            else:
+                self._lan.broadcast(1, device_id=device_id)
+
+
+def query_times(transport: FakeTransport, time: VirtualTime, answer: Callable[[], None] = lambda: None) -> list[float]:
+    """When each query went out on the transport's working interface, in seconds of virtual time; ``answer`` runs as
+    each later one goes out. Call it as the socket opens: the queries sent so far went out then, before the started
+    callbacks first waited."""
     assert all(data == QUERY for data, _ in transport.sent)
     times: list[float] = [time.elapsed for _ in transport.sent]
     send = transport.send
@@ -64,9 +98,19 @@ def query_times(transport: FakeTransport, time: VirtualTime) -> list[float]:
         send(data, interface)
         assert data == QUERY
         times.append(time.elapsed)
+        answer()
 
     transport.send = timed  # type: ignore[method-assign]
     return times
+
+
+async def answered(lan: Lan, answers: Answers) -> tuple[asyncio.Task[None], list[float]]:
+    """Runs the LAN monitor, whose queries ``answers`` answers, the first one too; gives its task and its queries'
+    times."""
+    task = asyncio.create_task(lan.monitor.run())
+    sent = query_times(await lan.network.next_open(), lan.time, answers)
+    answers()  # to the query that went out as the socket opened
+    return task, sent
 
 
 async def stop(task: asyncio.Task[None]) -> None:
@@ -86,6 +130,86 @@ async def test_queries_at_once_after_one_and_three_seconds_then_every_two_minute
     await asyncio.sleep(250)
 
     assert sent == pytest.approx([0, 1, 3, 123, 243])
+    await stop(task)
+
+
+# The catch-up queries (decision 36). Each answer comes as its query goes out, so a switch heard at 243 s is late after
+# 393 s, and online up to 543 s.
+
+
+async def test_no_catch_up_queries_while_every_switch_answers(time: VirtualTime) -> None:
+    lan = Lan(time, config=switches(DEVICE, OTHER))
+    task, sent = await answered(lan, Answers(lan, DEVICE, OTHER))
+
+    await asyncio.sleep(610)
+
+    assert sent == pytest.approx([0, 1, 3, 123, 243, 363, 483, 603])
+    await stop(task)
+
+
+async def test_a_lost_answer_brings_a_query_every_30_s_until_the_switch_is_heard(time: VirtualTime) -> None:
+    lan = Lan(time, config=switches(DEVICE))
+    answers = Answers(lan, DEVICE)
+    task, sent = await answered(lan, answers)
+    await asyncio.sleep(300)
+    answers.lose(DEVICE, 2)
+
+    await asyncio.sleep(400)
+
+    # The answers to the queries at 363 s and 423 s are lost; at 393 s the switch was heard 150 s before, not more. The
+    # answer to the one at 453 s comes, and the 2 minutes start again from it.
+    assert sent == pytest.approx([0, 1, 3, 123, 243, 363, 423, 453, 573, 693])
+    device = lan.registry.find(DEVICE)
+    assert device is not None
+    assert device.last_seen_at == VirtualTime.START + timedelta(seconds=693)
+    await stop(task)
+
+
+async def test_a_switch_silent_for_more_than_5_minutes_is_asked_every_2_minutes_again(time: VirtualTime) -> None:
+    lan = Lan(time, config=switches(DEVICE))
+    answers = Answers(lan, DEVICE)
+    task, sent = await answered(lan, answers)
+    await asyncio.sleep(300)
+    answers.stop(DEVICE)
+
+    await asyncio.sleep(610)
+
+    # A query every 30 s while it is late and online, from 423 s to 543 s; then every 2 minutes from the last one.
+    assert sent == pytest.approx([0, 1, 3, 123, 243, 363, 423, 453, 483, 513, 543, 663, 783, 903])
+    device = lan.registry.find(DEVICE)
+    assert device is not None
+    assert not lan.registry.is_online(device)
+    await stop(task)
+
+
+async def test_an_unconfigured_device_never_brings_catch_up_queries(time: VirtualTime) -> None:
+    lan = Lan(time, config=switches(DEVICE))
+    answers = Answers(lan, DEVICE, OTHER)
+    task, sent = await answered(lan, answers)
+    await asyncio.sleep(300)
+    answers.stop(OTHER)  # no switch maps it
+
+    await asyncio.sleep(400)
+
+    assert sent == pytest.approx([0, 1, 3, 123, 243, 363, 483, 603])
+    await stop(task)
+
+
+async def test_a_config_change_changes_which_switches_can_be_late(time: VirtualTime) -> None:
+    lan = Lan(time)
+    answers = Answers(lan, DEVICE)
+    task, sent = await answered(lan, answers)
+    await asyncio.sleep(10)
+    answers.stop(DEVICE)  # heard at 3 s, then silent: late after 153 s, and online up to 303 s
+
+    await asyncio.sleep(190)
+    lan.monitor.config_changed(switches(DEVICE))
+    await asyncio.sleep(50)
+    lan.monitor.config_changed(EngineConfig())
+    await asyncio.sleep(120)
+
+    # It counts at the looks at 213 s and 243 s, after the first change and before the second.
+    assert sent == pytest.approx([0, 1, 3, 123, 213, 243, 363])
     await stop(task)
 
 

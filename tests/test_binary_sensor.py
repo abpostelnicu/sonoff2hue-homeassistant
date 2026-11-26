@@ -5,11 +5,19 @@ from datetime import timedelta
 
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
-from homeassistant.const import ATTR_DEVICE_CLASS, STATE_OFF, STATE_ON, STATE_UNKNOWN, EntityCategory
+from homeassistant.const import (
+    ATTR_DEVICE_CLASS,
+    EVENT_STATE_CHANGED,
+    STATE_OFF,
+    STATE_ON,
+    STATE_UNKNOWN,
+    EntityCategory,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 import pytest
+from pytest_homeassistant.common import async_capture_events
 
 from .fakes import BRIDGE_ADDRESS, DEVICE_ADDRESS, DEVICE_KEY, Bridge, Lan, paired, relay, switch
 from .platforms import BRIDGE_DOWN, ONLINE, REACHABLE, settle, start, state_of, tick
@@ -186,3 +194,39 @@ async def test_online_counts_a_blank_key_as_none(hass: HomeAssistant, lan: Lan, 
     await start(hass, paired(switch(key=key)))
 
     assert online(hass)[1]["has_device_key"] is False
+
+
+async def test_online_stays_on_when_two_answers_in_a_row_are_lost(
+    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+) -> None:
+    """The switch answers each query, as a MINIR4M does, until two answers in a row are lost. With a query every 2
+    minutes, its last answer was then 6 minutes old, and Online was off for a minute; once the switch is late, the
+    LAN monitor asks every 30 seconds (decision 36)."""
+    await start(hass, paired(switch()))
+    transport = lan.network.transports[-1]
+    send = transport.send
+    lost = 0
+
+    def answer(data: bytes, interface: str) -> None:
+        nonlocal lost
+        send(data, interface)
+        if lost:
+            lost -= 1
+        else:
+            lan.broadcast(1)
+
+    transport.send = answer  # type: ignore[method-assign]
+    changes = async_capture_events(hass, EVENT_STATE_CHANGED)
+    lan.broadcast(1)  # its answer to the query that went out as the socket opened
+    for _ in range(10):  # the queries at 1 and 3 seconds, answered
+        await tick(freezer, 1)
+
+    lost = 2
+    for _ in range(600):
+        await tick(freezer, 1)
+
+    assert lost == 0
+    states = [event.data["new_state"].state for event in changes if event.data["entity_id"] == ONLINE]
+    assert states[0] == STATE_ON
+    assert STATE_OFF not in states
+    assert online(hass)[0] == STATE_ON

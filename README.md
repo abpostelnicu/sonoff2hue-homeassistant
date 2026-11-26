@@ -386,12 +386,14 @@ look through it before you share it.
   - A firewall on the host has to allow inbound UDP 5353. Home Assistant Container needs the host's network, and a
     virtual machine a bridged network adapter. If avahi-daemon runs on the host, keep its default
     `disallow-other-stacks=no` in `/etc/avahi/avahi-daemon.conf`.
-  - A MINIR4M announces itself when its state changes, or when asked. sonoff2hue asks when it starts and every 2
-    minutes, so operate the wall switch, or wait.
+  - A MINIR4M announces itself when its state changes, or when asked. sonoff2hue asks when it starts, then every 2
+    minutes, and every 30 seconds while a switch's last answer is more than 2½ minutes old, so operate the wall
+    switch, or wait.
   - When sonoff2hue can't listen on the network, the log warns "mDNS socket error (…); retrying in 5s."
 - **A switch is *Offline*, or the log warns "Not seen on the LAN yet: …".** sonoff2hue hasn't heard that MINIR4M in
-  the last 5 minutes, or since it connected to the bridge, and asks for it every 30 seconds while it hasn't. Check
-  that the MINIR4M has power and Wi-Fi, and its device id.
+  the last 5 minutes, or since it connected to the bridge. It asks for it every 30 seconds while it hasn't heard it
+  since then, and while its last answer is more than 2½ minutes old, until it is *Offline*. Check that the MINIR4M has
+  power and Wi-Fi, and its device id.
 - **Presses don't toggle the lights.**
   - Check that the MINIR4M is in detached relay mode. With the device key, a press that toggles the relay is ignored as
     a relay change, and a repair says that the switch isn't detached.
