@@ -1,9 +1,10 @@
 """The fake bridge's state: its lights, the devices that own them, its rooms and zones, the application keys it issued,
-its link button, and the logs of the requests and PUTs it answered."""
+its link button, and the logs of the requests, PUTs and POSTs it answered."""
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
+import json
 import secrets
 import string
 import time
@@ -13,6 +14,17 @@ BRIDGE_ID = "FA4E00FFFE000001"
 NAME = "Fake Hue bridge"
 LINK_BUTTON_WINDOW = 30.0
 """Seconds that pairing stays open after a press of the link button, as on a real bridge."""
+MAX_NAME_LENGTH = 32
+"""The characters of a room's or zone's name, as on a real bridge."""
+# fmt: off
+ARCHETYPES = frozenset({
+    "living_room", "kitchen", "dining", "bedroom", "kids_bedroom", "bathroom", "nursery", "recreation", "office", "gym",
+    "hallway", "toilet", "front_door", "garage", "terrace", "garden", "driveway", "carport", "home", "downstairs",
+    "upstairs", "top_floor", "attic", "guest_room", "staircase", "lounge", "man_cave", "computer", "studio", "music",
+    "tv", "reading", "closet", "storage", "laundry_room", "balcony", "porch", "barbecue", "pool", "other",
+})
+# fmt: on
+"""The archetypes of a room or zone, one of which a new zone needs."""
 
 _MAX_LINES = 10_000
 _KEY_CHARACTERS = string.ascii_uppercase + string.ascii_lowercase + string.digits
@@ -34,6 +46,17 @@ class FakeIds:
     HALLWAY_DEVICE = "55555555-0000-4000-8000-000000000003"
     DIMMER_SWITCH = "55555555-0000-4000-8000-000000000004"
     """The living room's dimmer switch, a device that owns no light."""
+
+    @staticmethod
+    def group(number: int) -> str:
+        """Room or zone ``number``: 1 is the living room and 2 the zone downstairs, then the zones that
+        ``POST /clip/v2/resource/zone`` creates, in order."""
+        return f"22222222-0000-4000-8000-{number:012d}"
+
+    @staticmethod
+    def grouped_light(number: int) -> str:
+        """The grouped light of room or zone ``number``."""
+        return f"33333333-0000-4000-8000-{number:012d}"
 
 
 @dataclass
@@ -68,6 +91,10 @@ class _Group:
         return [{"rid": light.id, "rtype": "light"} for light in self.lights]
 
 
+class RefusedError(Exception):
+    """A request that the fake bridge refuses, as a real bridge would, for the reason it gives."""
+
+
 @dataclass
 class Fault:
     """An answer the fake bridge gives instead of the normal one, for tests: to the next ``count`` requests whose method
@@ -94,6 +121,7 @@ class FakeBridge:
     _app_keys: set[str] = field(default_factory=set)
     _requests: list[str] = field(default_factory=list)
     _puts: list[str] = field(default_factory=list)
+    _posts: list[str] = field(default_factory=list)
     _link_button_pressed_until: float = float("-inf")
 
     def __post_init__(self) -> None:
@@ -120,6 +148,7 @@ class FakeBridge:
                 [ceiling, floor_lamp, hallway],
             ),
         ]
+        self._fixed_groups = len(self._groups)
 
     @staticmethod
     def public_config() -> dict[str, Any]:
@@ -211,6 +240,39 @@ class FakeBridge:
     def record_rejected_put(self, path: str, status: int, reason: str) -> None:
         _append(self._puts, f"rejected PUT {path}: {status} {reason}")
 
+    def create_zone(self, body: Any) -> str:
+        """Creates the zone of ``POST /clip/v2/resource/zone``, with a grouped light, and returns its id. ``body`` is
+        ``{"children":[{"rid":"<light id>","rtype":"light"},...],"metadata":{"name":"...","archetype":"..."}}``; raises
+        :class:`RefusedError` for a body that a real bridge would refuse."""
+        metadata = body.get("metadata") if isinstance(body, dict) else None
+        if not isinstance(metadata, dict):
+            raise RefusedError("the zone needs metadata, with its name and archetype")
+        name, archetype = metadata.get("name"), metadata.get("archetype")
+        if not isinstance(name, str) or not 1 <= len(name) <= MAX_NAME_LENGTH:
+            raise RefusedError(f"the zone needs a name of 1 to {MAX_NAME_LENGTH} characters")
+        if not isinstance(archetype, str) or archetype not in ARCHETYPES:
+            raise RefusedError("the zone needs the archetype of a room or zone")
+        children = body.get("children")
+        if not isinstance(children, list):
+            raise RefusedError("the zone needs a list of children")
+        lights: list[_Light] = []
+        for child in children:
+            if not isinstance(child, dict) or child.get("rtype") != "light":
+                raise RefusedError(f"a zone's children are lights, not {json.dumps(child)}")
+            light = next((x for x in self._lights if x.id == child.get("rid")), None)
+            if light is None:
+                raise RefusedError(f"no light with the id '{child.get('rid')}'")
+            if light not in lights:
+                lights.append(light)
+        number = len(self._groups) + 1
+        zone = _Group(FakeIds.group(number), "zone", name, archetype, FakeIds.grouped_light(number), lights)
+        self._groups.append(zone)
+        _append(self._posts, f"zone '{name}' ({', '.join(light.name for light in lights)})")
+        return zone.id
+
+    def record_rejected_post(self, path: str, status: int, reason: str) -> None:
+        _append(self._posts, f"rejected POST {path}: {status} {reason}")
+
     def record_request(self, method: str, path: str, status: int) -> None:
         _append(self._requests, f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]} {method} {path} {status}")  # noqa: DTZ005 - local time, for people
 
@@ -227,6 +289,11 @@ class FakeBridge:
         """One line per PUT, in order: what it switched, e.g. ``light 'Hallway' on``, or why it was rejected."""
         return _lines(self._puts)
 
+    def describe_posts(self) -> str:
+        """One line per POST of a zone, in order: the zone and its lights, e.g. ``zone 'Hall' (Ceiling, Hallway)``, or
+        why it was rejected."""
+        return _lines(self._posts)
+
     def describe_requests(self) -> str:
         """One line per request to the Hue API, in order: time, method, path and status."""
         return _lines(self._requests)
@@ -235,11 +302,18 @@ class FakeBridge:
     def puts(self) -> list[str]:
         return list(self._puts)
 
+    @property
+    def posts(self) -> list[str]:
+        return list(self._posts)
+
     def reset(self) -> None:
-        """Turns every light off, clears the logs and releases the link button. Issued application keys stay valid."""
+        """Turns every light off, removes the zones that POSTs created, clears the logs and releases the link button.
+        Issued application keys stay valid."""
         for light in self._lights:
             light.on = False
+        del self._groups[self._fixed_groups :]
         self._puts.clear()
+        self._posts.clear()
         self._requests.clear()
         self._link_button_pressed_until = float("-inf")
 

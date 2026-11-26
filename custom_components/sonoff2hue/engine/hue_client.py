@@ -7,7 +7,7 @@ wait for a handshake.
 """
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import Enum
 import hashlib
@@ -37,6 +37,13 @@ REQUEST_TIMEOUT = 5.0
 CONNECT_TIMEOUT = 4.0
 IDLE_TIMEOUT = 300.0
 """Seconds that an idle connection to the bridge stays open, much longer than the keep-alive's interval."""
+
+ZONE_ARCHETYPE = "other"
+"""The archetype of the zones that sonoff2hue creates: of the archetypes of rooms and zones, the one for any use."""
+ZONE_READS = 5
+ZONE_READ_DELAY = 0.5
+"""A new zone is read up to 5 times, 0.5 s apart, until it has its grouped light, which the bridge may add a moment
+after the zone: about 2 s in all, at most two requests a second."""
 
 _TRANSIENT = frozenset(
     {
@@ -356,6 +363,27 @@ class HueClient:
         body = json.dumps({"on": {"on": on}}, separators=(",", ":")).encode()
         await self._send("PUT", f"clip/v2/resource/{resource_type}/{_escape(target.id)}", resource_type, body)
 
+    async def create_zone(self, name: str, light_ids: Sequence[str]) -> HueGroup:
+        """Creates a zone of these lights, in this order, and returns it as the bridge then lists it, with the grouped
+        light that switches them all. The bridge may add the grouped light a moment after the zone, so the zone is read
+        up to 5 times, 0.5 s apart, until it has one, and returned without one after that. Raises
+        :class:`HueApiError`; an answer that doesn't name the new zone, or a reading without it, is unexpected."""
+        children = [{"rid": light_id, "rtype": "light"} for light_id in light_ids]
+        body = {"children": children, "metadata": {"name": name, "archetype": ZONE_ARCHETYPE}}
+        data = await self._send(
+            "POST", "clip/v2/resource/zone", "zone", json.dumps(body, separators=(",", ":")).encode()
+        )
+        created = [reference.rid for reference in _parse(data, _Reference.parse, "zone") if reference.rtype == "zone"]
+        if not created:
+            raise _unexpected("zone")
+        zone = await self._zone(created[0])
+        for _ in range(ZONE_READS - 1):
+            if zone.grouped_light_id is not None:
+                break
+            await asyncio.sleep(ZONE_READ_DELAY)
+            zone = await self._zone(zone.id)
+        return zone
+
     async def ping(self) -> None:
         """A cheap authenticated request; it keeps the TLS connection warm and tells whether the bridge is usable."""
         await self._resources("bridge")
@@ -371,6 +399,14 @@ class HueClient:
 
     async def _get(self, resource_type: str) -> list[dict[str, Any]]:
         return await self._send("GET", f"clip/v2/resource/{resource_type}", resource_type)
+
+    async def _zone(self, zone_id: str) -> HueGroup:
+        """The zone with this id, with the lights among its children."""
+        data = await self._send("GET", f"clip/v2/resource/zone/{_escape(zone_id)}", "zone")
+        zones = [zone for zone in _parse(data, _Related.parse, "zone") if zone.resource.id == zone_id]
+        if not zones:
+            raise _unexpected("zone")
+        return _groups([], [], zones[:1])[0]
 
     async def _send(self, method: str, path: str, resource_type: str, body: bytes | None = None) -> list[Any]:
         """Sends a request and returns the data of the bridge's answer. Raises :class:`HueApiError` when there is no

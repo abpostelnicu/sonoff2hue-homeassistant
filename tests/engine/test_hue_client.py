@@ -2,7 +2,7 @@
 answers, over real HTTPS against the fake bridge where the connection matters, and in memory otherwise."""
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 import errno
 import hashlib
 import json
@@ -29,6 +29,7 @@ from tools.fake_hue.bridge import FakeIds, Fault
 from tools.fake_hue.server import create_certificate, ssl_context
 
 from ..hue import FakeHueHost, InMemoryBridge, RecordedRequest
+from .fakes import VirtualTime
 
 PAIR_AGAIN = "reconfigure the sonoff2hue integration to pair the bridge again"
 UNEXPECTED = "Unexpected response from the Hue bridge for 'light'."
@@ -638,3 +639,135 @@ async def test_a_room_with_a_malformed_child_from_the_fake_bridge_is_unexpected(
 
     assert str(failure.value) == "Unexpected response from the Hue bridge for 'room'."
     assert (failure.value.status, failure.value.is_transient) == (None, True)
+
+
+# Creating a zone.
+
+CREATED = '{"errors":[],"data":[{"rid":"z1","rtype":"zone"}]}'
+NEW_ZONE = (
+    '{"errors":[],"data":[{"id":"z1","metadata":{"name":"Hall"},"children":[{"rid":"l2","rtype":"light"},'
+    '{"rid":"l1","rtype":"light"}],"services":[{"rid":"g1","rtype":"grouped_light"}]}]}'
+)
+NEW_ZONE_WITHOUT_ITS_GROUPED_LIGHT = '{"errors":[],"data":[{"id":"z1","children":[{"rid":"l1","rtype":"light"}]}]}'
+
+
+@pytest.fixture
+async def time() -> AsyncIterator[VirtualTime]:
+    virtual = VirtualTime(asyncio.get_running_loop())
+    yield virtual
+    virtual.restore()
+
+
+async def test_a_zone_of_lights_is_created_on_the_fake_bridge_and_read_back(fake_hue: FakeHueHost) -> None:
+    client = fake_hue.hue_client(await fake_hue.pair())
+    try:
+        zone = await client.create_zone("Hall", [FakeIds.CEILING, FakeIds.HALLWAY])
+        _, groups = await client.get_lights_and_groups()
+    finally:
+        await client.close()
+
+    lights = frozenset({FakeIds.CEILING, FakeIds.HALLWAY})
+    assert zone == HueGroup(FakeIds.group(3), "Hall", "zone", FakeIds.grouped_light(3), lights)
+    assert groups[-1] == zone
+    assert await fake_hue.get_text("_fake/posts") == "zone 'Hall' (Ceiling, Hallway)\n"
+    requests = [line[13:] for line in (await fake_hue.get_text("_fake/requests")).splitlines()]
+    assert requests[1:3] == ["POST /clip/v2/resource/zone 200", f"GET /clip/v2/resource/zone/{FakeIds.group(3)} 200"]
+
+
+async def test_creating_a_zone_sends_its_name_the_archetype_other_and_its_lights_in_order() -> None:
+    bridge = InMemoryBridge(lambda request: (200, CREATED if request.method == "POST" else NEW_ZONE))
+
+    zone = await bridge.client("the-key").create_zone("Hall", ["l2", "l1"])
+
+    assert zone == HueGroup("z1", "Hall", "zone", "g1", frozenset({"l1", "l2"}))
+    post, read = bridge.requests
+    assert (post.method, post.path, post.body) == (
+        "POST",
+        "/clip/v2/resource/zone",
+        '{"children":[{"rid":"l2","rtype":"light"},{"rid":"l1","rtype":"light"}],'
+        '"metadata":{"name":"Hall","archetype":"other"}}',
+    )
+    assert post.headers == {"hue-application-key": "the-key"}
+    assert (read.method, read.path, read.body) == ("GET", "/clip/v2/resource/zone/z1", None)
+
+
+async def test_a_zone_that_the_bridge_refuses_names_the_bridges_reason(fake_hue: FakeHueHost) -> None:
+    client = fake_hue.hue_client(await fake_hue.pair())
+    try:
+        with pytest.raises(HueApiError) as failure:
+            await client.create_zone("x" * 33, [FakeIds.CEILING, FakeIds.HALLWAY])
+    finally:
+        await client.close()
+
+    reason = "the zone needs a name of 1 to 32 characters"
+    assert str(failure.value) == f"Hue bridge returned 400 Bad Request for POST /clip/v2/resource/zone: {reason}"
+    assert (failure.value.status, failure.value.is_transient) == (400, False)
+    assert await fake_hue.get_text("_fake/posts") == f"rejected POST /clip/v2/resource/zone: 400 {reason}\n"
+    assert "zone 'x" not in await fake_hue.get_text("_fake/lights")
+
+
+async def test_an_answer_that_names_no_new_zone_from_the_fake_bridge_is_unexpected(fake_hue: FakeHueHost) -> None:
+    client = fake_hue.hue_client(await fake_hue.pair())
+    fake_hue.fail(Fault("/clip/v2/resource/zone", method="POST", status=200, body='{"errors":[],"data":[]}'))
+
+    try:
+        with pytest.raises(HueApiError) as failure:
+            await client.create_zone("Hall", [FakeIds.CEILING, FakeIds.HALLWAY])
+    finally:
+        await client.close()
+
+    assert str(failure.value) == "Unexpected response from the Hue bridge for 'zone'."
+    assert failure.value.is_transient
+
+
+@pytest.mark.parametrize(
+    ("created", "read"),
+    [
+        ("", NEW_ZONE),
+        ('{"data":[]}', NEW_ZONE),
+        ('{"data":[{"rid":"z1"}]}', NEW_ZONE),
+        ('{"data":[{"rid":"g1","rtype":"grouped_light"}]}', NEW_ZONE),
+        (CREATED, ""),
+        (CREATED, '{"data":[]}'),
+        (CREATED, '{"data":[{"id":"z2"}]}'),
+        (CREATED, '{"data":[{"id":"z1","children":[{"rid":"l1"}]}]}'),
+    ],
+)
+async def test_answers_that_dont_show_the_new_zone_are_unexpected(created: str, read: str) -> None:
+    bridge = InMemoryBridge(lambda request: (200, created if request.method == "POST" else read))
+
+    with pytest.raises(HueApiError) as failure:
+        await bridge.client().create_zone("Hall", ["l1"])
+
+    assert str(failure.value) == "Unexpected response from the Hue bridge for 'zone'."
+    assert failure.value.is_transient
+
+
+async def test_a_new_zone_is_read_again_until_it_has_its_grouped_light(time: VirtualTime) -> None:
+    readings: list[float] = []
+
+    def respond(request: RecordedRequest) -> tuple[int, str]:
+        if request.method == "POST":
+            return 200, CREATED
+        readings.append(time.elapsed)
+        return 200, NEW_ZONE if len(readings) == 3 else NEW_ZONE_WITHOUT_ITS_GROUPED_LIGHT
+
+    zone = await InMemoryBridge(respond).client().create_zone("Hall", ["l2", "l1"])
+
+    assert (zone.grouped_light_id, zone.light_ids) == ("g1", frozenset({"l1", "l2"}))
+    assert readings == pytest.approx([0, 0.5, 1])
+
+
+async def test_a_new_zone_is_read_five_times_at_most(time: VirtualTime) -> None:
+    readings: list[float] = []
+
+    def respond(request: RecordedRequest) -> tuple[int, str]:
+        if request.method == "POST":
+            return 200, CREATED
+        readings.append(time.elapsed)
+        return 200, NEW_ZONE_WITHOUT_ITS_GROUPED_LIGHT
+
+    zone = await InMemoryBridge(respond).client().create_zone("Hall", ["l1"])
+
+    assert zone == HueGroup("z1", "z1", "zone", None, frozenset({"l1"}))
+    assert readings == pytest.approx([0, 0.5, 1, 1.5, 2])

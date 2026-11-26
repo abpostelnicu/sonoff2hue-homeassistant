@@ -231,6 +231,127 @@ async def test_zone_is_on_while_any_of_its_lights_is_on(fake_hue: FakeHueHost) -
     assert groups[FakeIds.LIVING_ROOM_LIGHTS] is False
 
 
+NEW_ZONE = {
+    "children": [{"rid": FakeIds.CEILING, "rtype": "light"}, {"rid": FakeIds.HALLWAY, "rtype": "light"}],
+    "metadata": {"name": "Hall", "archetype": "other"},
+}
+
+
+async def test_a_post_creates_a_zone_of_lights_with_its_grouped_light(fake_hue: FakeHueHost) -> None:
+    headers = {"hue-application-key": await fake_hue.pair()}
+
+    status, text = await fake_hue.request("POST", "clip/v2/resource/zone", NEW_ZONE, headers=headers)
+
+    assert (status, json.loads(text)) == (200, {"data": [{"rid": FakeIds.group(3), "rtype": "zone"}], "errors": []})
+    status, text = await fake_hue.request("GET", f"clip/v2/resource/zone/{FakeIds.group(3)}", headers=headers)
+    assert (status, json.loads(text)["data"]) == (
+        200,
+        [
+            {
+                "id": FakeIds.group(3),
+                "type": "zone",
+                "metadata": {"name": "Hall", "archetype": "other"},
+                "children": NEW_ZONE["children"],
+                "services": [{"rid": FakeIds.grouped_light(3), "rtype": "grouped_light"}],
+            }
+        ],
+    )
+    put = await fake_hue.request(
+        "PUT", f"clip/v2/resource/grouped_light/{FakeIds.grouped_light(3)}", {"on": {"on": True}}, headers=headers
+    )
+    assert put[0] == 200
+    assert await fake_hue.get_text("_fake/lights") == (
+        "light 'Ceiling' on\n"
+        "light 'Floor lamp' off\n"
+        "light 'Hallway' on\n"
+        "room 'Living room' on (Ceiling, Floor lamp)\n"
+        "zone 'Downstairs' on (Ceiling, Floor lamp, Hallway)\n"
+        "zone 'Hall' on (Ceiling, Hallway)\n"
+    )
+    assert await fake_hue.get_text("_fake/posts") == "zone 'Hall' (Ceiling, Hallway)\n"
+    assert await fake_hue.get_text("_fake/puts") == "zone 'Hall' on\n"
+
+
+ROOM_CHILD = {"rid": FakeIds.LIVING_ROOM, "rtype": "room"}
+
+
+@pytest.mark.parametrize(
+    ("body", "reason"),
+    [
+        ("{not json", "body contains invalid JSON"),
+        ("[]", "the zone needs metadata, with its name and archetype"),
+        ({"children": NEW_ZONE["children"]}, "the zone needs metadata, with its name and archetype"),
+        ({**NEW_ZONE, "metadata": {"archetype": "other"}}, "the zone needs a name of 1 to 32 characters"),
+        ({**NEW_ZONE, "metadata": {"name": "", "archetype": "other"}}, "the zone needs a name of 1 to 32 characters"),
+        (
+            {**NEW_ZONE, "metadata": {"name": "x" * 33, "archetype": "other"}},
+            "the zone needs a name of 1 to 32 characters",
+        ),
+        ({**NEW_ZONE, "metadata": {"name": "Hall"}}, "the zone needs the archetype of a room or zone"),
+        (
+            {**NEW_ZONE, "metadata": {"name": "Hall", "archetype": "Other"}},
+            "the zone needs the archetype of a room or zone",
+        ),
+        (
+            {**NEW_ZONE, "metadata": {"name": "Hall", "archetype": ["other"]}},
+            "the zone needs the archetype of a room or zone",
+        ),
+        ({"metadata": NEW_ZONE["metadata"]}, "the zone needs a list of children"),
+        ({**NEW_ZONE, "children": [ROOM_CHILD]}, f"a zone's children are lights, not {json.dumps(ROOM_CHILD)}"),
+        ({**NEW_ZONE, "children": [None]}, "a zone's children are lights, not null"),
+        (
+            {**NEW_ZONE, "children": [{"rid": "no-such-light", "rtype": "light"}]},
+            "no light with the id 'no-such-light'",
+        ),
+    ],
+)
+async def test_a_post_refuses_a_zone_that_a_bridge_would_refuse_and_records_it(
+    fake_hue: FakeHueHost, body: object, reason: str
+) -> None:
+    headers = {"hue-application-key": await fake_hue.pair()}
+
+    status, text = await fake_hue.request("POST", "clip/v2/resource/zone", body, headers=headers)
+
+    assert (status, json.loads(text)) == (400, {"errors": [{"description": reason}], "data": []})
+    assert await fake_hue.get_text("_fake/posts") == f"rejected POST /clip/v2/resource/zone: 400 {reason}\n"
+    assert await fake_hue.get_text("_fake/lights") == ALL_OFF
+
+
+async def test_a_post_without_the_application_key_is_rejected_and_recorded(fake_hue: FakeHueHost) -> None:
+    await fake_hue.pair()
+
+    assert await fake_hue.request("POST", "clip/v2/resource/zone", NEW_ZONE) == (
+        403,
+        '{"errors":[{"description":"unauthorized user"}],"data":[]}',
+    )
+    assert await fake_hue.get_text("_fake/posts") == "rejected POST /clip/v2/resource/zone: 403 unauthorized user\n"
+    assert await fake_hue.get_text("_fake/lights") == ALL_OFF
+
+
+@pytest.mark.parametrize(
+    ("path", "status", "description"),
+    [
+        (f"light/{FakeIds.HALLWAY}", 200, None),
+        (f"zone/{FakeIds.LIVING_ROOM}", 404, f"no zone with the id '{FakeIds.LIVING_ROOM}'"),
+        ("scene/s1", 404, "The fake bridge has no resources of type 'scene'."),
+    ],
+)
+async def test_a_resource_is_found_by_its_type_and_id(
+    fake_hue: FakeHueHost, path: str, status: int, description: str | None
+) -> None:
+    headers = {"hue-application-key": await fake_hue.pair()}
+
+    answer = await fake_hue.request("GET", f"clip/v2/resource/{path}", headers=headers)
+
+    assert answer[0] == status
+    body = json.loads(answer[1])
+    if description is None:
+        assert [item["metadata"]["name"] for item in body["data"]] == ["Hallway"]
+    else:
+        assert body == {"errors": [{"description": description}], "data": []}
+    assert (await fake_hue.request("GET", f"clip/v2/resource/{path}"))[0] == 403
+
+
 @pytest.mark.parametrize(
     ("resource", "body", "status", "reason"),
     [
@@ -298,14 +419,17 @@ async def test_reset_turns_the_lights_off_clears_the_logs_and_keeps_the_keys(fak
     hue = fake_hue.hue_client(await fake_hue.pair())
     try:
         await hue.set_on(HueTarget(HueTargetKind.GROUPED_LIGHT, FakeIds.DOWNSTAIRS_LIGHTS, "Downstairs"), True)
+        await hue.create_zone("Hall", [FakeIds.HALLWAY])
 
         assert (await fake_hue.request("POST", "_fake/reset"))[0] == 204
 
         assert await fake_hue.get_text("_fake/lights") == ALL_OFF
         assert await fake_hue.get_text("_fake/puts") == ""
+        assert await fake_hue.get_text("_fake/posts") == ""
         assert await fake_hue.get_text("_fake/requests") == ""
         assert (await fake_hue.request_app_key())[0]["error"]["type"] == 101
         assert len(await hue.get_lights()) == 3
+        assert (await hue.create_zone("Hall", [FakeIds.HALLWAY])).id == FakeIds.group(3)
     finally:
         await hue.close()
 
@@ -314,7 +438,13 @@ async def test_help_lists_the_test_endpoints(fake_hue: FakeHueHost) -> None:
     text = await fake_hue.get_text("_fake/")
 
     assert text == HELP
-    for endpoint in ("POST /_fake/link-button", "GET  /_fake/lights", "GET  /_fake/puts", "POST /_fake/reset"):
+    for endpoint in (
+        "POST /_fake/link-button",
+        "GET  /_fake/lights",
+        "GET  /_fake/puts",
+        "GET  /_fake/posts",
+        "POST /_fake/reset",
+    ):
         assert endpoint in text
 
 

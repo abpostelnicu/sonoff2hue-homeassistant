@@ -1,9 +1,10 @@
 """The fake bridge's endpoints and HTTPS.
 
 The Hue API calls that sonoff2hue makes: ``GET /api/0/config`` (anonymous), pairing with ``POST /api``, and with the
-``hue-application-key`` header ``GET /clip/v2/resource/{light,room,zone,grouped_light,bridge}`` and
-``PUT /clip/v2/resource/{light,grouped_light}/{id}`` with ``{"on":{"on":true}}``. The test endpoints under ``/_fake/``
-need no key.
+``hue-application-key`` header ``GET /clip/v2/resource/{light,room,zone,grouped_light,bridge}``, one of them by its id
+(``GET /clip/v2/resource/{type}/{id}``), ``PUT /clip/v2/resource/{light,grouped_light}/{id}`` with
+``{"on":{"on":true}}``, and ``POST /clip/v2/resource/zone``, which creates a zone of lights. The test endpoints under
+``/_fake/`` need no key.
 """
 
 import asyncio
@@ -24,7 +25,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
-from .bridge import BRIDGE_ID, LINK_BUTTON_WINDOW, NAME, FakeBridge
+from .bridge import BRIDGE_ID, LINK_BUTTON_WINDOW, NAME, FakeBridge, RefusedError
 
 _LOGGER = logging.getLogger("fake_hue")
 
@@ -32,8 +33,10 @@ HELP = """Fake Hue bridge: test-only endpoints
   POST /_fake/link-button  press the link button: pairing is open for 30 seconds
   GET  /_fake/lights       the lights, rooms and zones, on or off
   GET  /_fake/puts         every PUT to a light or grouped light, in order: what it switched, or why not
+  GET  /_fake/posts        every POST of a zone, in order: the zone and its lights, or why not
   GET  /_fake/requests     every request to the Hue API, with its status
-  POST /_fake/reset        all lights off, both logs cleared, link button released; application keys stay
+  POST /_fake/reset        all lights off, the zones that POSTs created gone, the logs cleared, link button released;
+                           application keys stay
 
 """
 
@@ -47,11 +50,14 @@ def create_app(bridge: FakeBridge) -> web.Application:
     app.router.add_get("/api/0/config", _public_config)
     app.router.add_post("/api", _pair)
     app.router.add_get("/clip/v2/resource/{type}", _get_resources)
+    app.router.add_get("/clip/v2/resource/{type}/{id}", _get_resource)
     app.router.add_put("/clip/v2/resource/{type}/{id}", _put)
+    app.router.add_post("/clip/v2/resource/zone", _create_zone)
     app.router.add_get("/_fake/", _help)
     app.router.add_post("/_fake/link-button", _press_link_button)
     app.router.add_get("/_fake/lights", _lights)
     app.router.add_get("/_fake/puts", _puts)
+    app.router.add_get("/_fake/posts", _posts)
     app.router.add_get("/_fake/requests", _requests)
     app.router.add_post("/_fake/reset", _reset)
     return app
@@ -126,6 +132,39 @@ async def _get_resources(request: web.Request) -> web.Response:
     return _json({"errors": [], "data": data})
 
 
+async def _get_resource(request: web.Request) -> web.Response:
+    bridge = request.app[_BRIDGE]
+    if not bridge.is_authorized(_app_key(request)):
+        return _unauthorized()
+    resource_type, resource_id = request.match_info["type"], request.match_info["id"]
+    data = bridge.get_resources(resource_type)
+    if data is None:
+        return _clip_error(404, f"The fake bridge has no resources of type '{resource_type}'.")
+    found = [item for item in data if item["id"] == resource_id]
+    if not found:
+        return _clip_error(404, f"no {resource_type} with the id '{resource_id}'")
+    return _json({"errors": [], "data": found})
+
+
+async def _create_zone(request: web.Request) -> web.Response:
+    """Creates a zone of lights, and answers with its reference, as a real bridge does:
+    ``{"data":[{"rid":"<zone id>","rtype":"zone"}],"errors":[]}``."""
+    bridge = request.app[_BRIDGE]
+    path = request.path
+    if not bridge.is_authorized(_app_key(request)):
+        bridge.record_rejected_post(path, 403, "unauthorized user")
+        return _unauthorized()
+    try:
+        body = json.loads(await request.text())
+    except ValueError:
+        return _reject_post(bridge, path, 400, "body contains invalid JSON")
+    try:
+        zone_id = bridge.create_zone(body)
+    except RefusedError as err:
+        return _reject_post(bridge, path, 400, str(err))
+    return _json({"data": [{"rid": zone_id, "rtype": "zone"}], "errors": []})
+
+
 async def _put(request: web.Request) -> web.Response:
     bridge = request.app[_BRIDGE]
     path = request.path
@@ -160,6 +199,10 @@ async def _puts(request: web.Request) -> web.Response:
     return _text(request.app[_BRIDGE].describe_puts())
 
 
+async def _posts(request: web.Request) -> web.Response:
+    return _text(request.app[_BRIDGE].describe_posts())
+
+
 async def _requests(request: web.Request) -> web.Response:
     return _text(request.app[_BRIDGE].describe_requests())
 
@@ -175,7 +218,10 @@ async def _press_link_button(request: web.Request) -> web.Response:
 
 async def _reset(request: web.Request) -> web.Response:
     request.app[_BRIDGE].reset()
-    _LOGGER.info("Reset: all lights are off, the logs are empty and the link button is released.")
+    _LOGGER.info(
+        "Reset: all lights are off, the zones that POSTs created are gone, the logs are empty and the link button is "
+        "released."
+    )
     return web.Response(status=204)
 
 
@@ -186,6 +232,11 @@ def _app_key(request: web.Request) -> str | None:
 
 def _reject_put(bridge: FakeBridge, path: str, status: int, reason: str) -> web.Response:
     bridge.record_rejected_put(path, status, reason)
+    return _clip_error(status, reason)
+
+
+def _reject_post(bridge: FakeBridge, path: str, status: int, reason: str) -> web.Response:
+    bridge.record_rejected_post(path, status, reason)
     return _clip_error(status, reason)
 
 
