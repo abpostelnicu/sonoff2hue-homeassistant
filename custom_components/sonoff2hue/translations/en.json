@@ -351,6 +351,21 @@
         }
       }
     },
+    "bridge_moved": {
+      "title": "The Hue bridge answers at another address",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Pair the Hue bridge at its new address",
+            "description": "The Hue bridge doesn't answer at {address}, but a bridge with its bridge id answers at {found}. Its certificate isn't pinned, so nothing proves that this is your bridge, and sonoff2hue doesn't use that address by itself. Pair the bridge there, which pins its certificate: select Submit to reconfigure the sonoff2hue integration, choose Find bridges, then the bridge at {found}, which is selected when it is found, and press its link button."
+          }
+        },
+        "abort": {
+          "reconfigure": "Reconfigure the sonoff2hue integration to pair the bridge at its new address.",
+          "not_loaded": "The sonoff2hue integration is no longer set up."
+        }
+      }
+    },
     "invalid_config": {
       "title": "The configuration has problems",
       "description": "{message}\n\n{problems}\n\nReview the switches of the sonoff2hue integration."

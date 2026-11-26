@@ -27,9 +27,17 @@ from custom_components.sonoff2hue.const import (
 )
 from custom_components.sonoff2hue.engine import ewelink
 from custom_components.sonoff2hue.engine.config import HueSettings
-from custom_components.sonoff2hue.engine.hue_client import HueClient
+from custom_components.sonoff2hue.engine.hue_address import BridgeUrl
+from custom_components.sonoff2hue.engine.hue_client import (
+    HttpAnswer,
+    HueApiError,
+    HueBridgeInfo,
+    HueClient,
+    TransportError,
+)
+from custom_components.sonoff2hue.engine.hue_setup import DiscoveredBridge
 from custom_components.sonoff2hue.engine.mdns import MdnsListener
-from custom_components.sonoff2hue.engine.supervisor import HueClientFactory
+from custom_components.sonoff2hue.engine.supervisor import BridgeReader, BridgeSearch, HueClientFactory
 
 from .engine.fakes import FakeNetwork
 from .engine.packets import announcement
@@ -98,13 +106,15 @@ class Bridge(InMemoryBridge):
     by id. ``names`` holds the names of l1, l2 and r1, which a test may change, and ``deleted`` the ones that a test
     deleted, as the Hue app does: they aren't listed, nor among the zones' children, and their PUTs are answered 404. It
     records the requests, and how many clients were made for it and closed. ``hold`` keeps the answers to requests for
-    a path until the test releases them."""
+    a path until the test releases them. It answers at any address, but those of ``moved_from``, as a bridge that moved
+    away from them (decision 33): there, no request gets an answer."""
 
     def __init__(self) -> None:
         super().__init__(self._answer)
         self.on = {"l1": False, "l2": False}
         self.names = {"l1": "Ceiling", "l2": "Desk", "r1": "Hall"}
         self.deleted: set[str] = set()
+        self.moved_from: set[str] = set()
         self.created = 0
         self.closed = 0
         self.zones: list[dict[str, Any]] = []
@@ -115,7 +125,9 @@ class Bridge(InMemoryBridge):
         """``runtime.create_hue_client``: clients for the configured address, key and pin, which reach this bridge."""
 
         def create(hue: HueSettings) -> HueClient:
-            client = HueClient(hue.bridge_ip or "", hue.app_key or "", hue.certificate_sha256, self._transport)
+            client = HueClient(
+                hue.bridge_ip or "", hue.app_key or "", hue.certificate_sha256, lambda url, pin, report: At(self, url)
+            )
             self.created += 1
             return client
 
@@ -216,6 +228,60 @@ class Bridge(InMemoryBridge):
             else [],
         }[request.path]
         return 200, json.dumps({"errors": [], "data": data})
+
+
+class At:
+    """The transport of a client of a :class:`Bridge` at an address: it reaches the bridge, unless the bridge moved
+    away from that address, where no request gets an answer."""
+
+    def __init__(self, bridge: Bridge, url: BridgeUrl) -> None:
+        self._bridge = bridge
+        self._host = url.host
+        self._where = f"{url.host}:{url.port}"
+
+    async def send(
+        self, method: str, path: str, body: bytes | None, headers: dict[str, str] | None = None
+    ) -> HttpAnswer:
+        if self._host in self._bridge.moved_from:
+            raise TransportError("network", f"No route to host ({self._where})")
+        return await self._bridge.send(method, path, body, headers)
+
+    async def close(self) -> None:
+        await self._bridge.close()
+
+
+class Finder:
+    """The network as the runtime's search for its bridge sees it (decision 33), in place of
+    ``runtime.new_bridge_search``: the bridges that each search lists, ``listed``, and what reading each address gives,
+    ``bridges``, unless a test reads the bridges over HTTPS with ``read``. It records the sources of each search."""
+
+    def __init__(self) -> None:
+        self.listed: list[DiscoveredBridge] = []
+        self.bridges: dict[str, HueBridgeInfo] = {}
+        self.read: BridgeReader = self._read
+        self.searches: list[tuple[bool, bool]] = []
+
+    def search(self, hass: Any) -> BridgeSearch:
+        """``runtime.new_bridge_search``."""
+        return BridgeSearch(self._find, self._read_now)
+
+    async def _find(self, *, mdns: bool, cloud: bool) -> list[DiscoveredBridge]:
+        self.searches.append((mdns, cloud))
+        return list(self.listed)
+
+    async def _read_now(self, address: str) -> HueBridgeInfo:
+        """Reads with ``read`` as it is then, which a test may set once the runtime runs."""
+        return await self.read(address)
+
+    async def _read(self, address: str) -> HueBridgeInfo:
+        if (info := self.bridges.get(address)) is None:
+            raise HueApiError(f"No Hue bridge answered at {address}: No route to host ({address}:443)")
+        return info
+
+
+def bridge_info(address: str, certificate: str = PIN, bridge_id: str = BRIDGE_ID) -> HueBridgeInfo:
+    """What reading the bridge at ``address`` gives: its id, as its config gives it, and its certificate's SHA-256."""
+    return HueBridgeInfo(address, bridge_id, "Hue Bridge", "BSB002", "1972004020", certificate)
 
 
 def switch(

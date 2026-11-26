@@ -356,7 +356,14 @@ sonoff2hue reports these in Settings → System → Repairs:
   bridge again.
 - *The Hue bridge's certificate changed*: the bridge's certificate isn't the pinned one, so sonoff2hue doesn't talk to
   it. Either the bridge was replaced or reset, or another device now has its address. For a replaced or reset bridge,
-  select *Submit* in the repair and pair it again. Otherwise, *Reconfigure* with the bridge's new address.
+  select *Submit* in the repair and pair it again. Otherwise, sonoff2hue looks for the bridge on your network and
+  goes on at its new address once it finds it, as Troubleshooting describes; or *Reconfigure* with that address.
+- *The Hue bridge answers at another address*: the bridge no longer answers at its address, and a bridge with its
+  bridge id answers at another one. Its certificate isn't pinned, so nothing proves that this is your bridge, and
+  sonoff2hue doesn't use that address by itself. Select *Submit* in the repair, which opens *Reconfigure*, choose
+  *Find bridges* and the bridge at the new address, which is selected when it is found, and press its link button:
+  this pairs it there and pins its certificate. The repair goes away when the bridge answers at its address again,
+  or when its address changes.
 - *The configuration has problems*: the switches or the bridge's settings can't be used as they are, and it lists why,
   such as a switch without any light, room or zone, or a device id that two switches have. Until it's fixed, no switch
   toggles anything. Fix the switch with *Edit switch*, or pair the bridge again with *Reconfigure*.
@@ -400,8 +407,9 @@ Assistant's default log level hides. To see them:
 information, the file has:
 
 - `config`: the bridge and the switches, as stored;
-- `status`: what sonoff2hue is doing, whether the bridge is reachable, and each switch with its MINIR4M, the lights,
-  rooms and zones found on the bridge and the problems with those that aren't, and its last action and error;
+- `status`: what sonoff2hue is doing, whether the bridge is reachable, where it answered instead when its certificate
+  isn't pinned, and each switch with its MINIR4M, the lights, rooms and zones found on the bridge and the problems
+  with those that aren't, and its last action and error;
 - `lan_devices`: every eWeLink device heard on the LAN, with its address, type, `seq`, last press and whether it is
   online;
 - `activity`: sonoff2hue's last 1,000 log lines, at the levels that the log shows. Turn on debug logging before you
@@ -447,8 +455,19 @@ look through it before you share it.
 - **The bridge can't be reached.** *Reachable* is *Unreachable*, with the reason as its *Message*, such as "Hue bridge
   not reachable: No route to host (192.0.2.10:443)" or "Hue bridge request timed out.", and the log warns "Hue bridge
   at … not reachable (…); retrying every 10 s." or "Hue bridge unavailable: …". Check the bridge's power and network,
-  and that Home Assistant reaches it over HTTPS. If its address changed, reserve an address for it in your router's DHCP
-  settings, and *Reconfigure* sonoff2hue with it. Presses that wait more than 5 seconds for the bridge are dropped.
+  and that Home Assistant reaches it over HTTPS. Presses that wait more than 5 seconds for the bridge are dropped.
+  - Its address may have changed, for example when your router's DHCP gave it another one. Once the bridge has been
+    unreachable for a minute, sonoff2hue looks for it on your network while it stays so: with mDNS every 5 minutes,
+    and with Philips Hue's discovery service every 15 minutes, the most that the service allows. The log says "The Hue
+    bridge at … has been unreachable for 60 s; looking for it on the network.", and so does the *Status* while
+    sonoff2hue connects.
+  - With a pinned certificate, when sonoff2hue finds a bridge with its bridge id and that certificate at another
+    address, it saves the new address and goes on there, and the log warns "The Hue bridge … moved from … to …; saved
+    its new address." A bridge with another certificate isn't used.
+  - Without one, the repair *The Hue bridge answers at another address* offers to pair the bridge there.
+  - An address that you entered as a host name, such as `hue-bridge.local`, is never replaced: the name has to lead
+    to the bridge.
+  - To keep the bridge's address from changing, reserve one for it in your router's DHCP settings.
 - **"The Hue bridge TLS certificate does not match the pinned certificateSha256."** The bridge was replaced or reset, or
   another device now has its address: see the repair *The Hue bridge's certificate changed*.
 - **Pairing doesn't work.** If *Find bridges* finds none, enter the bridge's address. "No Hue bridge answered at …"
@@ -464,6 +483,9 @@ look through it before you share it.
 - A press while sonoff2hue starts, after a change of its bridge or switches, or while the network reconnects only sets
   the baseline.
 - A press that waited more than 5 seconds for an unreachable bridge is dropped, not replayed later.
+- sonoff2hue finds a bridge that moved to another address only with mDNS, on Home Assistant's network, or with
+  Philips Hue's discovery service, which lists the new address only once the bridge has reported it. It moves to that
+  address by itself only with a pinned certificate.
 - One Hue bridge per Home Assistant.
 
 ## Development

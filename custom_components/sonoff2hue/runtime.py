@@ -10,7 +10,8 @@ the status and the activity stay. Unloading the entry stops them all, and so doe
 
 What the runtime adds to the engine: the runner's presses and their outcomes as bus events, Home Assistant's
 reauthentication when the bridge rejects the application key, repair issues for the problems that the status shows,
-and the switch test.
+the switch test, and the search for a bridge that stopped answering at its address, whose new address it saves when
+the supervisor found the bridge there with its pinned certificate (decision 33).
 
 The API for the platforms and the flows, on ``entry.runtime_data``:
 
@@ -52,6 +53,7 @@ from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.const import ATTR_DEVICE_ID, ATTR_NAME, EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr, issue_registry as ir
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.util import dt as dt_util
 from homeassistant.util.signal_type import SignalTypeFormat
@@ -87,12 +89,13 @@ from .const import (
 from .engine.activity import ActivityBuffer
 from .engine.config import ConfigError, EngineConfig, HueSettings, SwitchSettings
 from .engine.hue_client import CERTIFICATE_MISMATCH, HueApiError, HueClient
+from .engine.hue_setup import DISCOVERY_TIMEOUT, DiscoveredBridge, discover
 from .engine.lan_monitor import LanMonitor
 from .engine.mdns import MdnsListener
 from .engine.registry import DeviceRegistry
 from .engine.runner import ResolvedSwitches, RunnerObserver, SwitchBinding, labels
 from .engine.status import PRESS_DROPPED, ServiceState, StatusSnapshot, StatusTracker
-from .engine.supervisor import BridgeSupervisor, HueClientFactory, create_hue_client
+from .engine.supervisor import BridgeMoved, BridgeSearch, BridgeSupervisor, HueClientFactory, create_hue_client
 from .engine.switch_rules import is_paired
 from .engine.targets import Field, Remembered, Renamed, name_key, resolve_switch
 from .engine.toggler import HueToggler, ToggleResult
@@ -118,6 +121,7 @@ SIGNAL_SUBENTRY_REMOVED: SignalTypeFormat[str] = SignalTypeFormat(f"{DOMAIN}_{{}
 # The repair issues, by translation key; the issue ids of the per-switch ones end with "_<device id>".
 ISSUE_CERTIFICATE_NOT_PINNED: Final = "certificate_not_pinned"
 ISSUE_CERTIFICATE_CHANGED: Final = "certificate_changed"
+ISSUE_BRIDGE_MOVED: Final = "bridge_moved"
 ISSUE_INVALID_CONFIG: Final = "invalid_config"
 ISSUE_NOT_DETACHED: Final = "not_detached"
 ISSUE_DECODE_ERROR: Final = "decode_error"
@@ -133,6 +137,18 @@ _SETTINGS: Final[dict[Field, str]] = {"lights": CONF_LIGHTS, "groups": CONF_GROU
 def new_listener(clock: Callable[[], datetime]) -> MdnsListener:
     """The config entry's mDNS listener, on the network; tests make one on a fake network."""
     return MdnsListener(clock=clock)
+
+
+def new_bridge_search(hass: HomeAssistant) -> BridgeSearch:
+    """The config entry's search for its bridge when the bridge stops answering at its address (decision 33): the
+    engine's discovery, with Home Assistant's shared session for Signify's endpoint, a public host name, as the setup
+    flow searches, and ``get_bridge_info`` for each bridge that it lists. Every supervisor of the entry gets it, so that
+    its rates hold across them; tests make one of fakes."""
+
+    async def find(*, mdns: bool, cloud: bool) -> list[DiscoveredBridge]:
+        return await discover(async_get_clientsession(hass), DISCOVERY_TIMEOUT, mdns=mdns, cloud=cloud)
+
+    return BridgeSearch(find)
 
 
 def config_from_entry(entry: ConfigEntry) -> EngineConfig:
@@ -225,6 +241,8 @@ class Sonoff2HueData:
     clock: Callable[[], datetime]
     remembered: RememberedResources
     """The resource that each entry of the switches last found, for following renames (decision 32)."""
+    search: BridgeSearch
+    """The search for the bridge when it stops answering at its address, which every supervisor gets (decision 33)."""
     _supervisor: BridgeSupervisor | None = field(default=None, init=False)
     """The supervisor of the current configuration, from the start on."""
     _supervisor_tasks: list[asyncio.Task[None]] = field(default_factory=list, init=False)
@@ -257,6 +275,7 @@ class Sonoff2HueData:
             create_hue_client,
             clock,
             RememberedResources(hass, entry.entry_id),
+            new_bridge_search(hass),
         )
 
     async def async_load(self) -> None:
@@ -375,6 +394,8 @@ class Sonoff2HueData:
             observer=_BusEvents(self.hass, self._switch_device_id),
             remembered=self.remembered.resources,
             on_resolved=self._on_resolved,
+            search=self.search,
+            on_bridge_moved=self._on_bridge_moved,
             clock=self.clock,
         )
         previous = [task for task in self._supervisor_tasks if not task.done()]
@@ -471,6 +492,27 @@ class Sonoff2HueData:
         self.async_config_changed()
 
     @callback
+    def _on_bridge_moved(self, moved: BridgeMoved) -> None:
+        """The supervisor found the bridge at another address, with its bridge id and the pinned certificate (decision
+        33): the address is saved as the entry's ``bridge_ip``, without a reload, so the configuration changes once and
+        the supervisor restarts once, at the new address; the remembered resources stay, as the bridge is the same. A
+        report of a configuration that has changed since is left out, as its supervisor looks for the bridge itself."""
+        if self._stopped or moved.config is not self.config:
+            return
+        hue = moved.config.hue
+        self._holding = True
+        try:
+            self.hass.config_entries.async_update_entry(
+                self.entry, data={**self.entry.data, CONF_BRIDGE_IP: moved.address}
+            )
+        finally:
+            self._holding = False
+        _LOGGER.warning(
+            "The Hue bridge %s moved from %s to %s; saved its new address.", hue.bridge_id, hue.bridge_ip, moved.address
+        )
+        self.async_config_changed()
+
+    @callback
     def _on_key_rejected(self) -> None:
         """Home Assistant starts no second reauthentication while one, or a reconfigure flow, is in progress."""
         if not self._stopped:
@@ -561,6 +603,13 @@ def _issues_of(snapshot: StatusSnapshot) -> dict[str, _Issue]:
         )
     if hue.message == CERTIFICATE_MISMATCH:
         issues[ISSUE_CERTIFICATE_CHANGED] = _Issue(ISSUE_CERTIFICATE_CHANGED, ir.IssueSeverity.ERROR, {}, fixable=True)
+    if hue.found_at is not None:
+        issues[ISSUE_BRIDGE_MOVED] = _Issue(
+            ISSUE_BRIDGE_MOVED,
+            ir.IssueSeverity.WARNING,
+            {"address": hue.bridge_ip or "", "found": hue.found_at},
+            fixable=True,
+        )
     service = snapshot.service
     if service.state is ServiceState.INVALID_CONFIG:
         issues[ISSUE_INVALID_CONFIG] = _Issue(

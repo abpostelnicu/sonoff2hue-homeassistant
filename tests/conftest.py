@@ -6,7 +6,7 @@ import pytest
 
 from custom_components.sonoff2hue import runtime
 
-from .fakes import Bridge, Lan
+from .fakes import Bridge, Finder, Lan
 from .hue import FakeHueHost
 
 
@@ -39,4 +39,13 @@ def bridge(monkeypatch: pytest.MonkeyPatch) -> Bridge:
     """A Hue bridge in memory, which the runtime's clients reach whatever the configured address."""
     fake = Bridge()
     monkeypatch.setattr(runtime, "create_hue_client", fake.clients())
+    return fake
+
+
+@pytest.fixture
+def finder(monkeypatch: pytest.MonkeyPatch) -> Finder:
+    """The runtime's search for its bridge on a network of the test's own, in place of ``runtime.new_bridge_search``
+    (decision 33)."""
+    fake = Finder()
+    monkeypatch.setattr(runtime, "new_bridge_search", fake.search)
     return fake

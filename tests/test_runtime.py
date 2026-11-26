@@ -10,10 +10,17 @@ from typing import Any
 
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.components.repairs import FlowType, repairs_flow_manager
-from homeassistant.config_entries import SOURCE_REAUTH, ConfigEntryState, ConfigSubentry, ConfigSubentryData
+from homeassistant.config_entries import (
+    SOURCE_REAUTH,
+    ConfigEntry,
+    ConfigEntryState,
+    ConfigSubentry,
+    ConfigSubentryData,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import device_registry as dr, issue_registry as ir
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.translation import async_get_translations
 from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
@@ -26,6 +33,7 @@ from custom_components.sonoff2hue import repairs, runtime
 from custom_components.sonoff2hue.const import (
     CONF_APP_KEY,
     CONF_BRIDGE_ID,
+    CONF_BRIDGE_IP,
     CONF_CERTIFICATE_SHA256,
     CONF_DEVICE_ID,
     CONF_DEVICE_KEY,
@@ -40,9 +48,10 @@ from custom_components.sonoff2hue.const import (
 from custom_components.sonoff2hue.engine import mdns, toggler
 from custom_components.sonoff2hue.engine.config import EngineConfig, HueSettings, SwitchSettings
 from custom_components.sonoff2hue.engine.hue_client import CERTIFICATE_MISMATCH
+from custom_components.sonoff2hue.engine.hue_setup import DiscoveredBridge, get_bridge_info
 from custom_components.sonoff2hue.engine.runner import NO_TARGETS, ResolvedSwitches
 from custom_components.sonoff2hue.engine.status import PRESS_DROPPED, ServiceState
-from custom_components.sonoff2hue.engine.supervisor import KEY_REJECTED, TARGETS_CHECK_INTERVAL
+from custom_components.sonoff2hue.engine.supervisor import KEY_REJECTED, TARGETS_CHECK_INTERVAL, BridgeMoved
 from custom_components.sonoff2hue.engine.targets import EntryKey, RememberedResource, Renamed
 from custom_components.sonoff2hue.remembered import SAVE_DELAY
 from custom_components.sonoff2hue.runtime import (
@@ -69,7 +78,9 @@ from .fakes import (
     OTHER_DEVICE_ID,
     PIN,
     Bridge,
+    Finder,
     Lan,
+    bridge_info,
     paired,
     relay,
     switch,
@@ -1280,6 +1291,276 @@ async def test_a_repair_without_its_entry_ends(hass: HomeAssistant) -> None:
     result = await flow.async_step_confirm({})
 
     assert (result["type"], result["reason"]) == (FlowResultType.ABORT, "not_loaded")
+
+
+# Following the bridge to a new address (decision 33).
+
+OLD_ADDRESS = "192.0.2.10"
+NEW_ADDRESS = "192.0.2.20"
+LISTED_ID = BRIDGE_ID.lower()
+"""The bridge id as mDNS and Signify's endpoint list it."""
+
+
+def moved_to(bridge: Bridge, finder: Finder, address: str, certificate: str = PIN) -> None:
+    """The bridge no longer answers at the old address, and the search lists it at ``address``."""
+    bridge.moved_from.add(OLD_ADDRESS)
+    finder.listed = [DiscoveredBridge(address, LISTED_ID, "mDNS")]
+    finder.bridges = {address: bridge_info(address, certificate)}
+
+
+async def test_the_bridge_found_at_a_new_address_with_its_pin_is_saved_once_without_a_reload(
+    hass: HomeAssistant,
+    lan: Lan,
+    bridge: Bridge,
+    finder: Finder,
+    freezer: FrozenDateTimeFactory,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The entry's address changes once, which restarts the supervisor once, and the switches toggle there."""
+    caplog.set_level(logging.INFO, logger=INTEGRATION_LOGGER.name)
+    entry = paired(switch(), address=OLD_ADDRESS)
+    entry.add_to_hass(hass)
+    addresses: list[str] = []
+
+    async def changed(hass: HomeAssistant, entry: ConfigEntry) -> None:
+        addresses.append(entry.data[CONF_BRIDGE_IP])
+
+    stop_following = entry.add_update_listener(changed)
+    moved_to(bridge, finder, NEW_ADDRESS)
+    runtime_data = await start(hass, entry)
+    await tick(freezer, 59)
+
+    assert (finder.searches, addresses) == ([], [])
+
+    await tick(freezer, 1)
+    await settle()
+
+    assert (entry.data[CONF_BRIDGE_IP], runtime_data.config.hue.bridge_ip) == (NEW_ADDRESS, NEW_ADDRESS)
+    assert addresses == [NEW_ADDRESS]
+    assert entry.runtime_data is runtime_data
+    assert [task.done() for task in runtime_data._supervisor_tasks] == [True, False]
+    assert logged(caplog, "custom_components.sonoff2hue.runtime") == [
+        f"The Hue bridge {BRIDGE_ID} moved from {OLD_ADDRESS} to {NEW_ADDRESS}; saved its new address."
+    ]
+    # The move, then the restart that it causes.
+    lines = [record.getMessage() for record in caplog.records]
+    assert lines.index(RESTARTING) == lines.index(logged(caplog, "custom_components.sonoff2hue.runtime")[0]) + 1
+    assert logged(caplog, SUPERVISOR).count(RESTARTING) == 1
+    status = runtime_data.status
+    assert (status.service.state, status.snapshot().hue.bridge_ip, status.snapshot().hue.reachable) == (
+        ServiceState.RUNNING,
+        NEW_ADDRESS,
+        True,
+    )
+
+    lan.broadcast(1)
+    lan.broadcast(2)
+    await settle()
+    await tick(freezer, 3600)
+
+    assert bridge.puts() == [("l1", True)]
+    assert (addresses, finder.searches) == ([NEW_ADDRESS], [(True, True)])
+    assert issues(hass) == {}
+    stop_following()
+
+
+async def test_a_bridge_that_moved_keeps_its_remembered_lights_rooms_and_zones(
+    hass: HomeAssistant,
+    hass_storage: dict[str, Any],
+    lan: Lan,
+    bridge: Bridge,
+    finder: Finder,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """They belong to the bridge's id, which its address doesn't change: a light renamed meanwhile is followed at the
+    new address (decision 32)."""
+    entry = paired(switch(), address=OLD_ADDRESS)
+    remember(hass_storage, entry, record("ceiling", "light", "l1", "Ceiling"), bridge_id=BRIDGE_ID)
+    moved_to(bridge, finder, NEW_ADDRESS)
+    bridge.names["l1"] = "Ceiling lamp"
+    await start(hass, entry)
+    await tick(freezer, 60)
+    await settle()
+    await tick(freezer, 0.5)
+
+    assert entry.data[CONF_BRIDGE_IP] == NEW_ADDRESS
+    assert subentry_of(entry).data[CONF_LIGHTS] == ["Ceiling lamp"]
+    assert issues(hass) == {}
+
+
+async def test_a_bridge_found_with_another_certificate_is_not_used(
+    hass: HomeAssistant, lan: Lan, bridge: Bridge, finder: Finder, freezer: FrozenDateTimeFactory
+) -> None:
+    entry = paired(switch(), address=OLD_ADDRESS)
+    moved_to(bridge, finder, NEW_ADDRESS, certificate="CD" * 32)
+    runtime_data = await start(hass, entry)
+    await tick(freezer, 60)
+    await tick(freezer, 0.5)
+
+    assert entry.data[CONF_BRIDGE_IP] == OLD_ADDRESS
+    assert runtime_data.status.service.state is ServiceState.CONNECTING
+    assert issues(hass) == {}
+
+
+async def test_a_move_is_saved_only_while_its_configuration_is_current(
+    hass: HomeAssistant, lan: Lan, bridge: Bridge
+) -> None:
+    """The configuration may have changed meanwhile, and its own supervisor looks for the bridge again."""
+    entry = paired(switch(), address=OLD_ADDRESS)
+    runtime_data = await start(hass, entry)
+    earlier = runtime_data.config
+    subentry = subentry_of(entry)
+    hass.config_entries.async_update_subentry(entry, subentry, data={**subentry.data, CONF_LIGHTS: ["Desk"]})
+    await settle()
+
+    runtime_data._on_bridge_moved(BridgeMoved(earlier, NEW_ADDRESS))
+    await settle()
+
+    assert entry.data[CONF_BRIDGE_IP] == OLD_ADDRESS
+    # The supervisors of the configuration at the start and after the switch's change; none for the move.
+    assert bridge.created == 2
+
+    runtime_data._on_bridge_moved(BridgeMoved(runtime_data.config, NEW_ADDRESS))
+    await settle()
+
+    assert entry.data[CONF_BRIDGE_IP] == NEW_ADDRESS
+    assert bridge.created == 3
+
+
+async def test_the_searches_keep_their_rates_across_the_restarts_of_the_supervisor(
+    hass: HomeAssistant, lan: Lan, bridge: Bridge, finder: Finder, freezer: FrozenDateTimeFactory
+) -> None:
+    """Every supervisor of the entry gets the same search, so a change of the switches doesn't ask sooner."""
+    entry = paired(switch(), address=OLD_ADDRESS)
+    bridge.moved_from.add(OLD_ADDRESS)
+    await start(hass, entry)
+    await tick(freezer, 60)
+
+    assert finder.searches == [(True, True)]
+
+    subentry = subentry_of(entry)
+    hass.config_entries.async_update_subentry(entry, subentry, data={**subentry.data, CONF_LIGHTS: ["Desk"]})
+    await settle()
+    # The new supervisor's 60 s end at 120 s, before mDNS is due again, at 360 s.
+    await tick(freezer, 60)
+
+    assert finder.searches == [(True, True)]
+
+    await tick(freezer, 240)
+
+    assert finder.searches == [(True, True), (True, False)]
+
+
+async def test_the_search_for_the_bridge_is_the_engines_discovery_on_home_assistants_session(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """For 5 seconds, as the setup flow searches, with Home Assistant's shared session for Signify's endpoint, a public
+    host name; each bridge it lists is read with ``get_bridge_info``."""
+    calls: list[tuple[object, float, bool, bool]] = []
+    found = [DiscoveredBridge(NEW_ADDRESS, LISTED_ID, "mDNS")]
+
+    async def discover(session: object, duration: float, *, mdns: bool, cloud: bool) -> list[DiscoveredBridge]:
+        calls.append((session, duration, mdns, cloud))
+        return found
+
+    monkeypatch.setattr(runtime, "discover", discover)
+    search = runtime.new_bridge_search(hass)
+    first = search.next_at(0.0)
+
+    assert await search.find(first) == found
+    assert await search.find(first + 300) == found
+    assert calls == [
+        (async_get_clientsession(hass), 5.0, True, True),
+        (async_get_clientsession(hass), 5.0, True, False),
+    ]
+    assert search.read is get_bridge_info
+
+
+async def raise_bridge_moved(
+    hass: HomeAssistant, bridge: Bridge, finder: Finder, freezer: FrozenDateTimeFactory
+) -> MockConfigEntry:
+    """An entry without a pin whose bridge the search finds at another address, which raises the repair."""
+    entry = paired(switch(), address=OLD_ADDRESS, pin=None)
+    moved_to(bridge, finder, NEW_ADDRESS, certificate="CD" * 32)
+    await start(hass, entry)
+    await tick(freezer, 60)
+    await tick(freezer, 0.5)
+    return entry
+
+
+async def test_without_a_pin_the_bridge_found_at_a_new_address_raises_a_repair_until_it_answers_at_its_own(
+    hass: HomeAssistant, lan: Lan, bridge: Bridge, finder: Finder, freezer: FrozenDateTimeFactory
+) -> None:
+    """The address isn't used: without a pin, the client checks no certificate. The repair offers to pair the bridge
+    there."""
+    entry = await raise_bridge_moved(hass, bridge, finder, freezer)
+
+    issue = issues(hass)["bridge_moved"]
+    assert (issue.translation_key, issue.severity, issue.is_fixable, issue.config_entry_id) == (
+        "bridge_moved",
+        ir.IssueSeverity.WARNING,
+        True,
+        entry.entry_id,
+    )
+    assert (issue.data, issue.translation_placeholders) == (
+        {"entry_id": entry.entry_id},
+        {"address": OLD_ADDRESS, "found": NEW_ADDRESS},
+    )
+    await check_texts(hass, issue)
+    assert entry.data[CONF_BRIDGE_IP] == OLD_ADDRESS
+
+    bridge.moved_from.clear()
+    await tick(freezer, 10)
+    await tick(freezer, 0.5)
+
+    assert set(issues(hass)) == {"certificate_not_pinned"}
+    assert entry.runtime_data.status.service.state is ServiceState.RUNNING
+
+
+async def test_the_repair_for_the_bridge_found_goes_when_its_address_changes(
+    hass: HomeAssistant, lan: Lan, bridge: Bridge, finder: Finder, freezer: FrozenDateTimeFactory
+) -> None:
+    entry = await raise_bridge_moved(hass, bridge, finder, freezer)
+    assert "bridge_moved" in issues(hass)
+
+    hass.config_entries.async_update_entry(entry, data={**entry.data, CONF_BRIDGE_IP: NEW_ADDRESS})
+    await settle()
+    await tick(freezer, 0.5)
+
+    assert set(issues(hass)) == {"certificate_not_pinned"}
+
+
+@pytest.mark.usefixtures("lan")
+async def test_the_repair_for_the_bridge_found_leads_to_the_reconfigure_flow(
+    hass: HomeAssistant, bridge: Bridge, finder: Finder, freezer: FrozenDateTimeFactory
+) -> None:
+    """Its text names both addresses; reconfigure's search selects the bridge that it finds with the paired id."""
+    assert await async_setup_component(hass, "repairs", {})
+    entry = await raise_bridge_moved(hass, bridge, finder, freezer)
+    manager = repairs_flow_manager(hass)
+    assert manager is not None
+
+    result = await manager.async_init(DOMAIN, context={"issue_id": "bridge_moved"})
+
+    assert (result["type"], result["step_id"], result["description_placeholders"]) == (
+        FlowResultType.FORM,
+        "confirm",
+        {"address": OLD_ADDRESS, "found": NEW_ADDRESS},
+    )
+
+    result = await manager.async_configure(result["flow_id"], {})
+
+    assert (result["type"], result["reason"]) == (FlowResultType.ABORT, "reconfigure")
+    flow_type, flow_id = result["next_flow"]
+    assert flow_type is FlowType.CONFIG_FLOW
+    flow = hass.config_entries.flow.async_get(flow_id)
+    assert (flow["context"]["source"], flow["context"]["entry_id"], flow["step_id"]) == (
+        "reconfigure",
+        entry.entry_id,
+        "reconfigure",
+    )
+    # The issue stays until the bridge answers at its address, or the address changes.
+    assert "bridge_moved" in issues(hass)
 
 
 # The switch test.

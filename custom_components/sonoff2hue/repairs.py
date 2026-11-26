@@ -1,10 +1,12 @@
 """The repair flows of the issues that pairing the bridge again fixes: the certificate isn't pinned, or it changed
-(decision 23). The flow explains the issue, and Submit opens the integration's reconfigure flow, which pairs the bridge
-again and pins its certificate. The issue stays until the runtime sees that its condition is gone."""
+(decision 23), or the bridge answers at another address without a pin (decision 33). The flow explains the issue, with
+the issue's placeholders, and Submit opens the integration's reconfigure flow, which pairs the bridge again and pins its
+certificate. The issue stays until the runtime sees that its condition is gone."""
 
 from homeassistant.components.repairs import FlowType, RepairsFlow, RepairsFlowResult
 from homeassistant.config_entries import SOURCE_RECONFIGURE
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import issue_registry as ir
 import probatio
 
 from .const import DOMAIN
@@ -21,7 +23,13 @@ class PairAgainRepairFlow(RepairsFlow):
 
     async def async_step_confirm(self, user_input: dict[str, str] | None = None) -> RepairsFlowResult:
         if user_input is None:
-            return self.async_show_form(step_id="confirm", data_schema=probatio.Schema({}))
+            # As Home Assistant's own confirm flow does: the step's text takes the issue's placeholders.
+            issue = ir.async_get(self.hass).async_get_issue(DOMAIN, self.issue_id)
+            return self.async_show_form(
+                step_id="confirm",
+                data_schema=probatio.Schema({}),
+                description_placeholders=None if issue is None else issue.translation_placeholders,
+            )
         entry = None if self._entry_id is None else self.hass.config_entries.async_get_entry(self._entry_id)
         if entry is None:
             return self.async_abort(reason="not_loaded")
