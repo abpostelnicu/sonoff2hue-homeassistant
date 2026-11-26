@@ -45,7 +45,7 @@ from custom_components.sonoff2hue.const import (
     EVENT_TOGGLE,
     SUBENTRY_SWITCH,
 )
-from custom_components.sonoff2hue.engine import mdns, toggler
+from custom_components.sonoff2hue.engine import mdns, supervisor, toggler
 from custom_components.sonoff2hue.engine.config import EngineConfig, HueSettings, SwitchSettings
 from custom_components.sonoff2hue.engine.hue_client import CERTIFICATE_MISMATCH
 from custom_components.sonoff2hue.engine.hue_setup import DiscoveredBridge, get_bridge_info
@@ -67,6 +67,7 @@ from custom_components.sonoff2hue.runtime import (
     config_from_entry,
 )
 from tools.fake_hue.bridge import BRIDGE_ID as FAKE_BRIDGE_ID
+from tools.fake_hue.server import create_certificate
 
 from .engine.fakes import until
 from .fakes import (
@@ -1474,6 +1475,52 @@ async def test_the_search_for_the_bridge_is_the_engines_discovery_on_home_assist
         (async_get_clientsession(hass), 5.0, True, False),
     ]
     assert search.read is get_bridge_info
+
+
+@pytest.mark.usefixtures("socket_enabled")
+async def test_the_bridge_is_followed_to_its_new_address_over_https(
+    hass: HomeAssistant, lan: Lan, finder: Finder, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Two fake bridges with one certificate and the bridge id. The first stops, as if the bridge's address had changed,
+    and the search lists the second: sonoff2hue reads it without the application key, compares its certificate with
+    the pin, saves its address and switches the lights there. The second one has the key that sonoff2hue paired, as
+    the bridge has at its new address. The search's 60 s are shortened here; the engine's tests keep them."""
+    caplog.set_level(logging.INFO, logger=INTEGRATION_LOGGER.name)
+    monkeypatch.setattr(supervisor, "SEARCH_AFTER", 0.1)
+    certificate = create_certificate()
+    first = await FakeHueHost.start(certificate=certificate)
+    second = await FakeHueHost.start(certificate=certificate)
+    running = [first, second]
+    try:
+        entry = paired(
+            switch(lights=["Hallway"]),
+            address=first.address,
+            app_key=await second.pair(),
+            pin=first.fingerprint,
+            bridge_id=FAKE_BRIDGE_ID,
+        )
+        await first.stop()
+        running.remove(first)
+        finder.read = get_bridge_info
+        finder.listed = [DiscoveredBridge(second.address, FAKE_BRIDGE_ID.lower(), "mDNS")]
+        runtime_data = await start(hass, entry)
+        await until(lambda: runtime_data.status.service.state is ServiceState.RUNNING)
+
+        assert (entry.data[CONF_BRIDGE_IP], runtime_data.status.snapshot().hue.bridge_ip) == (
+            second.address,
+            second.address,
+        )
+        assert entry.runtime_data is runtime_data
+        assert logged(caplog, "custom_components.sonoff2hue.runtime") == [
+            f"The Hue bridge {FAKE_BRIDGE_ID} moved from {first.address} to {second.address}; saved its new address."
+        ]
+
+        lan.broadcast(1)
+        lan.broadcast(2)
+        await until(lambda: second.bridge.puts == ["light 'Hallway' on"])
+    finally:
+        for host in running:
+            await host.stop()
 
 
 async def raise_bridge_moved(

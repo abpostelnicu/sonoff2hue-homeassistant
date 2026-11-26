@@ -389,9 +389,13 @@ class RunningBridge:
         await self.server.wait_closed()
 
 
-async def start(bridge: FakeBridge, bind: str = "127.0.0.1", port: int = 0) -> RunningBridge:
-    """Serves ``bridge`` over HTTPS on ``bind`` and ``port`` (0: a free port), with a new certificate."""
-    certificate_pem, key_pem = create_certificate()
+async def start(
+    bridge: FakeBridge, bind: str = "127.0.0.1", port: int = 0, *, certificate: tuple[bytes, bytes] | None = None
+) -> RunningBridge:
+    """Serves ``bridge`` over HTTPS on ``bind`` and ``port`` (0: a free port), with a new certificate, or with
+    ``certificate``, a certificate and its key in PEM, such as another fake bridge's: two fake bridges then present one
+    certificate, as a bridge does at its old address and its new one (decision 33)."""
+    certificate_pem, key_pem = create_certificate() if certificate is None else certificate
     runner = web.AppRunner(create_app(bridge), access_log=None)
     await runner.setup()
     handler = runner.server

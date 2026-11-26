@@ -36,10 +36,14 @@ class FakeHueHost:
         )
 
     @classmethod
-    async def start(cls, *, link_button_always_pressed: bool = False) -> Self:
+    async def start(
+        cls, *, link_button_always_pressed: bool = False, certificate: tuple[bytes, bytes] | None = None
+    ) -> Self:
+        """A new fake bridge, with a new certificate, or with ``certificate``, a certificate and its key in PEM
+        (``create_certificate()``), which another fake bridge may present too."""
         clock = ManualClock()
         bridge = FakeBridge(link_button_always_pressed=link_button_always_pressed, clock=clock)
-        return cls(await start(bridge), clock)
+        return cls(await start(bridge, certificate=certificate), clock)
 
     @property
     def address(self) -> str:

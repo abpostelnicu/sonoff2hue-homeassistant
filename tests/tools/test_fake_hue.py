@@ -17,6 +17,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 import pytest
 
+from custom_components.sonoff2hue.engine import hue_setup
 from custom_components.sonoff2hue.engine.hue_client import HueApiError, HueGroup, HueLight, HueTarget, HueTargetKind
 from tools.fake_hue.__main__ import OptionsError, options
 from tools.fake_hue.bridge import BRIDGE_ID, NAME, FakeBridge, FakeIds, Fault
@@ -678,3 +679,26 @@ def test_certificate_is_an_ecdsa_server_certificate_for_the_bridge_id_with_the_f
     der = certificate.public_bytes(serialization.Encoding.DER)
     assert fingerprint(certificate_pem) == hashlib.sha256(der).hexdigest().upper()
     assert re.fullmatch("[0-9A-F]{64}", fingerprint(certificate_pem))
+
+
+@pytest.mark.usefixtures("socket_enabled")
+async def test_two_fake_bridges_can_present_one_certificate() -> None:
+    """As a bridge does at its old address and its new one (decision 33): both are the bridge id with the certificate
+    given, where each fake bridge makes one of its own otherwise."""
+    certificate = create_certificate()
+    first = await FakeHueHost.start(certificate=certificate)
+    second = await FakeHueHost.start(certificate=certificate)
+    another = await FakeHueHost.start()
+    try:
+        bridges = [await hue_setup.get_bridge_info(host.address) for host in (first, second, another)]
+    finally:
+        for host in (first, second, another):
+            await host.stop()
+
+    assert len({first.address, second.address, another.address}) == 3
+    assert first.fingerprint == second.fingerprint == fingerprint(certificate[0]) != another.fingerprint
+    assert [(bridge.bridge_id, bridge.certificate_sha256) for bridge in bridges] == [
+        (BRIDGE_ID, first.fingerprint),
+        (BRIDGE_ID, first.fingerprint),
+        (BRIDGE_ID, another.fingerprint),
+    ]
