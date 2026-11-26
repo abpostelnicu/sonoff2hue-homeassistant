@@ -108,6 +108,39 @@ async def test_without_a_pin_any_certificate_is_accepted(fake_hue: FakeHueHost, 
     await ping(HueClient(fake_hue.address, await fake_hue.pair(), pin))
 
 
+@pytest.mark.parametrize(
+    ("spell", "matches"),
+    [
+        (str.upper, True),
+        (str.lower, True),
+        (lambda pin: ":".join(pin[i : i + 2] for i in range(0, 64, 2)), True),
+        (lambda pin: f" {pin}\t", True),
+        (lambda pin: pin[:62], False),
+        (lambda pin: f"{pin}00", False),
+        (lambda pin: hashlib.sha256(b"another bridge").hexdigest(), False),
+        (lambda pin: "not a fingerprint", False),
+    ],
+)
+async def test_a_certificate_matches_a_pin_as_the_clients_connections_check_it(
+    fake_hue: FakeHueHost, spell: Callable[[str], str], matches: bool
+) -> None:
+    """The search for a bridge that moved compares the certificate that it read with the pin (decision 33)."""
+    pin = spell(fake_hue.fingerprint)
+    app_key = await fake_hue.pair()
+    if matches:
+        await ping(HueClient(fake_hue.address, app_key, pin))
+    else:
+        with pytest.raises(HueApiError):
+            await ping(HueClient(fake_hue.address, app_key, pin))
+
+    assert hue_client.matches_pin(fake_hue.fingerprint, pin) is matches
+
+
+def test_a_malformed_pin_matches_no_certificate() -> None:
+    """Not even a certificate's SHA-256 written as malformed as it, which the client's check never sees."""
+    assert not hue_client.matches_pin("not a fingerprint", "NOT A FINGERPRINT")
+
+
 # Connections.
 
 

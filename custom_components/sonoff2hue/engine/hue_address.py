@@ -33,6 +33,9 @@ class BridgeUrl:
     host: str
     """The host as shown: a lowercased host name, an IPv4 address, or an IPv6 address in brackets."""
     port: int
+    is_ip_address: bool
+    """Whether the host is an IP address, IPv4 or IPv6, rather than a host name, which the system's resolver follows
+    wherever it points: only an address is ever replaced by the one that the bridge moved to (decision 33)."""
 
 
 def create_base_url(address: str) -> BridgeUrl:
@@ -52,14 +55,15 @@ def create_base_url(address: str) -> BridgeUrl:
 def _parse(value: str) -> BridgeUrl | None:
     if match := _BRACKETED.fullmatch(value):
         host, port = match["host"], match["port"]
-        parsed = _ipv6(host)
+        parsed, is_ip_address = _ipv6(host), True
     elif value.count(":") > 1:
         # An IPv6 address without brackets can't be followed by a port.
         host, port = value, None
-        parsed = _ipv6(host)
+        parsed, is_ip_address = _ipv6(host), True
     elif match := _HOST_AND_PORT.fullmatch(value):
         host, port = match["host"], match["port"]
-        parsed = _ipv4(host) or _host_name(host)
+        ipv4 = _ipv4(host)
+        parsed, is_ip_address = ipv4 or _host_name(host), ipv4 is not None
     else:
         return None
     if parsed is None:
@@ -70,7 +74,7 @@ def _parse(value: str) -> BridgeUrl | None:
         return None
     url_host, shown = parsed
     url = URL.build(scheme="https", host=url_host, port=None if number == DEFAULT_PORT else number)
-    return BridgeUrl(url, shown, number)
+    return BridgeUrl(url, shown, number, is_ip_address)
 
 
 def _ipv6(text: str) -> tuple[str, str] | None:

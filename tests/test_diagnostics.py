@@ -115,6 +115,7 @@ async def test_the_diagnostics_hold_the_configuration_the_status_the_lan_and_the
                 "reachable": False,
                 "message": LIGHTS_DOWN,
                 "checked_at": then,
+                "found_at": None,
             },
             "lan": {"listening": True, "devices_seen": 3, "last_packet_at": then},
             "switches": [

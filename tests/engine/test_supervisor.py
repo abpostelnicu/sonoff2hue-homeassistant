@@ -15,12 +15,19 @@ import pytest
 
 from custom_components.sonoff2hue.engine import supervisor
 from custom_components.sonoff2hue.engine.config import EngineConfig, HueSettings, SwitchSettings
-from custom_components.sonoff2hue.engine.hue_client import HueClient
+from custom_components.sonoff2hue.engine.hue_client import HueApiError, HueBridgeInfo, HueClient, TransportError
+from custom_components.sonoff2hue.engine.hue_setup import DiscoveredBridge
 from custom_components.sonoff2hue.engine.mdns import MdnsListener
 from custom_components.sonoff2hue.engine.registry import DeviceRegistry
 from custom_components.sonoff2hue.engine.runner import ResolvedSwitches, RunnerObserver, SwitchBinding
 from custom_components.sonoff2hue.engine.status import ServiceState, ServiceStatus, StatusSnapshot, StatusTracker
-from custom_components.sonoff2hue.engine.supervisor import BridgeSupervisor, HueClientFactory, create_hue_client
+from custom_components.sonoff2hue.engine.supervisor import (
+    BridgeMoved,
+    BridgeSearch,
+    BridgeSupervisor,
+    HueClientFactory,
+    create_hue_client,
+)
 from custom_components.sonoff2hue.engine.targets import EntryKey, Remembered, RememberedResource, Renamed
 from custom_components.sonoff2hue.engine.toggler import ToggleResult
 
@@ -52,7 +59,8 @@ async def time() -> AsyncIterator[VirtualTime]:
 
 class Bridge(InMemoryBridge):
     """A Hue bridge with the light Ceiling (l1), whose name a test may change and which it may delete (``gone``), which
-    records when each request came, and how many clients were made for it and closed."""
+    records when each request came, and how many clients were made for it and closed. While ``unreachable`` is set,
+    no request gets an answer: it fails as that transport error."""
 
     def __init__(self, time: VirtualTime) -> None:
         super().__init__(self._answer)
@@ -62,6 +70,7 @@ class Bridge(InMemoryBridge):
         self.name = "Ceiling"
         self.gone = False
         self.hang = False
+        self.unreachable: TransportError | None = None
         self.times: list[tuple[float, str]] = []
         self.created = 0
         self.closed = 0
@@ -88,6 +97,8 @@ class Bridge(InMemoryBridge):
 
     def _answer(self, request: RecordedRequest) -> tuple[int, str] | Awaitable[tuple[int, str]]:
         self.times.append((self._time.elapsed, f"{request.method} {request.path}"))
+        if self.unreachable is not None:
+            raise self.unreachable
         if self.hang:
             return asyncio.get_running_loop().create_future()
         for fault in self._faults:
@@ -144,6 +155,8 @@ class Harness:
         observer: RunnerObserver | None = None,
         remembered: Remembered | None = None,
         on_resolved: Callable[[ResolvedSwitches], None] | None = None,
+        search: BridgeSearch | None = None,
+        on_bridge_moved: Callable[[BridgeMoved], None] | None = None,
     ) -> None:
         self.time = time
         self.bridge = Bridge(time)
@@ -160,6 +173,8 @@ class Harness:
             observer=observer,
             remembered=remembered,
             on_resolved=on_resolved,
+            search=search,
+            on_bridge_moved=on_bridge_moved,
             clock=time.utc,
         )
         self.listening: asyncio.Task[None] | None = None
@@ -987,3 +1002,484 @@ async def test_config_changed_logs_while_the_supervisor_waits_for_a_change(
     harness.supervisor.config_changed()
 
     assert supervisor_log(caplog) == [(logging.INFO, "Configuration changed; restarting the bridge.")]
+
+
+# Following the bridge to a new address (decision 33).
+
+OLD = "192.0.2.10"
+NEW = "192.0.2.20"
+STORED_ID = "001788FFFE100491"
+"""The bridge id as the bridge's config gives it, which the entry stores."""
+LISTED_ID = "001788fffe100491"
+"""The same id as mDNS and Signify's endpoint list it."""
+PIN = "AB" * 32
+MOVING = HueSettings(OLD, STORED_ID, "app-key", PIN)
+NO_ROUTE = TransportError("network", f"No route to host ({OLD}:443)")
+NOT_REACHABLE = f"Hue bridge not reachable: No route to host ({OLD}:443)"
+LOOKING = f"The Hue bridge at {OLD} has been unreachable for 60 s; looking for it on the network."
+WAITING = f"Waiting for the Hue bridge at {OLD}: {NOT_REACHABLE}"
+
+
+class Finder:
+    """The network as the search sees it: the bridges that each search lists (``listed``), and what reading each
+    address gives (``bridges``). It records each search, when it came and which sources it asked, and each address
+    read. While ``hang`` is set, a search never ends; ``fail`` is what the next search raises."""
+
+    def __init__(self, time: VirtualTime) -> None:
+        self._time = time
+        self.listed: list[DiscoveredBridge] = []
+        self.bridges: dict[str, HueBridgeInfo] = {}
+        self.searches: list[tuple[float, bool, bool]] = []
+        self.reads: list[str] = []
+        self.hang = False
+        self.cancelled = 0
+        self.fail: Exception | None = None
+
+    def search(self) -> BridgeSearch:
+        return BridgeSearch(self.find, self.read)
+
+    async def find(self, *, mdns: bool, cloud: bool) -> list[DiscoveredBridge]:
+        self.searches.append((self._time.elapsed, mdns, cloud))
+        if (failure := self.fail) is not None:
+            self.fail = None
+            raise failure
+        if self.hang:
+            try:
+                await asyncio.get_running_loop().create_future()
+            except asyncio.CancelledError:
+                self.cancelled += 1
+                raise
+        return list(self.listed)
+
+    async def read(self, address: str) -> HueBridgeInfo:
+        self.reads.append(address)
+        if (info := self.bridges.get(address)) is None:
+            raise HueApiError(f"No Hue bridge answered at {address}: Connection refused ({address}:443)")
+        return info
+
+    @property
+    def timeline(self) -> list[tuple[float, bool, bool]]:
+        """Each search: when it came, in seconds of virtual time to the millisecond, and the sources it asked."""
+        return [(round(at, 3), mdns, cloud) for at, mdns, cloud in self.searches]
+
+
+def bridge_at(address: str, *, bridge_id: str = STORED_ID, certificate: str = PIN) -> HueBridgeInfo:
+    """What reading a bridge at ``address`` gives."""
+    return HueBridgeInfo(address, bridge_id, "Hue Bridge", "BSB002", "1972004020", certificate)
+
+
+def moving(hue: HueSettings = MOVING, *, finder: Finder, time: VirtualTime, **kwargs: Any) -> Harness:
+    """A supervisor whose bridge doesn't answer at its address, with the search of ``finder``."""
+    harness = Harness(time, EngineConfig(hue, [hall()]), search=finder.search(), **kwargs)
+    harness.bridge.unreachable = NO_ROUTE
+    return harness
+
+
+BOTH = (True, True)
+MDNS = (True, False)
+
+
+@pytest.mark.parametrize(
+    ("unreachable", "error", "looking"),
+    [
+        (NO_ROUTE, NOT_REACHABLE, f"{WAITING}; looking for it on the network."),
+        (
+            TransportError("timeout", "The request timed out."),
+            "Hue bridge request timed out.",
+            f"Waiting for the Hue bridge at {OLD}: Hue bridge request timed out; looking for it on the network.",
+        ),
+    ],
+)
+async def test_while_connecting_the_bridge_is_looked_for_once_it_has_been_unreachable_for_60_seconds(
+    time: VirtualTime, caplog: pytest.LogCaptureFixture, unreachable: TransportError, error: str, looking: str
+) -> None:
+    caplog.set_level(logging.INFO, logger=supervisor.__name__)
+    finder = Finder(time)
+    harness = moving(finder=finder, time=time)
+    harness.bridge.unreachable = unreachable
+    await harness.start()
+    await asyncio.sleep(59)
+    searches_before = list(finder.searches)
+    await asyncio.sleep(2)
+
+    assert searches_before == []
+    assert finder.timeline == [(60, *BOTH)]
+    # The states stay; the message says that the search looks for the bridge.
+    assert harness.status.history == [
+        (0, State.CONNECTING, f"Connecting to the Hue bridge at {OLD}."),
+        (0, State.CONNECTING, f"Waiting for the Hue bridge at {OLD}: {error}"),
+        (pytest.approx(60), State.CONNECTING, looking),
+    ]
+    assert supervisor_log(caplog) == [
+        (logging.WARNING, f"Hue bridge at {OLD} not reachable ({error}); retrying every 10 s."),
+        (logging.INFO, LOOKING),
+    ]
+    await harness.stop()
+
+
+async def test_while_running_the_bridge_is_looked_for_once_it_has_been_unreachable_for_60_seconds(
+    time: VirtualTime, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The runner notices with its keep-alive at 45 s; the state and the message stay, as the switches' message is
+    the running state's."""
+    caplog.set_level(logging.INFO, logger=supervisor.__name__)
+    finder = Finder(time)
+    harness = Harness(time, EngineConfig(MOVING, [hall()]), search=finder.search())
+    await harness.start()
+    await asyncio.sleep(1)
+    harness.bridge.unreachable = NO_ROUTE
+    await asyncio.sleep(103)
+    searches_before = list(finder.searches)
+    await asyncio.sleep(2)
+
+    assert searches_before == []
+    assert finder.timeline == [(105, *BOTH)]
+    assert harness.status.history == [
+        (0, State.CONNECTING, f"Connecting to the Hue bridge at {OLD}."),
+        (0, State.RUNNING, RUNNING),
+    ]
+    assert supervisor_log(caplog) == [(logging.INFO, LOOKING)]
+    await harness.stop()
+
+
+async def test_mdns_is_asked_at_most_every_5_minutes_and_signifys_endpoint_at_most_every_15(time: VirtualTime) -> None:
+    finder = Finder(time)
+    harness = moving(finder=finder, time=time)
+    await harness.start()
+    await asyncio.sleep(2000)
+
+    assert finder.timeline == [
+        (60, *BOTH),
+        (360, *MDNS),
+        (660, *MDNS),
+        (960, *BOTH),
+        (1260, *MDNS),
+        (1560, *MDNS),
+        (1860, *BOTH),
+    ]
+    await harness.stop()
+
+
+@pytest.mark.parametrize("first", [float.fromhex("0x1.42a1d573c246bp+7"), float.fromhex("0x1.dce539ad224a5p+7")])
+async def test_the_sources_that_fall_due_at_once_are_asked_in_one_search(first: float) -> None:
+    """At these times of the event loop's clock, the first search's time plus 15 minutes, and plus three times 5, round
+    apart, the one or the other way: as on a runner whose clock had just started, as the loop's clock starts with it."""
+    asked: list[tuple[bool, bool]] = []
+
+    async def find(*, mdns: bool, cloud: bool) -> list[DiscoveredBridge]:
+        asked.append((mdns, cloud))
+        return []
+
+    search = BridgeSearch(find)
+    at = first
+    for _ in range(4):
+        at = search.next_at(at)
+        await search.find(at)
+
+    assert (((first + 300) + 300) + 300) != first + 900
+    assert asked == [BOTH, MDNS, MDNS, BOTH]
+
+
+async def test_the_rates_hold_when_the_bridge_is_unreachable_again(time: VirtualTime) -> None:
+    """The next time that the bridge doesn't answer, the first search waits for a source to be due."""
+    finder = Finder(time)
+    harness = moving(finder=finder, time=time)
+    await harness.start()
+    await asyncio.sleep(95)
+    harness.bridge.unreachable = None
+    await asyncio.sleep(10)
+    # The ping at 100 s reached the bridge, and the runner's keep-alive did too; the next one, at 145 s, doesn't.
+    harness.bridge.unreachable = NO_ROUTE
+    await asyncio.sleep(900)
+
+    assert harness.status.service.state is State.RUNNING
+    assert finder.timeline == [(60, *BOTH), (360, *MDNS), (660, *MDNS), (960, *BOTH)]
+    await harness.stop()
+
+
+async def test_the_rates_hold_across_the_supervisors_that_share_a_search(time: VirtualTime) -> None:
+    """As the runtime gives each supervisor of its config entry the same search."""
+    finder = Finder(time)
+    search = finder.search()
+    first = Harness(time, EngineConfig(MOVING, [hall()]), search=search)
+    first.bridge.unreachable = NO_ROUTE
+    await first.start()
+    await asyncio.sleep(100)
+    await first.stop()
+
+    second = Harness(time, EngineConfig(MOVING, [hall()]), search=search)
+    second.bridge.unreachable = NO_ROUTE
+    await second.start()
+    await asyncio.sleep(900)
+
+    # The second one's first 60 s end at 160 s; mDNS is due again at 360 s, and the endpoint at 960 s.
+    assert finder.timeline == [(60, *BOTH), (360, *MDNS), (660, *MDNS), (960, *BOTH)]
+    await second.stop()
+
+
+@pytest.mark.parametrize("listed_id", [LISTED_ID, None])
+async def test_the_bridge_found_with_its_id_and_pin_is_reported_once(
+    time: VirtualTime, caplog: pytest.LogCaptureFixture, listed_id: str | None
+) -> None:
+    """Once, on the event loop's next turn, and the search ends. A pin is compared as the client compares it: here
+    written in lower case with colons. A bridge listed without an id is read for it."""
+    caplog.set_level(logging.INFO, logger=supervisor.__name__)
+    finder = Finder(time)
+    finder.listed = [DiscoveredBridge(NEW, listed_id, "mDNS")]
+    finder.bridges = {NEW: bridge_at(NEW)}
+    reports: list[tuple[float, BridgeMoved]] = []
+    pin = ":".join(["ab"] * 32)
+    harness = moving(
+        HueSettings(OLD, STORED_ID, "app-key", pin),
+        finder=finder,
+        time=time,
+        on_bridge_moved=lambda moved: reports.append((time.elapsed, moved)),
+    )
+    await harness.start()
+    await asyncio.sleep(2000)
+
+    ((at, moved),) = reports
+    assert at == pytest.approx(60)
+    assert (moved.config, moved.address) == (harness.supervisor._config, NEW)
+    assert finder.timeline == [(60, *BOTH)]
+    assert finder.reads == [NEW]
+    assert harness.status.snapshot().hue.found_at is None
+    # The runtime logs the move, as it saves the new address.
+    assert supervisor_log(caplog) == [
+        (logging.WARNING, f"Hue bridge at {OLD} not reachable ({NOT_REACHABLE}); retrying every 10 s."),
+        (logging.INFO, LOOKING),
+    ]
+    await harness.stop()
+
+
+async def test_another_bridge_and_one_with_another_certificate_are_not_used(
+    time: VirtualTime, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A bridge listed with another id isn't read. Those listed with the bridge's id are read first, then those without
+    an id; another certificate is warned about once."""
+    caplog.set_level(logging.INFO, logger=supervisor.__name__)
+    finder = Finder(time)
+    finder.listed = [
+        DiscoveredBridge("192.0.2.30", "001788fffe000002", "mDNS"),
+        DiscoveredBridge("192.0.2.40", LISTED_ID, "mDNS"),
+        DiscoveredBridge("192.0.2.50", None, "discovery.meethue.com"),
+        DiscoveredBridge("192.0.2.60", LISTED_ID, "discovery.meethue.com"),
+    ]
+    finder.bridges = {
+        "192.0.2.30": bridge_at("192.0.2.30"),
+        "192.0.2.40": bridge_at("192.0.2.40", certificate="CD" * 32),
+        "192.0.2.50": bridge_at("192.0.2.50", bridge_id="001788FFFE000003"),
+        "192.0.2.60": bridge_at("192.0.2.60", bridge_id="001788FFFE000004"),
+    }
+    reports: list[BridgeMoved] = []
+    harness = moving(finder=finder, time=time, on_bridge_moved=reports.append)
+    await harness.start()
+    await asyncio.sleep(700)
+
+    assert reports == []
+    assert finder.timeline == [(60, *BOTH), (360, *MDNS), (660, *MDNS)]
+    assert finder.reads == ["192.0.2.40", "192.0.2.60", "192.0.2.50"] * 3
+    assert supervisor_log(caplog)[2:] == [
+        (
+            logging.WARNING,
+            f"A device with the Hue bridge's id {STORED_ID} answers at 192.0.2.40, but its certificate isn't the pinned "
+            f"one, so sonoff2hue doesn't use that address. If the bridge was replaced or reset, {PAIR_AGAIN}.",
+        )
+    ]
+    assert harness.status.snapshot().hue.found_at is None
+    await harness.stop()
+
+
+async def test_a_bridge_at_its_own_address_is_not_read(time: VirtualTime) -> None:
+    finder = Finder(time)
+    finder.listed = [DiscoveredBridge(OLD, LISTED_ID, "mDNS"), DiscoveredBridge(f"{OLD}:443", None, "mDNS")]
+    finder.bridges = {OLD: bridge_at(OLD), f"{OLD}:443": bridge_at(f"{OLD}:443")}
+    reports: list[BridgeMoved] = []
+    harness = moving(finder=finder, time=time, on_bridge_moved=reports.append)
+    await harness.start()
+    await asyncio.sleep(400)
+
+    assert finder.timeline == [(60, *BOTH), (360, *MDNS)]
+    assert (finder.reads, reports) == ([], [])
+    await harness.stop()
+
+
+async def test_the_search_ends_when_the_bridge_answers_again(time: VirtualTime) -> None:
+    """While connecting and while running: a search under way is cancelled, and no other follows."""
+    finder = Finder(time)
+    finder.hang = True
+    harness = moving(finder=finder, time=time)
+    await harness.start()
+    await asyncio.sleep(95)
+    harness.bridge.unreachable = None
+    await asyncio.sleep(10)
+
+    # The search at 60 s, cancelled as the ping at 100 s reached the bridge.
+    assert harness.status.service.state is State.RUNNING
+    assert (finder.cancelled, len(finder.searches)) == (1, 1)
+
+    finder.hang = False
+    harness.bridge.unreachable = NO_ROUTE
+    await asyncio.sleep(80)
+    harness.bridge.unreachable = None
+    await asyncio.sleep(1000)
+
+    # The keep-alive failed at 145 s and reached the bridge at 190 s, before the 60 s were over: no search.
+    assert len(finder.searches) == 1
+    await harness.stop()
+
+
+async def test_a_bridge_that_answers_within_60_seconds_is_not_looked_for(
+    time: VirtualTime, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO, logger=supervisor.__name__)
+    finder = Finder(time)
+    harness = moving(finder=finder, time=time)
+    await harness.start()
+    await asyncio.sleep(45)
+    harness.bridge.unreachable = None
+    await asyncio.sleep(1000)
+
+    # The ping at 50 s reached the bridge.
+    assert harness.status.service.state is State.RUNNING
+    assert finder.searches == []
+    assert LOOKING not in [message for _, message in supervisor_log(caplog)]
+    await harness.stop()
+
+
+async def test_stopping_the_supervisor_ends_the_search(time: VirtualTime) -> None:
+    finder = Finder(time)
+    finder.hang = True
+    harness = moving(finder=finder, time=time)
+    await harness.start()
+    await asyncio.sleep(70)
+    tasks = asyncio.all_tasks()
+
+    await harness.stop_supervisor()
+    await asyncio.sleep(1000)
+
+    assert (finder.cancelled, len(finder.searches)) == (1, 1)
+    assert (harness.bridge.created, harness.bridge.closed) == (1, 1)
+    assert [task for task in tasks if not task.done() and "look_for_bridge" in repr(task.get_coro())] == []
+    await harness.stop()
+
+
+async def test_stopping_the_supervisor_while_the_runner_runs_ends_the_search(time: VirtualTime) -> None:
+    finder = Finder(time)
+    harness = Harness(time, EngineConfig(MOVING, [hall()]), search=finder.search())
+    await harness.start()
+    await asyncio.sleep(1)
+    harness.bridge.unreachable = NO_ROUTE
+    await asyncio.sleep(400)
+
+    await harness.stop_supervisor()
+    await asyncio.sleep(1000)
+
+    # The keep-alive failed at 45 s: a search at 105 s, and none at 405 s, as the supervisor stopped at 401 s.
+    assert finder.timeline == [(105, *BOTH)]
+    await harness.stop()
+
+
+async def test_the_search_ends_when_the_bridge_answers_with_a_refusal(time: VirtualTime) -> None:
+    """The bridge answered, so it isn't unreachable, though the supervisor waits for a change."""
+    finder = Finder(time)
+    harness = moving(finder=finder, time=time)
+    await harness.start()
+    await asyncio.sleep(65)
+    harness.bridge.unreachable = None
+    harness.bridge.fail("/clip/v2/resource/bridge", 403, '{"errors":[{"description":"unauthorized user"}]}')
+    await asyncio.sleep(1000)
+
+    assert harness.status.service.state is State.ERROR
+    assert finder.timeline == [(60, *BOTH)]
+    await harness.stop()
+
+
+@pytest.mark.parametrize(
+    ("address", "bridge_id", "looked_for"),
+    [
+        ("bridge.test", STORED_ID, False),
+        ("Hue-Bridge.local:8443", STORED_ID, False),
+        (OLD, None, False),
+        (OLD, " ", False),
+        (f"{OLD}:8443", STORED_ID, True),
+        ("[2001:db8::10]", STORED_ID, True),
+        ("fe80::10%eth0", STORED_ID, True),
+    ],
+)
+async def test_a_host_name_is_never_looked_for_nor_a_bridge_without_its_id(
+    time: VirtualTime, caplog: pytest.LogCaptureFixture, address: str, bridge_id: str | None, looked_for: bool
+) -> None:
+    """The system's resolver follows a host name, so it is never replaced; an IPv6 address is an address."""
+    caplog.set_level(logging.INFO, logger=supervisor.__name__)
+    finder = Finder(time)
+    harness = moving(HueSettings(address, bridge_id, "app-key", PIN), finder=finder, time=time)
+    await harness.start()
+    await asyncio.sleep(400)
+
+    assert finder.timeline == ([(60, *BOTH), (360, *MDNS)] if looked_for else [])
+    assert any("looking for it on the network" in message for _, message in supervisor_log(caplog)) is looked_for
+    await harness.stop()
+
+
+async def test_without_a_pin_the_bridge_found_goes_to_the_status_for_the_repair(
+    time: VirtualTime, caplog: pytest.LogCaptureFixture
+) -> None:
+    """It isn't used, whatever its certificate: without a pin, the client checks none. It is warned about once, and
+    shown until the bridge answers at its own address again."""
+    caplog.set_level(logging.INFO, logger=supervisor.__name__)
+    finder = Finder(time)
+    finder.listed = [DiscoveredBridge(NEW, LISTED_ID, "mDNS")]
+    finder.bridges = {NEW: bridge_at(NEW, certificate="CD" * 32)}
+    reports: list[BridgeMoved] = []
+    harness = moving(
+        HueSettings(OLD, STORED_ID, "app-key", None), finder=finder, time=time, on_bridge_moved=reports.append
+    )
+    await harness.start()
+    await asyncio.sleep(61)
+    found = harness.status.snapshot().hue.found_at
+    await asyncio.sleep(600)
+    still = harness.status.snapshot().hue.found_at
+    harness.bridge.unreachable = None
+    await asyncio.sleep(10)
+
+    assert (found, still) == (NEW, NEW)
+    assert harness.status.snapshot().hue.found_at is None
+    assert harness.status.service.state is State.RUNNING
+    assert reports == []
+    assert finder.timeline == [(60, *BOTH), (360, *MDNS), (660, *MDNS)]
+    assert supervisor_log(caplog)[2:] == [
+        (
+            logging.WARNING,
+            f"The Hue bridge {STORED_ID} answers at {NEW} instead of {OLD}, but its certificate isn't pinned, so "
+            f"sonoff2hue doesn't move there by itself; {PAIR_AGAIN} there.",
+        ),
+        (
+            logging.WARNING,
+            "hue.certificateSha256 is not set, so the bridge certificate is not verified. Reconfigure the sonoff2hue "
+            "integration to pair the bridge again and pin it.",
+        ),
+    ]
+    await harness.stop()
+
+
+async def test_a_search_that_fails_unexpectedly_is_logged_and_the_next_one_comes_at_its_rate(
+    time: VirtualTime, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO, logger=supervisor.__name__)
+    finder = Finder(time)
+    finder.fail = RuntimeError("discovery broke")
+    harness = moving(finder=finder, time=time)
+    await harness.start()
+    await asyncio.sleep(400)
+
+    assert finder.timeline == [(60, *BOTH), (360, *MDNS)]
+    (record,) = [record for record in caplog.records if record.levelno == logging.ERROR]
+    assert (record.name, record.getMessage()) == (
+        supervisor.__name__,
+        "Looking for the Hue bridge on the network failed.",
+    )
+    assert record.exc_info is not None
+    assert isinstance(record.exc_info[1], RuntimeError)
+    assert harness.status.service.state is State.CONNECTING
+    await harness.stop()

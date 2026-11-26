@@ -65,6 +65,9 @@ class HueStatus:
     message: str | None
     """Why the bridge isn't usable."""
     checked_at: datetime | None
+    found_at: str | None = None
+    """Where a bridge with this bridge's id answered while this one was unreachable at its address, when its certificate
+    isn't pinned, for the repair that offers it (decision 33); ``None`` otherwise, and while it isn't paired."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,6 +155,7 @@ class StatusTracker(RunnerObserver):
         self._reachable: bool | None = None
         self._reachability_message: str | None = None
         self._checked_at: datetime | None = None
+        self._found_at: str | None = None
         self._listeners: list[StatusListener] = []
         self._publish: asyncio.TimerHandle | None = None
         self._closed = False
@@ -208,11 +212,22 @@ class StatusTracker(RunnerObserver):
         self.set_service(ServiceState.RUNNING, f"{message}.", missing)
 
     def set_bridge_reachability(self, reachable: bool, message: str | None) -> None:
-        """Records a check of the bridge; the message is kept only while it isn't reachable."""
+        """Records a check of the bridge; the message is kept only while it isn't reachable, and a bridge that is
+        reachable again at its address forgets where another address answered for it."""
         self._reachable = reachable
         self._reachability_message = None if reachable else message
         self._checked_at = self._clock()
+        if reachable:
+            self._found_at = None
         self._schedule_publish()
+
+    def set_bridge_found(self, address: str) -> None:
+        """A bridge with this bridge's id answered at ``address`` while this one was unreachable, and its certificate
+        isn't pinned, so the user is to pair it there (decision 33). It is kept until the bridge is reachable again, or
+        the bridge's address, key or pin changes."""
+        if address != self._found_at:
+            self._found_at = address
+            self._schedule_publish()
 
     def on_toggled(self, binding: SwitchBinding, result: ToggleResult, elapsed: timedelta) -> None:
         now = self._clock()
@@ -273,6 +288,7 @@ class StatusTracker(RunnerObserver):
                 self._reachable if paired else None,
                 self._reachability_message if paired else None,
                 self._checked_at if paired else None,
+                self._found_at if paired else None,
             ),
             LanStatus(self._registry.listening, len(devices), self._registry.last_packet_at),
             tuple(switches),
@@ -280,8 +296,9 @@ class StatusTracker(RunnerObserver):
 
     def config_changed(self, config: EngineConfig) -> None:
         """For each change of the configuration, which the runtime applies without reloading the config entry:
-        snapshots show the new configuration. Reachability belongs to one bridge: editing switches keeps it, pairing
-        again or another bridge resets it."""
+        snapshots show the new configuration. Reachability belongs to one bridge at one address, and so does where
+        another address answered for it: editing switches keeps them; pairing again, another bridge or another address
+        resets them."""
         self._config = config
         bridge = _bridge_identity(config.hue)
         if bridge != self._bridge:
@@ -289,6 +306,7 @@ class StatusTracker(RunnerObserver):
             self._reachable = None
             self._reachability_message = None
             self._checked_at = None
+            self._found_at = None
         self._schedule_publish()
 
     def close(self) -> None:

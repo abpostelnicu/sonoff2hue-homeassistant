@@ -454,3 +454,60 @@ async def test_a_new_configuration_keeps_the_reachability_of_the_same_bridge(tim
     await asyncio.sleep(1)
     assert status.times == pytest.approx([0.5])
     tracker.close()
+
+
+async def test_where_another_address_answered_for_the_bridge_is_kept_until_it_answers_again(time: VirtualTime) -> None:
+    """Without a pin, the address that the search found for the bridge, for the repair (decision 33): a check that
+    finds the bridge unreachable, and editing the switches, keep it; the bridge answering at its own address forgets
+    it."""
+    status = Status(time, EngineConfig(PAIRED, [hall_switch()]))
+    tracker = status.tracker
+    tracker.set_bridge_reachability(False, "Hue bridge request timed out.")
+    await asyncio.sleep(1)
+    tracker.set_bridge_found("192.0.2.30")
+    await asyncio.sleep(1)
+    found = tracker.snapshot().hue
+    tracker.set_bridge_found("192.0.2.30")
+    await asyncio.sleep(1)
+    published = [(seconds, snapshot.hue.found_at) for seconds, snapshot in status.published]
+    tracker.set_bridge_reachability(False, "Hue bridge request timed out.")
+    tracker.config_changed(EngineConfig(PAIRED, [SwitchSettings(OTHER, "Porch", None, ["Desk"])]))
+    kept = tracker.snapshot().hue.found_at
+    tracker.set_bridge_reachability(True, None)
+
+    assert found == HueStatus(
+        True, "192.0.2.20", "001788fffe000001", True, False, "Hue bridge request timed out.", START, "192.0.2.30"
+    )
+    # Published when it changes; the same address again changes nothing.
+    assert published == [(pytest.approx(0.5), None), (pytest.approx(1.5), "192.0.2.30")]
+    assert kept == "192.0.2.30"
+    assert tracker.snapshot().hue.found_at is None
+    tracker.close()
+
+
+@pytest.mark.parametrize(
+    "hue",
+    [
+        HueSettings("192.0.2.21", PAIRED.bridge_id, PAIRED.app_key, PAIRED.certificate_sha256),
+        HueSettings(PAIRED.bridge_ip, PAIRED.bridge_id, "another-key", PAIRED.certificate_sha256),
+        HueSettings(PAIRED.bridge_ip, PAIRED.bridge_id, PAIRED.app_key, None),
+    ],
+)
+async def test_another_address_key_or_pin_forgets_where_another_address_answered(
+    time: VirtualTime, hue: HueSettings
+) -> None:
+    status = Status(time, EngineConfig(PAIRED))
+    status.tracker.set_bridge_found("192.0.2.30")
+
+    status.tracker.config_changed(EngineConfig(hue))
+
+    assert status.tracker.snapshot().hue.found_at is None
+    status.tracker.close()
+
+
+async def test_where_another_address_answered_shows_only_while_paired(time: VirtualTime) -> None:
+    status = Status(time, EngineConfig(HueSettings("192.0.2.20", "001788fffe000001")))
+    status.tracker.set_bridge_found("192.0.2.30")
+
+    assert status.tracker.snapshot().hue.found_at is None
+    status.tracker.close()

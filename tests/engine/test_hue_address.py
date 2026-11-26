@@ -112,3 +112,23 @@ def test_a_refused_address(address: str) -> None:
 @pytest.mark.parametrize("address", ["", " \t\n"])
 def test_an_empty_address(address: str) -> None:
     assert refusal(address) == "The Hue bridge address is empty."
+
+
+@pytest.mark.parametrize(
+    ("address", "is_ip_address"),
+    [
+        ("192.168.1.20", True),
+        ("192.168.1.20:8443", True),
+        ("fe80::1", True),
+        ("[2001:db8::1]:8443", True),
+        ("fe80::1%eth0", True),
+        ("::ffff:192.0.2.1", True),
+        ("Bridge.LOCAL", False),
+        ("localhost:8443", False),
+        ("1.2.3.4a", False),
+        ("B\u00fccher.local:8443", False),
+    ],
+)
+def test_an_address_is_an_ip_address_or_a_host_name(address: str, is_ip_address: bool) -> None:
+    """Only an IP address is replaced when the bridge moves; the system's resolver follows a host name (decision 33)."""
+    assert create_base_url(address).is_ip_address is is_ip_address

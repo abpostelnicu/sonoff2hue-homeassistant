@@ -225,6 +225,13 @@ def normalize_fingerprint(fingerprint: str) -> str:
     return re.sub(r"[\s:]", "", fingerprint).upper()
 
 
+def matches_pin(certificate_sha256: str, pin: str) -> bool:
+    """Whether a certificate with this SHA-256 is the pinned one, as the client's connections check it: both
+    normalized, and never for a malformed pin."""
+    pinned = normalize_fingerprint(pin)
+    return _SHA256.fullmatch(pinned) is not None and normalize_fingerprint(certificate_sha256) == pinned
+
+
 class AiohttpTransport:
     """HTTPS to the bridge with its own connection pool, whose idle connections stay open for 5 minutes. When
     ``certificate_sha256`` is set, a connection is used only if the bridge's certificate has that SHA-256; otherwise
