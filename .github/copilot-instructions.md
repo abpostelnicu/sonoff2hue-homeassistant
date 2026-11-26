@@ -2238,6 +2238,19 @@ frontend 20261028.8 on GitHub, hassfest 2026.11.3 run from core's tag, and the c
     search at 960 s asked the endpoint and mDNS one after the other. The search now asks together the sources due within
     a millisecond of each other (`DUE_TOGETHER`), the new test above reproduces it, and the tests' helper shows the
     searches when they differ, where it gave only `False`.
+- 2026-11-26: `VirtualTime.elapsed` (tests/engine/fakes.py) rounded to the nanosecond.
+  - **The failure:** CI's *Test* job on `main` at 2529398 failed in
+    `test_the_switches_are_resolved_again_every_15_minutes_and_the_runner_takes_their_new_targets` (decision 32), which
+    had passed on its pull request and locally. The resolution at 900 s was recorded at 899.9999999999999 s, so the
+    exact comparison failed. The aborted test then left the runner's keep-alive running, an error at its teardown.
+  - **The cause:** the virtual clock starts at the loop's real time, an arbitrary float that differs from machine to
+    machine, and each jump adds a timeout to it, so `now - start` can miss a round value by a few units in the last
+    place.
+  - **Reproduced:** with a throwaway pytest plugin that starts the virtual clock at a chosen value, the test failed at
+    1234.5678 every time and passed at seven other values. Run at 12 values, the 232 tests of the files that use
+    `VirtualTime` failed at 2 of them, 1234.5678 and 42.4242, each with this test.
+  - **Fixed:** `elapsed`, and with it `utc()`, is rounded to the nanosecond. No test depends on less than a
+    millisecond. With the fix, the 232 tests passed at all 12 values, and `scripts/check` passed with 1,528 tests.
 
 ## Status
 

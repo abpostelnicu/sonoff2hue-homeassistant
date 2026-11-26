@@ -98,8 +98,11 @@ class VirtualTime:
 
     @property
     def elapsed(self) -> float:
-        """Seconds since this virtual time started."""
-        return self.now - self.start
+        """Seconds since this virtual time started, to the nanosecond. The clock starts at the loop's real time, an
+        arbitrary float, and each jump adds a timeout to it, so the difference can miss a round value by a few units in
+        the last place, such as 899.9999999999999 for 900, depending on the machine's clock: rounding keeps the times
+        that tests compare exact."""
+        return round(self.now - self.start, 9)
 
     def utc(self) -> datetime:
         return self.START + timedelta(seconds=self.elapsed)
