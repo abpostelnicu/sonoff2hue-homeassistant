@@ -324,6 +324,27 @@ async def test_a_switch_without_a_subentry_names_no_device(hass: HomeAssistant, 
     assert runtime_data._switch_device_id(SwitchSettings(OTHER_DEVICE_ID)) is None
 
 
+async def test_a_target_whose_name_another_light_has_shows_its_id_wherever_it_is_named(
+    hass: HomeAssistant, lan: Lan, bridge: Bridge, caplog: pytest.LogCaptureFixture
+) -> None:
+    """In the status, the bus events and the log, as the switch dialog lists such a light."""
+    caplog.set_level(logging.INFO, logger=INTEGRATION_LOGGER.name)
+    bridge.names["l2"] = "Ceiling"
+    runtime_data = await start(hass, paired(switch(lights=["l2", "l1"])))
+    toggles = async_capture_events(hass, EVENT_TOGGLE)
+
+    lan.broadcast(1)
+    lan.broadcast(2)
+    await settle()
+
+    labels = ["light 'Ceiling' (l2)", "light 'Ceiling' (l1)"]
+    assert runtime_data.status.snapshot().switches[0].targets == tuple(labels)
+    assert [event.data["targets"] for event in toggles] == [labels]
+    messages = logged(caplog, "custom_components.sonoff2hue.engine.runner")
+    assert f"{HALL} -> {', '.join(labels)}" in messages
+    assert any(message.startswith(f"{HALL}: turned ON {', '.join(labels)} in ") for message in messages)
+
+
 # The status and the bridge across time.
 
 

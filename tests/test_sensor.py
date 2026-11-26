@@ -303,3 +303,25 @@ async def test_last_action_has_no_targets_while_the_bridge_does_not_run(
         STATE_UNKNOWN,
         {"changed": None, "unchanged": None, "failed": None, "targets": None, "message": None},
     )
+
+
+async def test_last_action_labels_a_target_whose_name_another_light_has_with_its_id(
+    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+) -> None:
+    bridge.names["l2"] = "Ceiling"
+    await start(hass, paired(switch(lights=["l1"], groups=["Hall"])))
+
+    lan.broadcast(1)
+    lan.broadcast(2)
+    await tick(freezer, 0.5)
+
+    assert last_action(hass) == (
+        "turned_on",
+        {
+            "changed": 2,
+            "unchanged": 0,
+            "failed": 0,
+            "targets": ["light 'Ceiling' (l1)", "group 'Hall'"],
+            "message": None,
+        },
+    )

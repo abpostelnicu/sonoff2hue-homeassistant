@@ -95,12 +95,14 @@ def relay(detached: bool) -> dict[str, Any]:
 class Bridge(InMemoryBridge):
     """A Hue bridge in memory, with the lights Ceiling (l1) and Desk (l2) and the room Hall (r1), which switches both
     through its grouped light g1, and the zones that ``POST /clip/v2/resource/zone`` creates, which it lists and gives
-    by id. It records the requests, and how many clients were made for it and closed. ``hold`` keeps the answers to
-    requests for a path until the test releases them."""
+    by id. ``names`` holds the names of l1, l2 and r1, which a test may change. It records the requests, and how many
+    clients were made for it and closed. ``hold`` keeps the answers to requests for a path until the test releases
+    them."""
 
     def __init__(self) -> None:
         super().__init__(self._answer)
         self.on = {"l1": False, "l2": False}
+        self.names = {"l1": "Ceiling", "l2": "Desk", "r1": "Hall"}
         self.created = 0
         self.closed = 0
         self.zones: list[dict[str, Any]] = []
@@ -186,11 +188,15 @@ class Bridge(InMemoryBridge):
         data: list[dict[str, Any]] = {
             "/clip/v2/resource/bridge": [{"id": "b1", "type": "bridge"}],
             "/clip/v2/resource/light": [
-                {"id": light, "metadata": {"name": name}, "on": {"on": self.on[light]}}
-                for light, name in (("l1", "Ceiling"), ("l2", "Desk"))
+                {"id": light, "metadata": {"name": self.names[light]}, "on": {"on": on}}
+                for light, on in self.on.items()
             ],
             "/clip/v2/resource/room": [
-                {"id": "r1", "metadata": {"name": "Hall"}, "services": [{"rid": "g1", "rtype": "grouped_light"}]}
+                {
+                    "id": "r1",
+                    "metadata": {"name": self.names["r1"]},
+                    "services": [{"rid": "g1", "rtype": "grouped_light"}],
+                }
             ],
             "/clip/v2/resource/zone": self._zones(),
             "/clip/v2/resource/grouped_light": [{"id": "g1", "on": {"on": any(self.on.values())}}],

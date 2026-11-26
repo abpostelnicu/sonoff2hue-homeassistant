@@ -63,14 +63,19 @@ class HueTargetKind(Enum):
 
 @dataclass(frozen=True, slots=True)
 class HueTarget:
-    """Something that can be switched on and off: a light, or the grouped_light of a room or zone."""
+    """Something that can be switched on and off: a light, or the grouped_light of a room or zone. Its label, such as
+    ``light 'Ceiling'``, names it in the log, the status and the events, followed by ``label_id`` when that is set:
+    the resolver sets it when another resource of its kind has the same name."""
 
     kind: HueTargetKind
     id: str
     name: str
+    label_id: str | None = None
+    """The id that the label shows: the light's own, or the room's or zone's, not its grouped_light's."""
 
     def __str__(self) -> str:
-        return f"light '{self.name}'" if self.kind == HueTargetKind.LIGHT else f"group '{self.name}'"
+        label = f"light '{self.name}'" if self.kind == HueTargetKind.LIGHT else f"group '{self.name}'"
+        return label if self.label_id is None else f"{label} ({self.label_id})"
 
 
 @dataclass(frozen=True, slots=True)

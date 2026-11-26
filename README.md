@@ -276,7 +276,9 @@ Each switch's device:
   number*.
 - *Last action*: what came of the last press: *Turned on*, *Turned off*, *Failed* or *Dropped*, the newer of the last
   toggle and the last error. Its attributes are the *Time*; for a toggle, how many lights, rooms and zones *Changed*,
-  were *Unchanged* or *Failed*, and the *Elapsed (ms)*; the *Message* of a failure; and what the switch *Toggles*.
+  were *Unchanged* or *Failed*, and the *Elapsed (ms)*; the *Message* of a failure; and what the switch *Toggles*,
+  such as `light 'Ceiling'` and `group 'Hallway'`. A light, room or zone whose name another one of its kind has
+  shows its id after the name too, as *Switch settings* lists it.
 - *Online*: *Online* if the MINIR4M was heard in the last 5 minutes, else *Offline*, also when it was never heard. Its
   attributes are what sonoff2hue knows of it: its *Address*, *Last seen*, *Last press* and *Sequence number*, whether it
   is *Encrypted*, *Device key set*, *Detached relay*, and a *Decode error*.
@@ -326,7 +328,8 @@ The events' data:
 - both: `device_id`, the id of the switch's Home Assistant device; `switch_id`, the MINIR4M's device id in lowercase;
   and `name`, the switch's name, or null;
 - `sonoff2hue_press`: `seq`, the announcement's sequence number;
-- `sonoff2hue_toggle`: `targets`, such as `light 'Ceiling'` or `group 'Hallway'`, and `result`:
+- `sonoff2hue_toggle`: `targets`, such as `light 'Ceiling'` or `group 'Hallway'`, as *Last action* shows them, and
+  `result`:
   - `toggled`, with `turned_on` (true or false), `changed` and `unchanged` (how many targets it switched, and how many
     were already so), `failed` (how many the bridge didn't switch) and `elapsed_ms`;
   - `failed`, when the toggle couldn't run, or `dropped`, when the press waited more than 5 seconds for the bridge,

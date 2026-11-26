@@ -4,8 +4,12 @@ bridge's resources.
 An entry names a resource by its name or its id, without regard to case or to white space around it
 (:func:`refers_to`). A ``groups`` entry may start with ``room:`` or ``zone:``, for a room and a zone that share a name
 (:func:`split_kind`). The switch picker (``picker.py``) matches entries by the same rules.
+
+A target's label shows its id after the name when another resource of its kind has the same name, by :func:`name_key`:
+another light, for a light, and another room, or zone, for a room or zone. The switch dialog lists them the same way.
 """
 
+from collections import Counter
 from collections.abc import Iterable, Sequence
 from typing import Literal
 
@@ -46,12 +50,16 @@ def resolve(
     with the names it could mean; so does a room or zone without lights. An empty entry, which ``validate_for_run``
     refuses, matches nothing."""
     name = settings.display_name
+    light_names = Counter(name_key(light.name) for light in lights)
+    group_names = Counter((group.kind, name_key(group.name)) for group in groups)
     targets: list[HueTarget] = []
     for entry in settings.lights:
         reference = entry.strip()
         matches = [light for light in lights if refers_to(reference, light.id, light.name)]
         if len(matches) == 1:
-            targets.append(HueTarget(HueTargetKind.LIGHT, matches[0].id, matches[0].name))
+            light = matches[0]
+            label_id = light.id if light_names[name_key(light.name)] > 1 else None
+            targets.append(HueTarget(HueTargetKind.LIGHT, light.id, light.name, label_id))
         elif not matches:
             known = _quoted(light.name for light in lights)
             errors.append(f"{name}: no Hue light named '{reference}'. Known lights: {known}")
@@ -76,7 +84,8 @@ def resolve(
         elif (group := found[0]).grouped_light_id is None:
             errors.append(f"{name}: {group.kind} '{group.name}' has no lights.")
         else:
-            targets.append(HueTarget(HueTargetKind.GROUPED_LIGHT, group.grouped_light_id, group.name))
+            label_id = group.id if group_names[group.kind, name_key(group.name)] > 1 else None
+            targets.append(HueTarget(HueTargetKind.GROUPED_LIGHT, group.grouped_light_id, group.name, label_id))
 
     distinct: dict[tuple[HueTargetKind, str], HueTarget] = {}
     for target in targets:

@@ -79,7 +79,7 @@ def test_a_name_that_two_lights_have_needs_the_light_id() -> None:
 
     targets, errors = run(["LAMP", "a1"], bridge_lights=lights)
 
-    assert targets == [light(lights[1])]
+    assert targets == [HueTarget(HueTargetKind.LIGHT, "a1", "Lamp", "a1")]
     assert errors == [f"{HALL}: 2 lights are named 'LAMP'; use the light id instead ('a1', 'a2')."]
 
 
@@ -183,6 +183,48 @@ def test_empty_entries_match_nothing() -> None:
         f"{HALL}: no Hue light named ''. Known lights: ''",
         f"{HALL}: no Hue light named ''. Known lights: ''",
         f"{HALL}: no Hue room or zone named ''. Known: {KNOWN_GROUPS}",
+    ]
+
+
+# Labels
+
+
+def test_a_target_whose_name_another_light_has_is_labelled_with_its_id() -> None:
+    """As the switch dialog lists them: names compare as entries do, and only a repeated name gets the id."""
+    lamps = [HueLight("a1", "Lamp", False), HueLight("a2", " LAMP ", False), CEILING]
+
+    targets = run(["a1", "a2", "Ceiling"], bridge_lights=lamps)[0]
+
+    assert targets == [
+        HueTarget(HueTargetKind.LIGHT, "a1", "Lamp", "a1"),
+        HueTarget(HueTargetKind.LIGHT, "a2", " LAMP ", "a2"),
+        light(CEILING),
+    ]
+    assert [str(target) for target in targets] == ["light 'Lamp' (a1)", "light ' LAMP ' (a2)", "light 'Ceiling'"]
+
+
+def test_a_room_or_zone_is_labelled_with_its_own_id_only_when_one_of_its_kind_has_its_name() -> None:
+    """The grouped light switches it, but the label shows the room's or zone's id, which the switch dialog shows. A
+    light, a room and a zone of one name are of three kinds, so none of them gets an id."""
+    study, other_study = HueGroup("r4", "Study", "room", "g5"), HueGroup("r5", "study", "room", "g6")
+    groups = [*GROUPS, study, other_study]
+    kitchen_light = HueLight("l7", "Kitchen", False)
+
+    targets = run(
+        ["Kitchen"], ["r4", "room:kitchen", "zone:Kitchen"], bridge_lights=[kitchen_light], bridge_groups=groups
+    )[0]
+
+    assert targets == [
+        light(kitchen_light),
+        HueTarget(HueTargetKind.GROUPED_LIGHT, "g5", "Study", "r4"),
+        grouped(KITCHEN_ROOM),
+        grouped(KITCHEN_ZONE),
+    ]
+    assert [str(target) for target in targets] == [
+        "light 'Kitchen'",
+        "group 'Study' (r4)",
+        "group 'Kitchen'",
+        "group 'Kitchen'",
     ]
 
 
