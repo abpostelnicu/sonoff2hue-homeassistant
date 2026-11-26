@@ -14,7 +14,14 @@ import pytest
 from custom_components.sonoff2hue.engine import ewelink, mdns, runner, toggler
 from custom_components.sonoff2hue.engine.config import EngineConfig, HueSettings, SwitchSettings
 from custom_components.sonoff2hue.engine.dns import DnsRecordType, build_query
-from custom_components.sonoff2hue.engine.hue_client import HueApiError, HueClient, HueTarget, HueTargetKind
+from custom_components.sonoff2hue.engine.hue_client import (
+    HueApiError,
+    HueClient,
+    HueGroup,
+    HueLight,
+    HueTarget,
+    HueTargetKind,
+)
 from custom_components.sonoff2hue.engine.mdns import MdnsListener, MdnsPacket
 from custom_components.sonoff2hue.engine.runner import (
     NO_TARGETS,
@@ -23,6 +30,7 @@ from custom_components.sonoff2hue.engine.runner import (
     SwitchBinding,
     resolve_bindings,
 )
+from custom_components.sonoff2hue.engine.targets import EntryKey, RememberedResource, Renamed
 from custom_components.sonoff2hue.engine.toggler import ToggleResult
 
 from ..hue import InMemoryBridge, RecordedRequest
@@ -476,7 +484,7 @@ async def test_encrypted_presses_resolve_and_toggle_mixed_targets_without_false_
 
     bridge = InMemoryBridge(respond)
     hue = bridge.client("qa-only-app-key")
-    bindings = await resolve_bindings(config, hue)
+    bindings = (await resolve_bindings(config, hue)).bindings
     assert len(bindings) == 1
     assert bindings[0].targets == [
         HueTarget(HueTargetKind.LIGHT, "l1", "Ceiling"),
@@ -798,7 +806,7 @@ async def test_resolving_waits_for_the_bridge_while_its_errors_are_transient(cap
     config = EngineConfig(HueSettings("bridge.test"), [SwitchSettings(DEVICE_ID, "Hall", None, ["Desk"], ["Hall"])])
     logger = logging.getLogger("tests.engine.supervisor")
 
-    bindings = await resolve_bindings(config, bridge.client(), logger)
+    bindings = (await resolve_bindings(config, bridge.client(), logger)).bindings
 
     assert [binding.targets for binding in bindings] == [
         [HueTarget(HueTargetKind.LIGHT, "l2", "Desk"), HueTarget(HueTargetKind.GROUPED_LIGHT, "g1", "Hall")]
@@ -840,7 +848,7 @@ async def test_resolving_keeps_each_switchs_problems_to_itself() -> None:
         ],
     )
 
-    bindings = await resolve_bindings(config, bridge.client())
+    bindings = (await resolve_bindings(config, bridge.client())).bindings
 
     assert [(binding.settings, binding.targets, binding.problems) for binding in bindings] == [
         (
@@ -854,6 +862,40 @@ async def test_resolving_keeps_each_switchs_problems_to_itself() -> None:
             [HueTarget(HueTargetKind.LIGHT, "l2", "Desk"), HueTarget(HueTargetKind.GROUPED_LIGHT, "g1", "Hall")],
             [],
         ),
+    ]
+
+
+def test_a_resolution_remembers_what_each_entry_of_the_configuration_found() -> None:
+    """Decision 32: what each entry found now; for one that found nothing, what it found before; and nothing for the
+    switches and entries that the configuration no longer has. A rename comes with the switch's entry."""
+    lights = [HueLight("l1", "Ceiling lamp", False), HueLight("l2", "Desk", False)]
+    groups = [HueGroup("r1", "Hall", "room", "g1")]
+    hall = SwitchSettings(DEVICE_ID, "Hall", None, ["Ceiling", "Desk", "Porch"], ["Garden"])
+    ceiling = EntryKey(DEVICE_ID, "lights", "ceiling")
+    porch = EntryKey(DEVICE_ID, "lights", "porch")
+    remembered = {
+        ceiling: RememberedResource("light", "l1", "Ceiling"),
+        porch: RememberedResource("light", "l7", "Porch"),
+        EntryKey(DEVICE_ID, "lights", "attic"): RememberedResource("light", "l5", "Attic"),
+        EntryKey(OTHER_DEVICE_ID, "groups", "hall"): RememberedResource("room", "r1", "Hall"),
+    }
+    config = EngineConfig(switches=[hall])
+
+    resolved = runner.resolve_switches(config, lights, groups, remembered)
+
+    lamp = RememberedResource("light", "l1", "Ceiling lamp")
+    assert resolved.config is config
+    assert resolved.remembered == {
+        ceiling: lamp,
+        EntryKey(DEVICE_ID, "lights", "desk"): RememberedResource("light", "l2", "Desk"),
+        porch: RememberedResource("light", "l7", "Porch"),
+    }
+    assert resolved.renames == [Renamed(ceiling, "Ceiling", "Ceiling", lamp, "Ceiling lamp")]
+    (binding,) = resolved.bindings
+    assert [str(target) for target in binding.targets] == ["light 'Ceiling lamp'", "light 'Desk'"]
+    assert binding.problems == [
+        "Hall (1000abcdef): no Hue light named 'Porch'. Known lights: 'Ceiling lamp', 'Desk'",
+        "Hall (1000abcdef): no Hue room or zone named 'Garden'. Known: 'room:Hall'",
     ]
 
 

@@ -90,12 +90,15 @@ from .engine.hue_client import CERTIFICATE_MISMATCH, HueApiError, HueClient
 from .engine.lan_monitor import LanMonitor
 from .engine.mdns import MdnsListener
 from .engine.registry import DeviceRegistry
-from .engine.runner import RunnerObserver, SwitchBinding, labels
+from .engine.runner import ResolvedSwitches, RunnerObserver, SwitchBinding, labels
 from .engine.status import PRESS_DROPPED, ServiceState, StatusSnapshot, StatusTracker
 from .engine.supervisor import BridgeSupervisor, HueClientFactory, create_hue_client
 from .engine.switch_rules import is_paired
-from .engine.targets import resolve
+from .engine.targets import Field, Remembered, Renamed, name_key, resolve_switch
 from .engine.toggler import HueToggler, ToggleResult
+from .remembered import RememberedResources
+
+_LOGGER = logging.getLogger(__name__)
 
 INTEGRATION_LOGGER: Final = logging.getLogger(__name__.rpartition(".")[0])
 """``custom_components.sonoff2hue``, which every logger of the integration is under. The activity buffer is its handler,
@@ -122,6 +125,9 @@ ISSUE_MISSING_TARGETS: Final = "missing_targets"
 
 TEST_NOT_PAIRED: Final = "Pair the Hue bridge first: reconfigure the sonoff2hue integration."
 """Why the switch test can't run while the bridge isn't paired, with how to pair it."""
+
+_SETTINGS: Final[dict[Field, str]] = {"lights": CONF_LIGHTS, "groups": CONF_GROUPS}
+"""The key in a switch subentry's data of each setting that holds entries."""
 
 
 def new_listener(clock: Callable[[], datetime]) -> MdnsListener:
@@ -217,7 +223,10 @@ class Sonoff2HueData:
     lan_monitor: LanMonitor
     hue_clients: HueClientFactory
     clock: Callable[[], datetime]
-    _supervisor: BridgeSupervisor = field(init=False)
+    remembered: RememberedResources
+    """The resource that each entry of the switches last found, for following renames (decision 32)."""
+    _supervisor: BridgeSupervisor | None = field(default=None, init=False)
+    """The supervisor of the current configuration, from the start on."""
     _supervisor_tasks: list[asyncio.Task[None]] = field(default_factory=list, init=False)
     """The supervisor's task, after the cancelled ones of earlier configurations that haven't ended yet."""
     _lan_task: asyncio.Task[None] | None = field(default=None, init=False)
@@ -226,6 +235,8 @@ class Sonoff2HueData:
     _undo: list[Callable[[], None]] = field(default_factory=list, init=False)
     _stop_listener: Callable[[], None] | None = field(default=None, init=False)
     _stopped: bool = field(default=False, init=False)
+    _holding: bool = field(default=False, init=False)
+    """While renames are saved: the changes of the subentries are applied together afterwards."""
 
     @classmethod
     def create(cls, hass: HomeAssistant, entry: Sonoff2HueConfigEntry) -> Sonoff2HueData:
@@ -245,10 +256,12 @@ class Sonoff2HueData:
             LanMonitor(listener, registry, config),
             create_hue_client,
             clock,
+            RememberedResources(hass, entry.entry_id),
         )
 
-    def __post_init__(self) -> None:
-        self._supervisor = self._new_supervisor()
+    async def async_load(self) -> None:
+        """Loads the remembered resources, before the runtime starts, so that its first supervisor follows renames."""
+        await self.remembered.async_load(self.config)
 
     @callback
     def async_start(self) -> None:
@@ -270,18 +283,19 @@ class Sonoff2HueData:
         """The entry's update listener, after any change of the entry. A change of the configuration restarts the
         supervisor: the old one logs "Configuration changed; restarting the bridge." and is cancelled, the LAN monitor
         and the status take the new configuration, and a new supervisor starts once the old one has stopped. Then the
-        signals go out."""
-        if self._stopped:
+        signals go out. While renames are saved, the changes wait until all of them are."""
+        if self._stopped or self._holding:
             return
         config = config_from_entry(self.entry)
         changed = config != self.config
         if changed:
-            self._supervisor.config_changed()
+            if self._supervisor is not None:
+                self._supervisor.config_changed()
             _cancel_once(self._supervisor_tasks)
             self.config = config
+            self.remembered.config_changed(config)
             self.lan_monitor.config_changed(config)
             self.status.config_changed(config)
-            self._supervisor = self._new_supervisor()
             self._start_supervisor()
         added, updated, removed = self._remember_subentries()
         entry_id = self.entry.entry_id
@@ -311,7 +325,7 @@ class Sonoff2HueData:
         except ConfigError as err:
             raise SwitchTestError(str(err)) from err
         try:
-            return await _test(settings, hue)
+            return await _test(settings, hue, self.remembered.resources)
         except HueApiError as err:
             raise SwitchTestError(str(err)) from err
         finally:
@@ -331,6 +345,7 @@ class Sonoff2HueData:
         if self._lan_task is not None:
             _cancel_once([self._lan_task])
             await asyncio.wait([self._lan_task])
+        await self.remembered.async_flush()
         for issue_id in self._issues:
             ir.async_delete_issue(self.hass, DOMAIN, issue_id)
         self._issues.clear()
@@ -348,23 +363,22 @@ class Sonoff2HueData:
         while self._undo:
             self._undo.pop()()
 
-    def _new_supervisor(self) -> BridgeSupervisor:
-        return BridgeSupervisor(
+    def _start_supervisor(self) -> None:
+        """Runs a supervisor for the current configuration as a background task, once the cancelled ones have
+        ended."""
+        self._supervisor = supervisor = BridgeSupervisor(
             self.config,
             self.listener,
             self.status,
             hue_clients=self.hue_clients,
             on_key_rejected=self._on_key_rejected,
             observer=_BusEvents(self.hass, self._switch_device_id),
+            remembered=self.remembered.resources,
+            on_resolved=self._on_resolved,
             clock=self.clock,
         )
-
-    def _start_supervisor(self) -> None:
-        """Runs the current supervisor as a background task, once the cancelled ones have ended."""
         previous = [task for task in self._supervisor_tasks if not task.done()]
-        task = self.hass.async_create_background_task(
-            _run_after(previous, self._supervisor), f"{DOMAIN} bridge supervisor"
-        )
+        task = self.hass.async_create_background_task(_run_after(previous, supervisor), f"{DOMAIN} bridge supervisor")
         self._supervisor_tasks = [*previous, task]
 
     def _remember_subentries(self) -> tuple[list[ConfigSubentry], list[ConfigSubentry], list[str]]:
@@ -385,22 +399,76 @@ class Sonoff2HueData:
         self._subentries = {subentry_id: _Subentry.of(subentry) for subentry_id, subentry in current.items()}
         return added, updated, removed
 
-    def _switch_device_id(self, settings: SwitchSettings) -> str | None:
-        """The Home Assistant device of the switch's subentry, which the platforms make, if there is one."""
-        key = settings.normalized_device_id.casefold()
-        subentry_id = next(
+    def _switch_subentry(self, device_id: str) -> ConfigSubentry | None:
+        """The ``switch`` subentry of the switch with ``device_id``, without regard to case, if there is one."""
+        key = device_id.strip().casefold()
+        return next(
             (
-                subentry_id
-                for subentry_id, subentry in self.entry.subentries.items()
+                subentry
+                for subentry in self.entry.subentries.values()
                 if subentry.subentry_type == SUBENTRY_SWITCH
                 and _switch(subentry.data).normalized_device_id.casefold() == key
             ),
             None,
         )
-        if subentry_id is None:
+
+    def _switch_device_id(self, settings: SwitchSettings) -> str | None:
+        """The Home Assistant device of the switch's subentry, which the platforms make, if there is one."""
+        subentry = self._switch_subentry(settings.normalized_device_id)
+        if subentry is None:
             return None
         devices = dr.async_entries_for_config_entry(dr.async_get(self.hass), self.entry.entry_id)
-        return next((device.id for device in devices if device.config_subentry_id == subentry_id), None)
+        return next((device.id for device in devices if device.config_subentry_id == subentry.subentry_id), None)
+
+    @callback
+    def _on_resolved(self, resolved: ResolvedSwitches) -> None:
+        """A resolution of the supervisor (decision 32): its resources are remembered, and its renames saved in the
+        switches' subentries. One of a configuration that has changed since is left out, as the supervisor of the new
+        one resolves again."""
+        if self._stopped or resolved.config is not self.config:
+            return
+        self.remembered.update(resolved.remembered, self.config)
+        if resolved.renames:
+            self._save_renames(resolved.renames)
+
+    def _save_renames(self, renames: Sequence[Renamed]) -> None:
+        """Saves the new name of each renamed resource in its switch's subentry, in place of its entry, the picker's
+        spelling of it, if the subentry still has that entry: the user may have changed it meanwhile. The configuration
+        then changes once, which restarts the supervisor once, and the new one finds the new names as they are."""
+        changes: dict[str, tuple[ConfigSubentry, dict[str, Any]]] = {}
+        saved: list[tuple[Renamed, str]] = []
+        for rename in renames:
+            subentry = self._switch_subentry(rename.key.device_id)
+            if subentry is None:
+                continue
+            _, data = changes.get(subentry.subentry_id, (subentry, dict(subentry.data)))
+            setting = _SETTINGS[rename.key.field]
+            entries = list(data.get(setting) or ())
+            if rename.entry not in entries:
+                continue
+            data[setting] = _renamed(entries, rename.entry, rename.new_entry)
+            changes[subentry.subentry_id] = (subentry, data)
+            saved.append((rename, _switch(data).display_name))
+            self.remembered.remember(rename.key._replace(entry=name_key(rename.new_entry)), rename.resource)
+        if not changes:
+            return
+
+        self._holding = True
+        try:
+            for subentry, data in changes.values():
+                self.hass.config_entries.async_update_subentry(self.entry, subentry, data=data)
+        finally:
+            self._holding = False
+        for rename, name in saved:
+            resource = rename.resource
+            _LOGGER.info(
+                "%s: %s '%s' was renamed to '%s' on the Hue bridge; saved the new name.",
+                name,
+                resource.kind,
+                rename.old_name,
+                resource.name,
+            )
+        self.async_config_changed()
 
     @callback
     def _on_key_rejected(self) -> None:
@@ -452,10 +520,10 @@ async def _run_after(previous: list[asyncio.Task[None]], supervisor: BridgeSuper
     await supervisor.run()
 
 
-async def _test(settings: SwitchSettings, hue: HueClient) -> SwitchTestResult:
-    problems: list[str] = []
+async def _test(settings: SwitchSettings, hue: HueClient, remembered: Remembered) -> SwitchTestResult:
     lights, groups = await hue.get_lights_and_groups()
-    targets = resolve(settings, lights, groups, problems)
+    resolution = resolve_switch(settings, lights, groups, remembered)
+    targets, problems = resolution.targets, resolution.problems
     if problems and not targets:
         raise SwitchTestError(" ".join(problems), problems)
 
@@ -515,6 +583,16 @@ def _issues_of(snapshot: StatusSnapshot) -> dict[str, _Issue]:
                 ISSUE_MISSING_TARGETS, ir.IssueSeverity.WARNING, {"name": name, "problems": _bullets(switch.problems)}
             )
     return issues
+
+
+def _renamed(entries: list[str], old: str, new: str) -> list[str]:
+    """The entries with ``old`` spelled ``new`` in its place, or without ``old`` when another entry already is ``new``,
+    as entries compare."""
+    index = entries.index(old)
+    others = entries[:index] + entries[index + 1 :]
+    if any(name_key(entry) == name_key(new) for entry in others):
+        return others
+    return [*entries[:index], new, *entries[index + 1 :]]
 
 
 def _bullets(lines: Sequence[str]) -> str:

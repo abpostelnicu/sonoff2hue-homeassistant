@@ -4,7 +4,8 @@ It resolves a switch's ``lights`` and ``groups`` entries against the bridge's re
 ``targets.resolve`` follows, and turns the picker's selection back into entries:
 
 - A light is saved by its name if no other light has that name, else by its id. A room or zone is saved as
-  ``room:<name>`` or ``zone:<name>`` if no other room, or zone, has that name, else by its id.
+  ``room:<name>`` or ``zone:<name>`` if no other room, or zone, has that name, else by its id (``targets.encode_light``
+  and ``targets.encode_group``, which the runtime also uses for a renamed resource's new name, decision 32).
 - An entry that still resolves to a selected resource keeps its own spelling, and a resource is saved once.
 - An entry that doesn't resolve (no match, or several) is kept unless it was removed.
 
@@ -16,7 +17,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
-from .targets import GroupKind, name_key, refers_to, split_kind
+from .targets import GroupKind, encode_group, encode_light, refers_to, split_kind
 
 type Kind = Literal["light", "room", "zone"]
 type ListName = Literal["lights", "groups"]
@@ -110,25 +111,6 @@ def resolve_group(entry: str, rooms: Sequence[Resource], zones: Sequence[Resourc
     if len(found) == 1:
         return Resolution("ok", item=found[0][1], kind=found[0][0])
     return Resolution("ambiguous" if found else "missing", count=len(found))
-
-
-def _is_unique_name(item: Resource, items: Sequence[Resource]) -> bool:
-    name = name_key(item.name)
-    return name != "" and sum(1 for other in items if name_key(other.name) == name) == 1
-
-
-def encode_light(light: Resource, lights: Sequence[Resource]) -> str:
-    """The light's name if no other light has the same name, else its id."""
-    if _is_unique_name(light, lights):
-        return light.name.strip()
-    return light.id
-
-
-def encode_group(kind: GroupKind, group: Resource, groups: Sequence[Resource]) -> str:
-    """``room:<name>`` or ``zone:<name>`` if the name is unique among its kind, else the id."""
-    if _is_unique_name(group, groups):
-        return f"{kind}:{group.name.strip()}"
-    return group.id
 
 
 def create_selection(resources: Resources, lights: Sequence[str] = (), groups: Sequence[str] = ()) -> Selection:

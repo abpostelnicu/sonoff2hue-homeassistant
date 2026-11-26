@@ -14,7 +14,9 @@ change of the configuration, call :meth:`BridgeSupervisor.config_changed`, cance
 the new configuration once it has ended. Cancelling it stops the runner and closes the Hue client, and leaves the
 listener running. ``on_key_rejected`` is called whenever the bridge rejects the application key, while the supervisor
 connects to it and while the runner runs, which is when the runtime starts Home Assistant's reauthentication.
-``observer`` gets the runner's reports after the status tracker, for the runtime's bus events.
+``observer`` gets the runner's reports after the status tracker, for the runtime's bus events. ``remembered`` and
+``on_resolved`` follow renames (decision 32): the supervisor resolves with the resource that each entry last found, and
+reports what each resolution found and which resources were renamed, which the runtime keeps and saves.
 """
 
 import asyncio
@@ -26,8 +28,9 @@ from typing import NoReturn
 from .config import ConfigError, EngineConfig, HueSettings
 from .hue_client import PAIR_AGAIN, HueApiError, HueClient
 from .mdns import MdnsListener
-from .runner import Runner, RunnerObserver, SwitchBinding, resolve_bindings
+from .runner import ResolvedSwitches, Runner, RunnerObserver, SwitchBinding, resolve_bindings
 from .status import ServiceState, StatusTracker
+from .targets import Remembered
 from .toggler import ToggleResult
 
 _LOGGER = logging.getLogger(__name__)
@@ -74,6 +77,8 @@ class BridgeSupervisor:
         hue_clients: HueClientFactory = create_hue_client,
         on_key_rejected: Callable[[], None] | None = None,
         observer: RunnerObserver | None = None,
+        remembered: Remembered | None = None,
+        on_resolved: Callable[[ResolvedSwitches], None] | None = None,
         clock: Callable[[], datetime] = _now,
     ) -> None:
         """``listener`` is the config entry's mDNS listener, which the runner shares and which keeps running when the
@@ -81,13 +86,18 @@ class BridgeSupervisor:
         while the supervisor connects to it, which leaves it in the error state until the next change, and after each
         keep-alive request or toggle that the bridge refuses so while the runner runs, which goes on running. One that
         raises goes to the loop's exception handler. ``observer`` gets each of the runner's reports right after the
-        status tracker. ``clock`` is the runner's, for the age of a press, and has to agree with the listener's."""
+        status tracker. ``remembered`` is the resource that each entry last found, and ``on_resolved`` runs on the
+        event loop soon after each resolution, with what it found and the renames, which the runtime remembers and
+        saves (decision 32); one that raises goes to the loop's exception handler too. ``clock`` is the runner's, for
+        the age of a press, and has to agree with the listener's."""
         self._config = config
         self._listener = listener
         self._status = status
         self._hue_clients = hue_clients
         self._on_key_rejected = on_key_rejected
         self._observer = observer
+        self._remembered: Remembered = remembered or {}
+        self._on_resolved = on_resolved
         self._clock = clock
         self._running = False
         self._waiting_after_failure = False
@@ -148,7 +158,7 @@ class BridgeSupervisor:
         try:
             try:
                 await self._wait_for_bridge(hue, settings.hue.bridge_ip or "")
-                bindings = await resolve_bindings(settings, hue, _LOGGER)
+                resolved = await resolve_bindings(settings, hue, _LOGGER, self._remembered)
             except HueApiError as err:
                 self._status.set_bridge_reachability(False, str(err))
                 self._status.set_service(ServiceState.ERROR, KEY_REJECTED if err.is_authentication_error else str(err))
@@ -158,6 +168,8 @@ class BridgeSupervisor:
 
             if _is_blank(settings.hue.certificate_sha256):
                 _LOGGER.warning(NOT_PINNED)
+            self._report_resolved(resolved)
+            bindings = resolved.bindings
             for binding in bindings:
                 for problem in binding.problems:
                     _LOGGER.warning("%s", problem)
@@ -173,6 +185,13 @@ class BridgeSupervisor:
         runner."""
         if self._on_key_rejected is not None:
             asyncio.get_running_loop().call_soon(self._on_key_rejected)
+
+    def _report_resolved(self, resolved: ResolvedSwitches) -> None:
+        """Remembers what the resolution found, for the next one, and runs the hook on the event loop's next turn, as
+        :meth:`_report_key_rejected` does."""
+        self._remembered = resolved.remembered
+        if self._on_resolved is not None:
+            asyncio.get_running_loop().call_soon(self._on_resolved, resolved)
 
     async def _wait_for_bridge(self, hue: HueClient, bridge_ip: str) -> None:
         self._status.set_service(ServiceState.CONNECTING, f"Connecting to the Hue bridge at {bridge_ip}.")

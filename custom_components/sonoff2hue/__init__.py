@@ -3,6 +3,7 @@
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
+from . import remembered
 from .entity import async_track_devices
 from .runtime import Sonoff2HueConfigEntry, Sonoff2HueData
 
@@ -13,8 +14,10 @@ PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.E
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: Sonoff2HueConfigEntry) -> None:
-    """Starts the runtime of the one bridge (decision 23), its update listener and the platforms."""
+    """Starts the runtime of the one bridge (decision 23), its update listener and the platforms. The remembered
+    resources are loaded first, so that the runtime's first resolution follows renames (decision 32)."""
     runtime = Sonoff2HueData.create(hass, entry)
+    await runtime.async_load()
     entry.runtime_data = runtime
     # Also when a platform fails to set up, which unloads the entry without async_unload_entry.
     entry.async_on_unload(runtime.async_stop)
@@ -28,6 +31,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: Sonoff2HueConfigEntry) 
     """Unloads the platforms; the runtime stops after them. A platform that fails to unload raises Home Assistant's
     translated ``ConfigEntryError`` (decision 36)."""
     await hass.config_entries.async_unload_platforms_or_raise(entry, PLATFORMS)
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: Sonoff2HueConfigEntry) -> None:
+    """Deletes the entry's remembered resources (decision 32), once it has unloaded."""
+    await remembered.async_remove(hass, entry.entry_id)
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: Sonoff2HueConfigEntry) -> None:

@@ -26,7 +26,7 @@ from .ewelink import SERVICE_TYPE
 from .hue_client import HueApiError, HueClient, HueGroup, HueLight, HueTarget
 from .mdns import TRACE, MdnsListener, MdnsPacket
 from .press import SwitchEventKind, SwitchTracker, TrackedEvent, summarize
-from .targets import resolve
+from .targets import EntryKey, Remembered, RememberedResource, Renamed, keys_of, resolve_switch
 from .toggler import HueToggler, ToggleResult
 
 _LOGGER = logging.getLogger(__name__)
@@ -99,13 +99,47 @@ def bindings_by_device_id(bindings: Iterable[SwitchBinding]) -> dict[str, Switch
     return by_device_id
 
 
+@dataclass(frozen=True, slots=True)
+class ResolvedSwitches:
+    """A configuration's switches resolved against the bridge, each on its own (decision 32): their bindings; the
+    resource that each entry found, or the one remembered for an entry that found none, for the configuration's entries
+    only; and the entries whose resources were renamed."""
+
+    config: EngineConfig
+    bindings: list[SwitchBinding]
+    remembered: dict[EntryKey, RememberedResource]
+    renames: list[Renamed]
+
+
+def resolve_switches(
+    config: EngineConfig, lights: list[HueLight], groups: list[HueGroup], remembered: Remembered | None = None
+) -> ResolvedSwitches:
+    """Resolves each switch's light, room and zone names on its own, so that an entry that resolves to nothing never
+    stops another switch: each binding has the targets that resolve and a message for each entry that doesn't. An entry
+    that matches no resource, or several, resolves to its remembered resource while the bridge has that one."""
+    remembered = remembered or {}
+    bindings: list[SwitchBinding] = []
+    found: dict[EntryKey, RememberedResource] = {}
+    renames: list[Renamed] = []
+    for settings in config.switches:
+        resolution = resolve_switch(settings, lights, groups, remembered)
+        bindings.append(SwitchBinding(settings, resolution.targets, resolution.problems))
+        found |= resolution.found
+        renames += resolution.renamed
+
+    kept: dict[EntryKey, RememberedResource] = {}
+    for key in (key for settings in config.switches for key in keys_of(settings)):
+        if (resource := found.get(key, remembered.get(key))) is not None:
+            kept[key] = resource
+    return ResolvedSwitches(config, bindings, kept, renames)
+
+
 async def resolve_bindings(
-    config: EngineConfig, hue: HueClient, logger: logging.Logger = _LOGGER
-) -> list[SwitchBinding]:
-    """Resolves the configured light, room and zone names of each switch on its own, so that an entry that resolves to
-    nothing never stops another switch: each binding has the targets that resolve and a message for each entry that
-    doesn't. Waits for the bridge if it isn't usable yet, logging that on ``logger``, and raises :class:`HueApiError`
-    when the bridge refuses."""
+    config: EngineConfig, hue: HueClient, logger: logging.Logger = _LOGGER, remembered: Remembered | None = None
+) -> ResolvedSwitches:
+    """Resolves the switches with :func:`resolve_switches`, with the bridge's lights and groups as they are now. Waits
+    for the bridge if it isn't usable yet, logging that on ``logger``, and raises :class:`HueApiError` when the bridge
+    refuses."""
     while True:
         try:
             lights, groups = await hue.get_lights_and_groups()
@@ -115,13 +149,7 @@ async def resolve_bindings(
             logger.warning("Hue bridge at %s not usable yet (%s); retrying in 10s.", config.hue.bridge_ip, err)
             await asyncio.sleep(RESOLVE_RETRY_DELAY)
         else:
-            return [_bind(settings, lights, groups) for settings in config.switches]
-
-
-def _bind(settings: SwitchSettings, lights: list[HueLight], groups: list[HueGroup]) -> SwitchBinding:
-    problems: list[str] = []
-    targets = resolve(settings, lights, groups, problems)
-    return SwitchBinding(settings, targets, problems)
+            return resolve_switches(config, lights, groups, remembered)
 
 
 def labels(targets: Iterable[HueTarget]) -> str:

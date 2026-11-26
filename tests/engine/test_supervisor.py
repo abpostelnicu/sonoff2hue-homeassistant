@@ -18,9 +18,10 @@ from custom_components.sonoff2hue.engine.config import EngineConfig, HueSettings
 from custom_components.sonoff2hue.engine.hue_client import HueClient
 from custom_components.sonoff2hue.engine.mdns import MdnsListener
 from custom_components.sonoff2hue.engine.registry import DeviceRegistry
-from custom_components.sonoff2hue.engine.runner import RunnerObserver, SwitchBinding
+from custom_components.sonoff2hue.engine.runner import ResolvedSwitches, RunnerObserver, SwitchBinding
 from custom_components.sonoff2hue.engine.status import ServiceState, ServiceStatus, StatusTracker
 from custom_components.sonoff2hue.engine.supervisor import BridgeSupervisor, HueClientFactory, create_hue_client
+from custom_components.sonoff2hue.engine.targets import EntryKey, Remembered, RememberedResource, Renamed
 from custom_components.sonoff2hue.engine.toggler import ToggleResult
 
 from ..hue import InMemoryBridge, RecordedRequest
@@ -50,14 +51,15 @@ async def time() -> AsyncIterator[VirtualTime]:
 
 
 class Bridge(InMemoryBridge):
-    """A Hue bridge with the light Ceiling (l1), which records when each request came, and how many clients were made
-    for it and closed."""
+    """A Hue bridge with the light Ceiling (l1), whose name a test may change, which records when each request came,
+    and how many clients were made for it and closed."""
 
     def __init__(self, time: VirtualTime) -> None:
         super().__init__(self._answer)
         self._time = time
         self._faults: list[list[Any]] = []
         self.on = False
+        self.name = "Ceiling"
         self.hang = False
         self.times: list[tuple[float, str]] = []
         self.created = 0
@@ -97,7 +99,7 @@ class Bridge(InMemoryBridge):
             return 200, NO_ERRORS
         data: list[dict[str, Any]] = {
             "/clip/v2/resource/bridge": [{"id": "b1", "type": "bridge"}],
-            "/clip/v2/resource/light": [{"id": "l1", "metadata": {"name": "Ceiling"}, "on": {"on": self.on}}],
+            "/clip/v2/resource/light": [{"id": "l1", "metadata": {"name": self.name}, "on": {"on": self.on}}],
             "/clip/v2/resource/room": [],
             "/clip/v2/resource/zone": [],
         }[request.path]
@@ -136,6 +138,8 @@ class Harness:
         hue_clients: HueClientFactory | None = None,
         on_key_rejected: Callable[[], None] | None = None,
         observer: RunnerObserver | None = None,
+        remembered: Remembered | None = None,
+        on_resolved: Callable[[ResolvedSwitches], None] | None = None,
     ) -> None:
         self.time = time
         self.bridge = Bridge(time)
@@ -150,6 +154,8 @@ class Harness:
             hue_clients=hue_clients or self.bridge.clients(),
             on_key_rejected=on_key_rejected,
             observer=observer,
+            remembered=remembered,
+            on_resolved=on_resolved,
             clock=time.utc,
         )
         self.listening: asyncio.Task[None] | None = None
@@ -627,6 +633,54 @@ async def test_presses_toggle_the_lights_and_reach_the_tracker(start: Callable[.
     assert switch.last_error is None
     # The supervisor's observer got the runner's reports, each after the tracker.
     assert reports == [("press", 2), ("toggled", True)]
+
+
+async def test_a_renamed_light_is_followed_with_the_remembered_resources_and_reported(time: VirtualTime) -> None:
+    """Decision 32: the entry resolves to the light it found before, and each resolution reports what was found and the
+    rename, on the event loop's next turn, for the runtime to save."""
+    ceiling = EntryKey(DEVICE_ID, "lights", "ceiling")
+    resolutions: list[tuple[float, ResolvedSwitches]] = []
+    harness = Harness(
+        time,
+        EngineConfig(PAIRED, [hall("Ceiling")]),
+        remembered={ceiling: RememberedResource("light", "l1", "Ceiling")},
+        on_resolved=lambda resolved: resolutions.append((time.elapsed, resolved)),
+    )
+    harness.bridge.name = "Ceiling lamp"
+    await harness.start()
+    await asyncio.sleep(1)
+    harness.broadcast(1)
+    harness.broadcast(2)
+    await asyncio.sleep(1)
+
+    lamp = RememberedResource("light", "l1", "Ceiling lamp")
+    assert harness.status.history == [(0, State.CONNECTING, CONNECTING), (0, State.RUNNING, RUNNING)]
+    assert harness.status.snapshot().switches[0].targets == ("light 'Ceiling lamp'",)
+    assert harness.bridge.on is True
+    ((at, resolved),) = resolutions
+    assert at == 0
+    assert resolved.config is harness.supervisor._config
+    assert resolved.remembered == {ceiling: lamp}
+    assert resolved.renames == [Renamed(ceiling, "Ceiling", "Ceiling", lamp, "Ceiling lamp")]
+    await harness.stop()
+
+
+async def test_an_on_resolved_that_raises_does_not_stop_the_supervisor(time: VirtualTime) -> None:
+    errors: list[dict[str, Any]] = []
+    asyncio.get_running_loop().set_exception_handler(lambda loop, context: errors.append(context))
+
+    def remember(resolved: ResolvedSwitches) -> None:
+        raise RuntimeError("saving broke")
+
+    harness = Harness(time, EngineConfig(PAIRED, [hall()]), on_resolved=remember)
+    await harness.start()
+    await asyncio.sleep(1)
+
+    assert [str(context["exception"]) for context in errors] == ["saving broke"]
+    assert harness.status.history == [(0, State.CONNECTING, CONNECTING), (0, State.RUNNING, RUNNING)]
+    assert harness.running is not None
+    assert not harness.running.done()
+    await harness.stop()
 
 
 # Failures.

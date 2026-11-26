@@ -25,6 +25,7 @@ from pytest_homeassistant.typing import ClientSessionGenerator
 from custom_components.sonoff2hue import repairs, runtime
 from custom_components.sonoff2hue.const import (
     CONF_APP_KEY,
+    CONF_BRIDGE_ID,
     CONF_CERTIFICATE_SHA256,
     CONF_DEVICE_ID,
     CONF_DEVICE_KEY,
@@ -39,9 +40,11 @@ from custom_components.sonoff2hue.const import (
 from custom_components.sonoff2hue.engine import mdns, toggler
 from custom_components.sonoff2hue.engine.config import EngineConfig, HueSettings, SwitchSettings
 from custom_components.sonoff2hue.engine.hue_client import CERTIFICATE_MISMATCH
-from custom_components.sonoff2hue.engine.runner import NO_TARGETS
+from custom_components.sonoff2hue.engine.runner import NO_TARGETS, ResolvedSwitches
 from custom_components.sonoff2hue.engine.status import PRESS_DROPPED, ServiceState
 from custom_components.sonoff2hue.engine.supervisor import KEY_REJECTED
+from custom_components.sonoff2hue.engine.targets import EntryKey, RememberedResource, Renamed
+from custom_components.sonoff2hue.remembered import SAVE_DELAY
 from custom_components.sonoff2hue.runtime import (
     INTEGRATION_LOGGER,
     SIGNAL_CONFIG_CHANGED,
@@ -575,6 +578,251 @@ async def test_unloading_lets_a_stopping_supervisor_close_its_client(
     assert await unloading
     assert (bridge.created, bridge.closed) == (1, 1)
     assert lan.network.transports[0].closed
+
+
+# The remembered resources (decision 32).
+
+SUPERVISOR = "custom_components.sonoff2hue.engine.supervisor"
+
+
+def store_key(entry: MockConfigEntry) -> str:
+    return f"{DOMAIN}.{entry.entry_id}"
+
+
+def record(entry: str, kind: str, resource_id: str, name: str, *, switch_id: str = DEVICE_ID) -> dict[str, str]:
+    """A record of the store: what an entry of a switch found."""
+    field = "lights" if kind == "light" else "groups"
+    return {"switch": switch_id, "field": field, "entry": entry, "kind": kind, "id": resource_id, "name": name}
+
+
+def remember(hass_storage: dict[str, Any], entry: MockConfigEntry, *records: dict[str, str], bridge_id: str) -> None:
+    """The store as an earlier run left it."""
+    key = store_key(entry)
+    data = {"bridge_id": bridge_id, "resources": list(records)}
+    hass_storage[key] = {"version": 1, "minor_version": 1, "key": key, "data": data}
+
+
+async def test_what_each_entry_found_is_remembered_for_the_paired_bridge(
+    hass: HomeAssistant, hass_storage: dict[str, Any], lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+) -> None:
+    entry = paired(switch(lights=[" CEILING "], groups=["Hall"]))
+    await start(hass, entry)
+
+    # Written 10 seconds after the change.
+    assert store_key(entry) not in hass_storage
+    await tick(freezer, SAVE_DELAY)
+
+    assert hass_storage[store_key(entry)]["version"] == 1
+    assert hass_storage[store_key(entry)]["data"] == {
+        "bridge_id": BRIDGE_ID,
+        "resources": [record("ceiling", "light", "l1", "Ceiling"), record("hall", "room", "r1", "Hall")],
+    }
+
+
+async def test_a_renamed_light_is_followed_and_its_new_name_saved_in_its_switch_once(
+    hass: HomeAssistant,
+    hass_storage: dict[str, Any],
+    lan: Lan,
+    bridge: Bridge,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The store, of the same bridge, without regard to the case of its id, follows the rename; the new name replaces
+    the entry, which restarts the supervisor once, and that one finds the light by its new name."""
+    caplog.set_level(logging.INFO, logger=INTEGRATION_LOGGER.name)
+    entry = paired(switch(lights=["Ceiling", "Desk"]))
+    remember(hass_storage, entry, record("ceiling", "light", "l1", "Ceiling"), bridge_id=BRIDGE_ID.lower())
+    bridge.names["l1"] = "Ceiling lamp"
+    updates: list[dict[str, Any]] = []
+    update_subentry = hass.config_entries.async_update_subentry
+
+    def counted(entry: Any, subentry: ConfigSubentry, **changes: Any) -> bool:
+        updates.append(changes)
+        return update_subentry(entry, subentry, **changes)
+
+    monkeypatch.setattr(hass.config_entries, "async_update_subentry", counted)
+    runtime_data = await start(hass, entry)
+    await settle()
+
+    assert subentry_of(entry).data[CONF_LIGHTS] == ["Ceiling lamp", "Desk"]
+    assert [list(changes) for changes in updates] == [["data"]]
+    assert logged(caplog, "custom_components.sonoff2hue.runtime") == [
+        f"{HALL}: light 'Ceiling' was renamed to 'Ceiling lamp' on the Hue bridge; saved the new name."
+    ]
+    assert logged(caplog, SUPERVISOR).count(RESTARTING) == 1
+    assert (bridge.created, bridge.closed) == (2, 1)
+    snapshot = runtime_data.status.snapshot()
+    assert (snapshot.service.state, snapshot.service.problems) == (ServiceState.RUNNING, ())
+    assert snapshot.switches[0].targets == ("light 'Ceiling lamp'", "light 'Desk'")
+    assert runtime_data.remembered.resources == {
+        EntryKey(DEVICE_ID, "lights", "ceiling lamp"): RememberedResource("light", "l1", "Ceiling lamp"),
+        EntryKey(DEVICE_ID, "lights", "desk"): RememberedResource("light", "l2", "Desk"),
+    }
+
+    lan.broadcast(1)
+    lan.broadcast(2)
+    await settle()
+
+    assert bridge.puts() == [("l1", True), ("l2", True)]
+
+
+async def test_a_renamed_entry_whose_new_spelling_the_switch_already_has_is_dropped(
+    hass: HomeAssistant, hass_storage: dict[str, Any], lan: Lan, bridge: Bridge
+) -> None:
+    """The other entry names the light by its new name already, so the switch keeps it once."""
+    entry = paired(switch(lights=["Ceiling", "Desk", "ceiling lamp"]))
+    remember(hass_storage, entry, record("ceiling", "light", "l1", "Ceiling"), bridge_id=BRIDGE_ID)
+    bridge.names["l1"] = "Ceiling lamp"
+
+    runtime_data = await start(hass, entry)
+    await settle()
+
+    assert subentry_of(entry).data[CONF_LIGHTS] == ["Desk", "ceiling lamp"]
+    assert runtime_data.status.snapshot().switches[0].targets == ("light 'Desk'", "light 'Ceiling lamp'")
+
+
+async def test_a_room_that_two_switches_found_renamed_saves_both_and_restarts_the_supervisor_once(
+    hass: HomeAssistant, hass_storage: dict[str, Any], lan: Lan, bridge: Bridge, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO, logger=INTEGRATION_LOGGER.name)
+    entry = paired(
+        switch(lights=[], groups=["room:Hall"]), switch(OTHER_DEVICE_ID, "Porch", lights=["Desk"], groups=["hall "])
+    )
+    remember(
+        hass_storage,
+        entry,
+        record("room:hall", "room", "r1", "Hall"),
+        record("hall", "room", "r1", "Hall", switch_id=OTHER_DEVICE_ID),
+        bridge_id=BRIDGE_ID,
+    )
+    bridge.names["r1"] = "Hallway"
+    entry.add_to_hass(hass)
+    configs = async_mock_signal(hass, SIGNAL_CONFIG_CHANGED.format(entry.entry_id))
+
+    runtime_data = await start(hass, entry)
+    await settle()
+
+    # Both subentries are saved before the configuration changes, once.
+    assert configs == [(runtime_data.config,)]
+    assert [dict(subentry_of(entry, device).data) for device in (DEVICE_ID, OTHER_DEVICE_ID)] == [
+        {**switch(lights=[], groups=["room:Hallway"])["data"]},
+        {**switch(OTHER_DEVICE_ID, "Porch", lights=["Desk"], groups=["room:Hallway"])["data"]},
+    ]
+    assert logged(caplog, "custom_components.sonoff2hue.runtime") == [
+        f"{HALL}: room 'Hall' was renamed to 'Hallway' on the Hue bridge; saved the new name.",
+        "Porch (1000999999): room 'Hall' was renamed to 'Hallway' on the Hue bridge; saved the new name.",
+    ]
+    assert logged(caplog, SUPERVISOR).count(RESTARTING) == 1
+    assert (bridge.created, bridge.closed) == (2, 1)
+    assert [s.targets for s in runtime_data.status.snapshot().switches] == [
+        ("group 'Hallway'",),
+        ("light 'Desk'", "group 'Hallway'"),
+    ]
+
+
+async def test_a_rename_is_saved_only_while_the_switch_has_its_entry_and_its_configuration_is_current(
+    hass: HomeAssistant, lan: Lan, bridge: Bridge
+) -> None:
+    """The user may have changed the switch meanwhile; the supervisor of a newer configuration resolves again."""
+    entry = paired(switch(lights=["Desk"]))
+    runtime_data = await start(hass, entry)
+    lamp = RememberedResource("light", "l1", "Ceiling lamp")
+    ceiling = EntryKey(DEVICE_ID, "lights", "ceiling")
+    rename = Renamed(ceiling, "Ceiling", "Ceiling", lamp, "Ceiling lamp")
+
+    runtime_data._on_resolved(ResolvedSwitches(runtime_data.config, [], {}, [rename]))
+    await settle()
+
+    assert subentry_of(entry).data[CONF_LIGHTS] == ["Desk"]
+    assert bridge.created == 1
+
+    earlier = runtime_data.config
+    subentry = subentry_of(entry)
+    hass.config_entries.async_update_subentry(entry, subentry, data={**subentry.data, CONF_LIGHTS: ["Ceiling"]})
+    await settle()
+    runtime_data._on_resolved(ResolvedSwitches(earlier, [], {ceiling: lamp}, [rename]))
+    await settle()
+
+    assert subentry_of(entry).data[CONF_LIGHTS] == ["Ceiling"]
+    assert bridge.created == 2
+    # What the current supervisor found, not what the earlier configuration's report said.
+    assert runtime_data.remembered.resources[ceiling] == RememberedResource("light", "l1", "Ceiling")
+
+
+async def test_remembered_resources_of_another_bridge_are_never_used(
+    hass: HomeAssistant, hass_storage: dict[str, Any], lan: Lan, bridge: Bridge
+) -> None:
+    entry = paired(switch(lights=["Ceiling", "Desk"]))
+    remember(hass_storage, entry, record("ceiling", "light", "l1", "Ceiling"), bridge_id="001788FFFE000002")
+    bridge.names["l1"] = "Ceiling lamp"
+
+    runtime_data = await start(hass, entry)
+
+    assert subentry_of(entry).data[CONF_LIGHTS] == ["Ceiling", "Desk"]
+    assert runtime_data.status.snapshot().switches[0].problems == (
+        f"{HALL}: no Hue light named 'Ceiling'. Known lights: 'Ceiling lamp', 'Desk'",
+    )
+
+
+async def test_the_remembered_resources_forget_removed_switches_and_entries_and_another_bridges(
+    hass: HomeAssistant, hass_storage: dict[str, Any], lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+) -> None:
+    entry = paired(switch(lights=["Ceiling", "Desk"]), switch(OTHER_DEVICE_ID, None, lights=[], groups=["Hall"]))
+    await start(hass, entry)
+    await tick(freezer, SAVE_DELAY)
+
+    def stored() -> list[tuple[str, str]]:
+        return [(item["switch"], item["entry"]) for item in hass_storage[store_key(entry)]["data"]["resources"]]
+
+    assert stored() == [(DEVICE_ID, "ceiling"), (DEVICE_ID, "desk"), (OTHER_DEVICE_ID, "hall")]
+
+    # The bridge stops answering, so only the configuration's changes reach the store.
+    bridge.fail("/clip/v2/resource/bridge", 503)
+    hall = subentry_of(entry)
+    hass.config_entries.async_update_subentry(entry, hall, data={**hall.data, CONF_LIGHTS: ["Desk"]})
+    hass.config_entries.async_remove_subentry(entry, subentry_of(entry, OTHER_DEVICE_ID).subentry_id)
+    await settle()
+    await tick(freezer, SAVE_DELAY)
+
+    assert stored() == [(DEVICE_ID, "desk")]
+
+    hass.config_entries.async_update_entry(entry, data={**entry.data, CONF_BRIDGE_ID: "001788FFFE000002"})
+    await settle()
+    await tick(freezer, SAVE_DELAY)
+
+    assert hass_storage[store_key(entry)]["data"] == {"bridge_id": "001788FFFE000002", "resources": []}
+
+
+async def test_the_remembered_resources_are_written_as_the_entry_unloads_and_removed_with_it(
+    hass: HomeAssistant, hass_storage: dict[str, Any], lan: Lan, bridge: Bridge
+) -> None:
+    entry = paired(switch())
+    await start(hass, entry)
+    assert store_key(entry) not in hass_storage
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+    assert hass_storage[store_key(entry)]["data"]["resources"] == [record("ceiling", "light", "l1", "Ceiling")]
+
+    await start(hass, entry)
+    assert await hass.config_entries.async_remove(entry.entry_id)
+
+    assert store_key(entry) not in hass_storage
+
+
+async def test_the_switch_test_resolves_with_the_remembered_resources(
+    hass: HomeAssistant, hass_storage: dict[str, Any], lan: Lan, bridge: Bridge
+) -> None:
+    """Another light took the name: the entry stays with the light that it found, as a press does."""
+    entry = paired(switch(lights=["Ceiling"]))
+    remember(hass_storage, entry, record("ceiling", "light", "l1", "Ceiling"), bridge_id=BRIDGE_ID)
+    bridge.names["l2"] = "Ceiling"
+    runtime_data = await start(hass, entry)
+
+    result = await runtime_data.async_test_toggle(DEVICE_ID)
+
+    assert (result.targets, result.problems) == (("light 'Ceiling' (l1)",), ())
+    assert bridge.puts() == [("l1", True)]
 
 
 # Reauthentication.

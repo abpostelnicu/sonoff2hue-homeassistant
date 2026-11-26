@@ -222,9 +222,16 @@ another, with one command each. It also switches the lights that you add to it l
 Once saved, the switch works within seconds: sonoff2hue restarts its connection to the bridge with the new switch.
 
 The switch keeps the names of its lights, rooms and zones, or their ids where two have the same name, and finds them on
-the bridge by those, without regard to case. When it no longer finds one, for example because it was renamed or deleted
-in the Hue app, the switch goes on toggling the others, and the repair *Some lights, rooms or zones of … are missing*
-says which one and why. The other switches aren't affected.
+the bridge by those, without regard to case. sonoff2hue also remembers which light, room or zone each of them found, in
+Home Assistant's storage (`.storage/sonoff2hue.<entry id>`, deleted with the integration):
+
+- When you rename one in the Hue app, the switch still finds it, and sonoff2hue saves the new name in the switch, as
+  *Switch settings* would save it: the new name, or the id when another one of its kind has that name. It then
+  restarts its connection to the bridge with the new name. It notices a rename when it starts, and when its bridge or
+  its switches change.
+- When it no longer finds one, for example because it was deleted in the Hue app, the switch goes on toggling the
+  others, and the repair *Some lights, rooms or zones of … are missing* says which one and why. The other switches
+  aren't affected.
 
 If the bridge can't list its lights, because it isn't paired or doesn't answer, choose *Try again* or *Enter them by
 hand*: light names or ids, and rooms and zones as `room:Name` or `zone:Name` (or ids), separated by commas. If the
@@ -353,7 +360,7 @@ sonoff2hue reports these in Settings → System → Repairs:
   such as a switch without any light, room or zone, or a device id that two switches have. Until it's fixed, no switch
   toggles anything. Fix the switch with *Edit switch*, or pair the bridge again with *Reconfigure*.
 - *Some lights, rooms or zones of … are missing*: the switch can't toggle some of its lights, rooms or zones, and it
-  lists why: one isn't on the bridge, because it was renamed or deleted in the Hue app, a name matches several of them,
+  lists why: one isn't on the bridge, for example because it was deleted in the Hue app, a name matches several of them,
   or a room or zone has no lights. The switch goes on toggling the others, and when none is left, each press fails.
   The other switches aren't affected. Edit the switch to choose them again. If you fix them in the Hue app instead,
   reload the integration (⋮ → *Reload*): sonoff2hue looks them up again when it starts, or when its bridge or its

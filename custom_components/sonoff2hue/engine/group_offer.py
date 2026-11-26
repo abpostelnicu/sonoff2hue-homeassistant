@@ -16,9 +16,9 @@ from dataclasses import dataclass, replace
 
 from .config import SwitchSettings
 from .hue_client import HueGroup, HueLight
-from .picker import encode_group, resolve_group
+from .picker import resolve_group
 from .switch_rules import BridgeLists, SwitchInput
-from .targets import GroupKind, name_key, refers_to
+from .targets import GroupKind, encode_group, name_key, refers_to
 
 MAX_NAME_LENGTH = 32
 """The characters of a room's or zone's name on the bridge."""
