@@ -512,3 +512,34 @@ async def test_discovery_reads_the_clouds_answer_as_json(cloud: list[web.Respons
         DiscoveredBridge("192.0.2.31", None, "discovery.meethue.com"),
         DiscoveredBridge("2001:db8::1", "001788fffe000001", "discovery.meethue.com"),
     ]
+
+
+class NoCloud:
+    """A session for discovery that fails the test when Signify's endpoint is asked."""
+
+    def get(self, *args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("Signify's discovery endpoint was asked.")
+
+
+async def test_discovery_can_leave_the_cloud_out() -> None:
+    """As the bridge supervisor asks between two requests to Signify's endpoint (decision 33)."""
+    network = FakeNetwork()
+    task = asyncio.create_task(
+        hue_setup.discover(NoCloud(), 0.2, lambda: MdnsListener(network.open, network.watch), cloud=False)  # type: ignore[arg-type]
+    )
+    await network.next_open()
+    network.deliver(hue_announcement("Hue Bridge - 1", "001788fffe000001", host="192.0.2.10"), ("192.0.2.99", 5353))
+
+    assert await task == [DiscoveredBridge("192.0.2.10", "001788fffe000001", "mDNS")]
+
+
+async def test_discovery_can_leave_mdns_out(cloud: list[web.Response]) -> None:
+    cloud.append(web.json_response([{"id": "001788fffe000003", "internalipaddress": "192.0.2.30"}]))
+
+    def no_listener() -> MdnsListener:
+        raise AssertionError("mDNS was asked.")
+
+    async with aiohttp.ClientSession() as session:
+        bridges = await hue_setup.discover(session, 0.2, no_listener, mdns=False)
+
+    assert bridges == [DiscoveredBridge("192.0.2.30", "001788fffe000003", "discovery.meethue.com")]

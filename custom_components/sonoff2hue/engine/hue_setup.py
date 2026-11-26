@@ -2,7 +2,7 @@
 
 Discovery runs for 5 seconds: it asks for ``_hue._tcp.local`` with an mDNS listener of its own, from the integration's
 own mDNS layer, and asks Signify's discovery endpoint, which lists the bridges that reach the internet from this
-network. It lists the bridges by address, each as the first answer for that address gave it.
+network, or only one of the two. It lists the bridges by address, each as the first answer for that address gave it.
 
 Pairing reads the bridge's public config and pins the certificate it presents (trust on first use), then asks the bridge
 for an application key every 2 seconds for 60 seconds, while the user presses its link button.
@@ -83,16 +83,20 @@ async def discover(
     session: aiohttp.ClientSession,
     duration: float = DISCOVERY_TIMEOUT,
     listener_factory: Callable[[], MdnsListener] = MdnsListener,
+    *,
+    mdns: bool = True,
+    cloud: bool = True,
 ) -> list[DiscoveredBridge]:
     """Bridges found with mDNS and with Signify's discovery endpoint within ``duration`` seconds: the first answer for
-    each address, sorted by address."""
+    each address, sorted by address. ``mdns=False`` leaves mDNS out, and ``cloud=False`` Signify's endpoint."""
     found: dict[str, DiscoveredBridge] = {}
-    # Both run to the end; then the first failure, if any, is raised.
-    outcomes = await asyncio.gather(
-        _discover_mdns(found, duration, listener_factory),
-        _discover_cloud(found, duration, session),
-        return_exceptions=True,
-    )
+    searches: list[Awaitable[None]] = []
+    if mdns:
+        searches.append(_discover_mdns(found, duration, listener_factory))
+    if cloud:
+        searches.append(_discover_cloud(found, duration, session))
+    # They run to the end; then the first failure, if any, is raised.
+    outcomes = await asyncio.gather(*searches, return_exceptions=True)
     for outcome in outcomes:
         if isinstance(outcome, BaseException):
             raise outcome
