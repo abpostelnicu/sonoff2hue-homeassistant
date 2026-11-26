@@ -617,10 +617,22 @@ folder, and `scripts/setup` done.
 Each version is a GitHub Release, "sonoff2hue X.Y.Z" on the tag `vX.Y.Z`. Home Assistant's Marketplace installs and
 updates the integration from these Releases, and shows their notes before an update. It shows this README as it is at
 the tag of the Release it offers, so a change to the README reaches the Marketplace with the next release. A published
-Release never changes: a fix comes as the next version.
+Release can't be undone: its tag can't be moved or deleted, so a fix comes as the next version. Versions are released
+in rising order.
 
-To release, raise `version` in `custom_components/sonoff2hue/manifest.json` through a pull request, then tag the merged
-commit on `main` and push the tag. The Release workflow checks the tag and creates the Release.
+To release, open a release pull request that raises `version` in `custom_components/sonoff2hue/manifest.json` to X.Y.Z
+and adds the release's notes as `.github/release-notes/vX.Y.Z.md`, written for users: they become the Release's notes
+as they are. Once it is merged and CI passes on `main`, the *Tag the release* workflow tags the merged commit `vX.Y.Z`,
+and the *Release* workflow checks the tag and publishes the Release with those notes.
+
+CI has to pass on the release commit itself. If it fails there, or is cancelled because something else was pushed to
+`main` while it ran, the release commit isn't tagged, and the next commit of `main` whose CI passes, which still has the
+notes, would get the tag instead: the release would include the changes merged after it. So if CI fails or is
+cancelled on the release commit, re-run it (`gh run rerun <id>`, or *Re-run jobs* on its page) before merging anything
+else: when the re-run passes, the release commit itself is tagged.
+
+Pushing a tag by hand still works: tag the merged commit on `main` and push the tag, and the Release workflow checks it
+and publishes the Release, with the commit's notes file if it has one, or else notes that GitHub generates.
 
 ```sh
 git switch main && git pull --ff-only

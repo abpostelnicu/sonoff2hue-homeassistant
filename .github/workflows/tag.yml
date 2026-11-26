@@ -1,0 +1,203 @@
+name: Tag the release
+
+# Releases a merged release pull request (decision 37). Such a pull request raises the version in
+# custom_components/sonoff2hue/manifest.json to X.Y.Z and adds the release's notes as .github/release-notes/vX.Y.Z.md,
+# the file that marks a release commit. Once CI passes on that commit on main, this workflow tags it vX.Y.Z, as
+# `git tag -a vX.Y.Z -m "sonoff2hue X.Y.Z"` would, and runs the Release workflow (release.yml) on the tag, which checks
+# the tag again and creates the GitHub Release with those notes. A tag that a workflow creates with its GITHUB_TOKEN
+# starts no workflow, so its push wouldn't run release.yml, but a dispatch does. A tag pushed by hand still releases.
+#
+# It runs after every CI run on main. Most commits aren't release commits: then the check passes with a notice, and
+# nothing is tagged. A commit after the release commit still has its notes file, but by then vX.Y.Z is on the release
+# commit, before it, and it isn't tagged either.
+#
+# CI must pass on the release commit itself. If it fails there, from a flaky test for example, or is cancelled because a
+# newer push to main started CI again (CI's concurrency group cancels the older run), this workflow doesn't tag the
+# release commit. The next commit of main whose CI passes still has the notes file, so that commit would get the tag
+# vX.Y.Z, and the release would include the changes merged after the release commit. So if CI fails or is cancelled on
+# the release commit, re-run it (gh run rerun <id>, or Re-run jobs) before merging anything else: the re-run's success
+# tags the release commit itself.
+#
+# .github/scripts/release-test.sh runs both jobs' steps against a stand-in for gh.
+on:
+  workflow_run:
+    # ci.yml's name. GitHub starts this workflow only from the default branch's copy of this file, and branches filters
+    # the branch that the CI run ran on.
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+# One run at a time, so that each one sees the tag that the one before it made. A run waits while another one runs; a
+# third run meanwhile cancels the waiting one, which then has to be run again.
+concurrency:
+  group: tag
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check the release commit
+    # Only after CI passed on a push to main. A pull request's CI runs on its own branch, which may be called main too,
+    # as a fork's often is; a run of CI by hand doesn't count, only a re-run of the push's run does; and a run that
+    # failed or was cancelled tested nothing.
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # For the tag job: X.Y.Z, the commit, and whether to tag it.
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      sha: ${{ github.event.workflow_run.head_sha }}
+      tag: ${{ steps.release.outputs.tag }}
+    env:
+      # The commit that CI passed on. This run's own github.sha is main's newest commit, which may be a later one.
+      SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          # With main's history, for the checks that the commit is on main and comes after its tag.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Read the version in manifest.json
+        id: version
+        run: |
+          version=$(.github/scripts/release.sh manifest-version "$SHA")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # The notes file marks a release commit, and vX.Y.Z names the commit once it is released: this commit, if CI ran
+      # again on it, or the release commit before it.
+      - name: Look for the release notes and the tag
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          notes=.github/release-notes/v$VERSION.md
+          tag=v$VERSION
+          # git ls-tree shows the file's entry if the commit has it, and nothing if it hasn't.
+          entry=$(git ls-tree "$SHA" -- "$notes")
+          if [[ $entry != *" blob "* ]]; then
+            echo "::notice::Not a release commit: $SHA has no $notes for the version in its manifest.json, $VERSION. Nothing was tagged."
+            echo "tag=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "$SHA has $notes."
+          status=0
+          tagged=$(gh api "repos/$GITHUB_REPOSITORY/commits/refs/tags/$tag" --jq .sha 2>&1) || status=$?
+          if [ "$status" -ne 0 ]; then
+            # GitHub answers 422 "No commit found for SHA: refs/tags/vX.Y.Z" when there is no such tag.
+            if [[ $tagged != *"(HTTP 422)"* ]]; then
+              printf '%s\n' "$tagged"
+              echo "::error::Couldn't find out whether $tag exists. Nothing was tagged; run this job again."
+              exit 1
+            fi
+            echo "$tag doesn't exist yet: $SHA is the release commit of $VERSION."
+            echo "tag=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$tagged" = "$SHA" ]; then
+            echo "::notice::$tag names this commit already. Nothing was tagged. If the Release workflow didn't run for it, run it on the tag: gh workflow run release.yml --ref $tag"
+          elif git merge-base --is-ancestor "$tagged" "$SHA" 2> /dev/null; then
+            echo "::notice::$tag names $tagged, a commit before this one, so this isn't the release commit of $VERSION. Nothing was tagged."
+          else
+            echo "::error::$tag names $tagged, which is neither this commit, $SHA, nor one before it, so this commit can't be released as $VERSION. Nothing was tagged."
+            exit 1
+          fi
+          echo "tag=false" >> "$GITHUB_OUTPUT"
+
+      # CI ran on a push to main, but main may have been reset since.
+      - name: Check that the commit is on main
+        if: steps.release.outputs.tag == 'true'
+        run: .github/scripts/release.sh check-main "$SHA" origin/main
+
+      # The Marketplace offers the newest Release, not the highest version, so versions are released in rising order.
+      # The released versions are the tags vX.Y.Z of the published GitHub Releases.
+      - name: Check that X.Y.Z is higher than every released version
+        if: steps.release.outputs.tag == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          released=$(.github/scripts/release.sh released "$GITHUB_REPOSITORY")
+          .github/scripts/release.sh check-higher "$VERSION" <<< "$released"
+
+  tag:
+    # Tags the release commit vX.Y.Z and runs the Release workflow on the tag. It's the only job that may write: the
+    # repository's contents, for the tag, and its Actions, for the run. It doesn't check out the repository, so none of
+    # the repository's code runs with those permissions.
+    name: Tag and release
+    needs: check
+    if: needs.check.outputs.tag == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.check.outputs.version }}
+      SHA: ${{ needs.check.outputs.sha }}
+    steps:
+      # An annotated tag, as git tag -a makes it: a tag object, then the ref refs/tags/vX.Y.Z that names it. The tagger
+      # is the token's own account, and the date is given because the API doesn't say which one it would take.
+      - name: Tag the commit vX.Y.Z
+        id: tag
+        run: |
+          strict='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          commit='^[0-9a-f]{40}$'
+          if [[ ! $VERSION =~ $strict || ! $SHA =~ $commit ]]; then
+            echo "::error::The check job handed over the version '$VERSION' and the commit '$SHA', which aren't a version X.Y.Z and a commit. Nothing was tagged."
+            exit 1
+          fi
+          tag=v$VERSION
+          if ! object=$(gh api --method POST "repos/$GITHUB_REPOSITORY/git/tags" -f tag="$tag" \
+            -f message="sonoff2hue $VERSION" -f object="$SHA" -f type=commit -f "tagger[name]=github-actions[bot]" \
+            -f "tagger[email]=41898282+github-actions[bot]@users.noreply.github.com" \
+            -f "tagger[date]=$(date -u +%Y-%m-%dT%H:%M:%SZ)" --jq .sha); then
+            echo "::error::Couldn't create the tag object of $tag, for the reason above. Nothing was tagged; run this job again."
+            exit 1
+          fi
+          status=0
+          answer=$(gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$tag" -f sha="$object" \
+            2>&1) || status=$?
+          if [ "$status" -eq 0 ]; then
+            echo "Tagged $SHA $tag."
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # The ref exists already if someone pushed the tag since the check job looked: that push ran the Release
+          # workflow, so this job doesn't run it again.
+          if ! tagged=$(gh api "repos/$GITHUB_REPOSITORY/commits/refs/tags/$tag" --jq .sha 2> /dev/null); then
+            printf '%s\n' "$answer"
+            echo "::error::Couldn't create the tag $tag, for the reason above. Nothing was tagged; run this job again."
+            exit 1
+          fi
+          if [ "$tagged" != "$SHA" ]; then
+            echo "::error::$tag names $tagged, not $SHA: it was pushed on another commit since the check job looked. Nothing was tagged."
+            exit 1
+          fi
+          echo "::notice::$tag names $SHA already: it was pushed since the check job looked, and its push ran the Release workflow. If it didn't, run it on the tag: gh workflow run release.yml --ref $tag"
+          echo "run=false" >> "$GITHUB_OUTPUT"
+
+      # A dispatch on the tag runs release.yml as the tag's push would have: on the tagged commit, with the tag as ref.
+      - name: Run the Release workflow on vX.Y.Z
+        if: steps.tag.outputs.run == 'true'
+        run: |
+          if ! gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "v$VERSION"; then
+            echo "::error::Couldn't run the Release workflow on v$VERSION, for the reason above. Run it on the tag: gh workflow run release.yml --ref v$VERSION"
+            exit 1
+          fi
+
+      - name: Show the tag and the Release workflow's runs
+        run: |
+          tag=v$VERSION
+          runs=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/workflows/release.yml
+          echo "$tag names $SHA. The Release workflow creates its GitHub Release: $runs"
+          {
+            echo "The tag: [$tag]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$tag), on $SHA."
+            echo
+            echo "The Release workflow creates its GitHub Release: [its runs]($runs)."
+          } >> "$GITHUB_STEP_SUMMARY"

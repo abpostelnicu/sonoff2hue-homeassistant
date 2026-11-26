@@ -1,14 +1,19 @@
 name: Release
 
-# A release (decision 29). Pushing a tag vX.Y.Z on a commit of main whose custom_components/sonoff2hue/manifest.json has
-# the version X.Y.Z creates the GitHub Release "sonoff2hue X.Y.Z". The Marketplace installs a Release from its tag's
-# source archive, so the Release has no files of its own. The checks run first, in a job that may only read; the next
-# job creates the Release and is the only one that may write the repository's contents. Nothing else runs this
-# workflow: not main, not pull requests and not manual runs. .github/scripts/release-test.sh runs both jobs' steps
-# against a stand-in for gh.
+# A release (decisions 29 and 37). A tag vX.Y.Z on a commit of main whose custom_components/sonoff2hue/manifest.json has
+# the version X.Y.Z gets the GitHub Release "sonoff2hue X.Y.Z", with the notes in that commit's
+# .github/release-notes/vX.Y.Z.md, or notes that GitHub generates if it has none. The Marketplace installs a Release
+# from its tag's source archive, so the Release has no files of its own. The checks run first, in a job that may only
+# read; the next job creates the Release and is the only one that may write the repository's contents. It runs when the
+# tag is pushed, and when it is run on the tag: Tag the release (tag.yml) does that after it tags a release commit of
+# main, as a tag that a workflow creates with its GITHUB_TOKEN starts no workflow. A run on anything but a tag vX.Y.Z,
+# such as main, fails the check job, and nothing is released. Nothing else runs this workflow: not main and not pull
+# requests. .github/scripts/release-test.sh runs both jobs' steps against a stand-in for gh.
 on:
   push:
     tags: ['v*.*.*']
+  # Without inputs: the run's ref, the tag, is all it needs.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -35,7 +40,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           # The tagged commit itself rather than the tag, so that the checks see the commit that gets the Release even
-          # if the tag is moved during the run.
+          # if the tag is moved during the run. A run on a tag has the same github.sha and github.ref as its push.
           ref: ${{ github.sha }}
           # With main's history, for the check that the tagged commit is on main.
           fetch-depth: 0
@@ -73,11 +78,11 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
   release:
-    # Creates the GitHub Release "sonoff2hue X.Y.Z" for the tag vX.Y.Z, with notes that GitHub generates from the pull
-    # requests merged since the previous release. It runs only once the checks have passed, since with immutable
-    # releases a Release locks its tag for good. It's the only job that may write the repository's contents, which a
-    # Release needs. It doesn't check out the repository, so none of the repository's code runs with that permission,
-    # and it never creates or moves a tag.
+    # Creates the GitHub Release "sonoff2hue X.Y.Z" for the tag vX.Y.Z, with the notes of the release pull request,
+    # .github/release-notes/vX.Y.Z.md, or else notes that GitHub generates from the pull requests merged since the
+    # previous release. It runs only once the checks have passed, since with immutable releases a Release locks its tag
+    # for good. It's the only job that may write the repository's contents, which a Release needs. It doesn't check out
+    # the repository, so none of the repository's code runs with that permission, and it never creates or moves a tag.
     name: GitHub Release
     needs: check
     runs-on: ubuntu-latest
@@ -146,8 +151,27 @@ jobs:
             fi
           fi
           options=(--repo "$GITHUB_REPOSITORY" --verify-tag --target "$GITHUB_SHA" --title "sonoff2hue $VERSION"
-            --generate-notes --latest="$latest")
-          if [ -n "$PREVIOUS" ]; then options+=(--notes-start-tag "v$PREVIOUS"); fi
+            --latest="$latest")
+          # The notes: the tagged commit's .github/release-notes/vX.Y.Z.md, exactly, which a release pull request adds.
+          # The contents API reads it without a checkout, and its raw media type answers with the file itself. Without
+          # it, GitHub generates the notes from the pull requests merged since the previous release.
+          notes=.github/release-notes/$tag.md
+          status=0
+          gh api "repos/$GITHUB_REPOSITORY/contents/$notes?ref=$GITHUB_SHA" \
+            -H "Accept: application/vnd.github.raw+json" > "$RUNNER_TEMP/notes.md" 2> "$RUNNER_TEMP/notes.log" \
+            || status=$?
+          if [ "$status" -eq 0 ]; then
+            echo "The notes: $notes, as the tagged commit has it."
+            options+=(--notes-file "$RUNNER_TEMP/notes.md")
+          elif grep -qF "(HTTP 404)" "$RUNNER_TEMP/notes.log"; then
+            echo "The tagged commit has no $notes, so GitHub generates the notes."
+            options+=(--generate-notes)
+            if [ -n "$PREVIOUS" ]; then options+=(--notes-start-tag "v$PREVIOUS"); fi
+          else
+            cat "$RUNNER_TEMP/notes.log"
+            echo "::error::Couldn't read $notes in the tagged commit. No GitHub Release was created; run this job again."
+            exit 1
+          fi
           echo "gh release create $tag$(printf ' %q' "${options[@]}")"
           if ! gh release create "$tag" "${options[@]}"; then
             echo "::error::gh couldn't create the GitHub Release $tag, for the reason above. Run this job again once that's fixed."

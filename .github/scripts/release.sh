@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
-# The checks of the Release workflow (.github/workflows/release.yml, decision 29). A release is a tag vX.Y.Z on a commit
-# of main whose custom_components/sonoff2hue/manifest.json has the version X.Y.Z. It gets the GitHub Release
-# "sonoff2hue X.Y.Z", from which the Marketplace installs the tag's source tree. The Release is Latest if X.Y.Z is the
-# highest released version, and its notes start at the highest released version below X.Y.Z. The released versions are
-# the tags vX.Y.Z of the repository's published GitHub Releases. Git tags alone don't count, so a stray or refused tag,
-# such as a v9.9.9 that the checks stopped, changes neither.
+# The checks of the Release workflow (.github/workflows/release.yml, decision 29) and of Tag the release
+# (.github/workflows/tag.yml, decision 37). A release is a tag vX.Y.Z on a commit of main whose
+# custom_components/sonoff2hue/manifest.json has the version X.Y.Z. It gets the GitHub Release "sonoff2hue X.Y.Z", from
+# which the Marketplace installs the tag's source tree. The Release is Latest if X.Y.Z is the highest released version,
+# and its notes start at the highest released version below X.Y.Z. The released versions are the tags vX.Y.Z of the
+# repository's published GitHub Releases. Git tags alone don't count, so a stray or refused tag, such as a v9.9.9 that
+# the checks stopped, changes neither.
 #
 #   release.sh version <ref>                  the tag is exactly vX.Y.Z: prints X.Y.Z for refs/tags/vX.Y.Z
 #   release.sh check-version <X.Y.Z> <commit> X.Y.Z is the version in the commit's
 #                                             custom_components/sonoff2hue/manifest.json
+#   release.sh manifest-version <commit>      the version in the commit's custom_components/sonoff2hue/manifest.json
+#                                             is exactly X.Y.Z: prints X.Y.Z
 #   release.sh check-main <commit> [<main>]   the commit is on main (default origin/main; needs main's history)
 #   release.sh released <owner/repository>    the released versions: the tags vX.Y.Z of the repository's published
 #                                             GitHub Releases, neither drafts nor pre-releases, as X.Y.Z in numeric
@@ -17,11 +20,12 @@
 #                                             highest of itself and the released versions on stdin, else false
 #   release.sh previous <X.Y.Z>               where the GitHub Release's notes start: the highest released version
 #                                             below X.Y.Z, from the released versions on stdin, or nothing
+#   release.sh check-higher <X.Y.Z>           X.Y.Z is higher than every released version on stdin
 #
 # A check that fails prints a GitHub Actions error on stderr and exits with 1; wrong usage exits with 2. It needs bash
-# 3.2 or later and git, and check-version and released need python3; released also needs gh.
-# .github/scripts/release-test.sh tests it, and the whole workflow, without a network: with a scratch git repository
-# and a stand-in for gh.
+# 3.2 or later and git, and check-version, manifest-version and released need python3; released also needs gh.
+# .github/scripts/release-test.sh tests it, and both workflows, without a network: with a scratch git repository and a
+# stand-in for gh.
 set -euo pipefail
 
 manifest_path=custom_components/sonoff2hue/manifest.json
@@ -65,7 +69,12 @@ versions() {
 cmd_version() { # ref
     [ $# -eq 1 ] || usage
     local tag=${1#refs/tags/}
-    if [ "$tag" = "$1" ] || [[ ! $tag =~ $tag_re ]]; then
+    # A manual run can be started on a branch, such as main, as well as on a tag.
+    if [ "$tag" = "$1" ]; then
+        fail "$1 isn't a tag. Only a tag vX.Y.Z is released, when it is pushed or when the Release workflow is run" \
+            "on it (gh workflow run release.yml --ref vX.Y.Z). No GitHub Release was created."
+    fi
+    if [[ ! $tag =~ $tag_re ]]; then
         fail "$tag isn't a release tag. Only a tag vX.Y.Z is released: three numbers without leading zeros and" \
             "without a suffix such as -rc.1, for example v1.2.3. No GitHub Release was created."
     fi
@@ -112,6 +121,44 @@ cmd_check_version() { # X.Y.Z commit
         *) fail "Couldn't read the version in the tagged commit's $manifest_path (exit code $status):" \
             "$(cat "$work/errors") No GitHub Release was created." ;;
     esac
+}
+
+# Prints the version of the manifest on stdin as JSON, such as "1.2.3", and exits with 1 and the reason on stderr if
+# the manifest isn't a JSON object with a version.
+read_version_py=$(
+    cat << 'PY'
+import json
+import sys
+
+try:
+    manifest = json.loads(sys.stdin.buffer.read())
+except ValueError as error:
+    sys.exit(f"isn't valid JSON ({error})")
+if not isinstance(manifest, dict):
+    sys.exit("isn't a JSON object")
+if "version" not in manifest:
+    sys.exit("has no version")
+print(json.dumps(manifest["version"], ensure_ascii=False))
+PY
+)
+
+cmd_manifest_version() { # commit
+    [ $# -eq 1 ] || usage
+    local commit=$1 declared version
+    make_work
+    git show "$commit:$manifest_path" > "$work/manifest" 2> /dev/null \
+        || fail "Couldn't read $manifest_path in the commit $commit. Nothing was tagged."
+    declared=$(python3 -c "$read_version_py" < "$work/manifest" 2> "$work/errors") \
+        || fail "$manifest_path in the commit $commit $(cat "$work/errors"). Nothing was tagged."
+    # A JSON string of exactly X.Y.Z: not a number, and nothing escaped.
+    version=${declared#\"}
+    version=${version%\"}
+    if [ "\"$version\"" != "$declared" ] || [[ ! $version =~ $version_re ]]; then
+        fail "The version in $manifest_path in the commit $commit, $declared, isn't X.Y.Z: three numbers without" \
+            "leading zeros and without a suffix, for example 1.2.3. Nothing was tagged."
+    fi
+    echo "$version is the version in the commit's $manifest_path." >&2
+    printf '%s\n' "$version"
 }
 
 cmd_check_main() { # commit [main]
@@ -226,14 +273,33 @@ cmd_previous() { # X.Y.Z, with the released versions on stdin
     printf '%s\n' "$previous"
 }
 
+cmd_check_higher() { # X.Y.Z, with the released versions on stdin
+    [ $# -eq 1 ] || usage
+    [[ $1 =~ $version_re ]] || usage
+    local version=$1 highest
+    highest=$(versions | tail -n 1)
+    if [ -z "$highest" ]; then
+        echo "No version is released yet, so $version is the first."
+    elif [ "$highest" != "$version" ] \
+        && [ "$(printf '%s\n' "$highest" "$version" | versions | tail -n 1)" = "$version" ]; then
+        echo "$version is higher than every released version, the highest of which is $highest."
+    else
+        fail "$version isn't higher than every released version: $highest is released. The Marketplace offers the" \
+            "newest Release, so versions are released in rising order: raise the version above $highest. Nothing" \
+            "was tagged."
+    fi
+}
+
 command=${1:-}
 [ $# -eq 0 ] || shift
 case $command in
     version) cmd_version "$@" ;;
     check-version) cmd_check_version "$@" ;;
+    manifest-version) cmd_manifest_version "$@" ;;
     check-main) cmd_check_main "$@" ;;
     released) cmd_released "$@" ;;
     latest) cmd_latest "$@" ;;
     previous) cmd_previous "$@" ;;
+    check-higher) cmd_check_higher "$@" ;;
     *) usage ;;
 esac
