@@ -1,27 +1,31 @@
 # sonoff2hue for Home Assistant
 
-A Home Assistant integration that toggles Philips Hue lights from Sonoff **MINIR4M** wall switches. The wall switch is
-wired to a MINIR4M in detached relay mode. When you operate it, sonoff2hue toggles the Hue lights, rooms and zones that
-you mapped to that MINIR4M. Presses and toggles stay on your LAN: it needs no eWeLink or Hue cloud, and no Matter.
+A Home Assistant integration that toggles lights from Sonoff **MINIR4M** wall switches. The wall switch is wired to a
+MINIR4M in detached relay mode. When you operate it, sonoff2hue toggles the lights that you mapped to that MINIR4M:
+any of Home Assistant's lights, such as the lights, rooms and zones of its Philips Hue integration. Presses stay on your
+LAN: sonoff2hue needs no eWeLink cloud and no Matter.
 
 ```
-wall switch ──S1/S2──> MINIR4M ──mDNS broadcast──> Home Assistant (sonoff2hue) ──HTTPS (CLIP v2)──> Hue bridge ──> lights
-               (detached relay mode)     (LAN)
+wall switch ──S1/S2──> MINIR4M ──mDNS broadcast──> sonoff2hue ──light actions──> Hue integration ──> bridge ──> lights
+               (detached relay mode)     (LAN)    (Home Assistant)              (or another light's integration)
 ```
 
-- Each MINIR4M can toggle any number of Hue lights, rooms and zones.
+- Each MINIR4M can toggle any number of lights.
 - Toggle rule: if any of a switch's lights is on, all of them are turned off; otherwise all are turned on.
 - It works with both rocker and push-button wall switches. Every operation of the switch toggles.
 
-You set sonoff2hue up and use it in Home Assistant's own UI: its dialogs pair the bridge and map the switches, each
-switch is a device with its entities, and Repairs, the Activity panel and the diagnostics show what it does. It talks to
-the Hue bridge and listens to the switches on its own, so it needs neither Home Assistant's Hue integration nor
-SonoffLAN.
+You set sonoff2hue up and use it in Home Assistant's own UI: its dialogs map the switches to your lights with Home
+Assistant's own picker, each switch is a device with its entities, and Repairs, the Activity panel and the diagnostics
+show what it does. It listens to the switches on its own, so it doesn't need SonoffLAN. It switches the lights through
+Home Assistant, so Hue lights need Home Assistant's Philips Hue integration, set up with your bridge.
+
+Coming from sonoff2hue 1.x, which paired the Hue bridge itself? Upgrading from sonoff2hue 1.x, under Setup, says what
+changes.
 
 ## How it works
 
-In detached relay mode, the MINIR4M's relay stays closed, so the Hue bulbs always have power. The wall switch on S1/S2
-no longer cuts the power; it only reports to the MINIR4M.
+In detached relay mode, the MINIR4M's relay stays closed, so the lights always have power. The wall switch on S1/S2 no
+longer cuts the power; it only reports to the MINIR4M.
 
 eWeLink devices announce their state on the LAN with mDNS, as a `_ewelink._tcp` service. The announcement carries a
 sequence number (`seq`) and the device's parameters, encrypted with its device key. The MINIR4M sends the button event
@@ -37,12 +41,13 @@ ask which eWeLink devices are on the LAN.
 - A new `seq` is a press, unless the relay or a setting changed. Telling those apart needs the switch's device key.
 - Repeated announcements are ignored. When a switch restarts or rejoins Wi-Fi, its next announcement only sets a new
   baseline.
-- On a press, sonoff2hue reads the state of the mapped lights, rooms and zones from the bridge, and switches them all on
-  or all off. A room or a zone takes one command.
-- It keeps its HTTPS connection to the bridge open, with a request every 45 seconds, so that a press doesn't wait for a
-  new connection. A press that waited more than 5 seconds for the bridge is dropped.
-- It pins the bridge's certificate when it pairs, and from then on talks only to a bridge with that certificate. The
-  usual check of a certificate can't work here: the bridge's certificate names its bridge id, not its address.
+- On a press, sonoff2hue looks at the states of the switch's lights in Home Assistant, and turns them all on or all off
+  with Home Assistant's actions `light.turn_on` and `light.turn_off`: one call per light, all at the same time, each
+  within 5 seconds. A light that is already so is left alone, and one that is unavailable counts as failed.
+- Each light's own integration switches it: for Hue lights, Home Assistant's Hue integration, over its connection to
+  the bridge. A Hue room or zone is a light too, which switches all its lights with one command.
+- The presses of one switch are toggled one after another. A press that waited more than 5 seconds for the one before
+  it is dropped.
 
 ## Requirements
 
@@ -54,8 +59,8 @@ ask which eWeLink devices are on the LAN.
     sets it up.
   - In a virtual machine, the network adapter has to be bridged to the LAN: NAT doesn't pass on the LAN's multicast.
 - The MINIR4Ms added to the eWeLink app, each with **Detach relay** (detached relay mode) turned on in its settings.
-- A Philips Hue bridge with the local CLIP v2 API, the Hue Bridge v2 (the square one) or the Hue Bridge Pro, which Home
-  Assistant can reach over HTTPS.
+- The lights in Home Assistant. For Philips Hue, that's Home Assistant's Philips Hue integration, set up with your Hue
+  bridge; sonoff2hue doesn't connect to the bridge itself. Any other light works too, such as a Matter or Zigbee light.
 - Nothing else that toggles the same lights when the switches are pressed, such as sonoff2hue in a second Home
   Assistant. With both running, every press would toggle the lights twice, and they would end up as they were.
 
@@ -67,10 +72,8 @@ ask which eWeLink devices are on the LAN.
 
 [![Open your Home Assistant instance and open this repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=abpostelnicu&repository=sonoff2hue-homeassistant&category=integration)
 
-1. Select the button above to open sonoff2hue in your Home Assistant's Marketplace. Or go to Settings → Marketplace →
-   *Add from link*, and enter `https://github.com/abpostelnicu/sonoff2hue-homeassistant` as the *GitHub link*, with
-   *Integration* as its *Type*. Adding a repository from its link needs a GitHub connection, which the Marketplace asks
-   for.
+1. In Home Assistant, go to Settings → Marketplace, search for sonoff2hue, and open it. Or select the button above,
+   which opens it in your Home Assistant's Marketplace.
 2. On sonoff2hue's page in the Marketplace, select *Install*.
 3. Select *Restart Home Assistant*. Then set sonoff2hue up, as Setup describes.
 
@@ -92,98 +95,39 @@ To update, replace the folder with the one of the new release, and restart Home 
 
 [![Open your Home Assistant instance and start setting up sonoff2hue.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=sonoff2hue)
 
-Go to Settings → Devices & services → *Add integration*, and choose **sonoff2hue**. It pairs the Hue bridge first, and
-you add the switches after that. sonoff2hue works with one Hue bridge.
+1. Set up the lights first. For Hue lights, add Home Assistant's Philips Hue integration with your bridge, if it isn't
+   there yet: it adds the bridge's lights, rooms and zones.
+2. Go to Settings → Devices & services → *Add integration*, choose **sonoff2hue**, and select *Submit* in *Set up
+   sonoff2hue*. There is nothing to pair.
+3. sonoff2hue then opens *Add switch*, to add your first switch, as Switches describes.
 
-### Pairing the Hue bridge
+### Upgrading from sonoff2hue 1.x
 
-1. Choose how to find the bridge:
-   - *Find bridges* searches your network for about 5 seconds, with mDNS and with Philips Hue's discovery service,
-     `discovery.meethue.com`. Choose the bridge, which shows its address, its bridge id and how it was found, or
-     *Another address*.
-   - *Enter the bridge address*: its IP address or host name, optionally with `:port`.
-2. sonoff2hue reads the bridge and shows its name, model, bridge id, firmware and address, and the SHA-256 of the
-   certificate that it pins from now on.
-3. Press the round link button on top of the bridge within 60 seconds. If the time runs out, choose *Retry* or *Choose
-   another bridge*. Closing the dialog stops the pairing.
+sonoff2hue 1.x paired the Hue bridge itself, and its switches named the bridge's lights, rooms and zones. From 2.0, it
+toggles Home Assistant's lights instead. Before you update:
 
-Then add your switches, as Switches describes.
+1. Set up Home Assistant's Philips Hue integration with your bridge, if it isn't there yet, and check that it shows
+   your lights, rooms and zones.
+2. Take a backup of Home Assistant. The update can't be undone: Home Assistant doesn't set sonoff2hue 1.x up with the
+   configuration that 2.0 leaves, so going back means restoring the backup.
 
-### Importing a sonoff2hue.yaml
+When Home Assistant starts with 2.0, sonoff2hue moves its configuration over by itself:
 
-When you add the integration, you can import the bridge and the switches from a `sonoff2hue.yaml` instead of pairing
-the bridge and adding the switches one by one: choose *Import sonoff2hue.yaml*, and paste the whole file. If something
-else already toggles the lights for these switches, stop it first: with both running, every press would toggle the
-lights twice.
-
-The file holds the Hue bridge under `hue`, and one entry per MINIR4M under `switches`. Its keys are case-sensitive, and
-each value is text, as written:
-
-```yaml
-hue:
-  bridgeIp: 192.0.2.10              # its IP address or host name, optionally with :port
-  appKey: <application key>         # the key that pairing with the bridge gave
-  certificateSha256: <SHA-256>      # optional: the pin of the bridge's certificate
-  bridgeId: 001788FFFE000001        # optional: sonoff2hue reads it from the bridge
-
-switches:
-  - deviceId: 1000abcdef            # the MINIR4M's eWeLink device id
-    name: Hall                      # optional
-    deviceKey: <device key>         # optional, as Device keys describes
-    lights:                         # Hue lights, by name or id
-      - Ceiling
-      - Floor lamp
-    groups:                         # rooms and zones, by name or id
-      - room:Living room
-```
-
-- `certificateSha256` is the SHA-256 of the bridge's certificate: 64 hexadecimal digits, with or without colons.
-- `groups` names rooms and zones as `lights` names lights, by name or id, without regard to case. Where a room and a
-  zone have the same name, `room:` or `zone:` says which one.
-- A setting that is missing, empty, `~` or `null` isn't set, but each entry of `lights` and `groups` has to name
-  something. Quote a value with `: ` or ` #` in it, which YAML would read otherwise: `name: "Spot #2"`.
-
-The import reads the text, then checks it:
-
-- It takes one YAML document with the keys above, each once, and refuses anything else, such as `bridgeip` for
-  `bridgeIp`, a key given twice, a list where a text belongs, or an empty entry of `lights` or `groups`. It reports
-  such a mistake where it is, such as `Config, line 4, column 3: duplicate key 'appKey'.` or
-  `Config, line 5, column 9: an entry of 'lights' is empty. Write the light's name or id, or remove the '-'.`
-- Then it checks the switches as sonoff2hue does before it runs them: at least one switch, each with a `deviceId` that
-  no other entry has, and with at least one entry in `lights` or `groups`, none of them blank. It reports these
-  problems all at once, each with the switch's place in the list, such as `switches[1]: deviceId is missing.`
-- With the bridge's `bridgeIp` and `appKey` in the file, sonoff2hue connects to the bridge with them, and with its
-  `certificateSha256` if the file has one. If that fails, it offers *Try again*, *Pair the bridge again and keep the
-  switches* or *Paste the file again*. Without them, you pair the bridge next.
-- After an error, paste the whole file again: the dialog never shows the text back, as it holds the keys.
-
-Once the file is imported:
-
-- sonoff2hue keeps the bridge's address, application key and pin, and every switch with its `deviceId`, `name`,
-  `deviceKey`, `lights` and `groups` as written. The bridge id comes from the bridge itself. Home Assistant keeps the
-  application key and the device keys, and never shows them again.
-- It looks up the lights, rooms and zones on the bridge when it starts, not during the import, and a repair lists the
-  names that it doesn't find.
-- A file without `certificateSha256` is imported too. Then the repair *The Hue bridge's certificate is not pinned*
-  offers to pair the bridge again, which pins it.
-- sonoff2hue doesn't read the file again. Change the switches in Home Assistant instead.
-
-### Pairing again or another bridge
-
-On the integration's page (Settings → Devices & services → sonoff2hue), the ⋮ menu of the sonoff2hue entry has
-*Reconfigure*: *Find bridges* or *Enter the bridge address*, then the link button, as above. Your switch mappings are
-kept. Use it to pair the bridge again, for example to pin its certificate or after its address changed, or to pair
-another bridge. Deleting the integration instead would delete its switches too.
-
-When the bridge no longer accepts sonoff2hue's application key, Home Assistant asks you to pair it again. Repairs shows
-*Authentication expired for sonoff2hue*, and Settings → Devices & services shows a sonoff2hue card with *Reconfigure*.
-Select it, select *Submit* in *Pair the Hue bridge again*, and press the bridge's link button within 60 seconds. This
-pairs the bridge at the address that sonoff2hue knows, and only the bridge it paired before; to pair another one, use
-*Reconfigure* from the menu.
+- Each switch keeps its MINIR4M, its name and its device key. Its lights, rooms and zones become the Hue integration's
+  lights, rooms and zones in Home Assistant: those that sonoff2hue 1.x last found on the bridge, by their Hue ids, or
+  else those of that name, without regard to case, when exactly one light, or one room or zone, has it.
+- What it can't find, it leaves to you: the repair *Choose the lights of … again* lists it and opens *Edit switch*.
+  Until then, the switch toggles the lights that it found.
+- The bridge's address, sonoff2hue's application key and the certificate pin are deleted, and so is the store of the
+  lights, rooms and zones that sonoff2hue 1.x remembered.
+- The *Hue bridge* device becomes sonoff2hue's service, with *Status* and *eWeLink devices seen*, which keep their
+  entity ids and history. *Reachable* is removed, as sonoff2hue no longer talks to the bridge.
+- The import of a `sonoff2hue.yaml` is gone, and so are *Reconfigure* and pairing the bridge again: the Hue integration
+  does that now.
 
 ## Switches
 
-Each switch maps one MINIR4M to the Hue lights, rooms and zones that its wall switch toggles.
+Each switch maps one MINIR4M to the lights that its wall switch toggles.
 
 ### Adding a switch
 
@@ -198,45 +142,27 @@ On the integration's page, select *Add switch*, and find the MINIR4M that the wa
 Then, in *Switch settings*:
 
 - *Name*: optional, up to 64 characters. It names the switch and its device; without a name, the device id does.
-- *Lights*, *Rooms* and *Zones*: what the switch toggles, as the bridge lists them. Choose at least one. A light shows
-  whether it is on or off, and a room or zone without lights says "no lights".
+- *Lights*: what the switch toggles, chosen with Home Assistant's own picker, which searches your lights and shows their
+  areas. Any light works, and the Hue integration's rooms and zones are lights too. Choose at least one, and at most
+  50.
 - *Advanced*: the device key, described below.
 
-When the switch would toggle two or more single lights, sonoff2hue offers a room or zone in their place before it
-saves the switch:
+When the switch would toggle two or more lights, none of them a room or zone, and a room or zone of the Hue integration
+has exactly those lights, *Use a room or zone?* offers it before sonoff2hue saves the switch:
 
-- If a room or zone on the bridge has exactly those lights, *Use room "…"* (or *Use zone "…"*) saves the switch with
-  it instead of the lights.
-- Otherwise, *Create zone "…" on the bridge* creates a zone of those lights and saves the switch with it. The zone is
-  named after the switch, or after its device id without a name: cut to the bridge's 32 characters, and with " 2",
-  " 3" and so on when a room or zone has that name already. If the bridge refuses the zone or can't be reached,
-  *Couldn't create the zone* says why, with *Try again* and *Keep the lights*.
+- *Use room "…"* (or *Use zone "…"*) saves the switch with the room or zone instead of the lights.
 - *Keep the lights* saves the switch with the lights as you chose them.
 
-The switch's other rooms and zones stay. Nothing is offered when one of them has exactly those lights already, and
-editing a switch offers the same, so a switch of single lights can move to a room or zone.
+A room or zone switches all its lights at once, with one command, where single lights take one command each. It also
+switches the lights that you add to it later in the Hue app. To have a zone of exactly a switch's lights, create it in
+the Hue app: the Hue integration adds it to Home Assistant, and editing the switch then offers it.
 
-Tip: a room or zone switches all its lights at once, with one command, where single lights are switched one after
-another, with one command each. It also switches the lights that you add to it later in the Hue app.
+Once saved, the switch works within seconds: sonoff2hue starts its switches again with the new one.
 
-Once saved, the switch works within seconds: sonoff2hue restarts its connection to the bridge with the new switch.
-
-The switch keeps the names of its lights, rooms and zones, or their ids where two have the same name, and finds them on
-the bridge by those, without regard to case. sonoff2hue also remembers which light, room or zone each of them found, in
-Home Assistant's storage (`.storage/sonoff2hue.<entry id>`, deleted with the integration):
-
-- When you rename one in the Hue app, the switch still finds it, and sonoff2hue saves the new name in the switch, as
-  *Switch settings* would save it: the new name, or the id when another one of its kind has that name. It then
-  restarts its connection to the bridge with the new name. It notices a rename when it starts, when its bridge or its
-  switches change, and within 15 minutes while it runs.
-- When it no longer finds one, for example because it was deleted in the Hue app, the switch goes on toggling the
-  others, and the repair *Some lights, rooms or zones of … are missing* says which one and why. The other switches
-  aren't affected. sonoff2hue looks for it again every minute, and notices a deletion at the next press, when the
-  bridge says that it no longer has that light, room or zone.
-
-If the bridge can't list its lights, because it isn't paired or doesn't answer, choose *Try again* or *Enter them by
-hand*: light names or ids, and rooms and zones as `room:Name` or `zone:Name` (or ids), separated by commas. If the
-bridge can't check the names when you save, *Save without checking?* asks first.
+The switch keeps its lights by Home Assistant's entity registry, so renaming a light, in the Hue app or in Home
+Assistant, and changing its entity id change nothing for the switch. When a light is removed from Home Assistant, or
+disabled, the switch goes on toggling the others, and the repair *Some lights of … are missing* says which one. The
+other switches aren't affected. When the light comes back, or is enabled again, the switch toggles it again at once.
 
 ### Device keys (optional)
 
@@ -260,24 +186,22 @@ device, replace or remove its key, or it is dropped.
 ### Changing or deleting a switch
 
 The integration's page lists the switches. A switch's *Edit switch* button, the cog, offers *Keep device …* or another
-device, then *Switch settings*. Its ⋮ menu has *Delete*, which deletes the switch with its device and entities.
+device, then *Switch settings*, with the switch's lights; it names those that are no longer in Home Assistant. Its ⋮
+menu has *Delete*, which deletes the switch with its device and entities.
 
-Changes apply at once, without a reload: sonoff2hue restarts its connection to the bridge with the new switches.
+Changes apply at once, without a reload: sonoff2hue starts its switches again with the new settings.
 
 ## Devices and entities
 
-sonoff2hue adds a device named Hue bridge, and a device for each switch, named as the switch: a SONOFF MINIR4M with its
+sonoff2hue adds a service named sonoff2hue, and a device for each switch, named as the switch: a SONOFF MINIR4M with its
 device id as serial number.
 
-The Hue bridge's device:
+sonoff2hue's service:
 
-- *Status*: what sonoff2hue is doing: *Running*, *Connecting*, *Error*, *Invalid configuration* or *Not configured*. Its
-  attributes are the *Message*, the *Problems*, and *Since*, the time either of them or the state last changed. While it
-  runs, the *Message* counts the switches and what they toggle, such as "2 wall switches toggle 5 Hue lights, rooms
-  and zones; 1 is missing.", and the *Problems* say what is missing.
-- *Reachable*: *Reachable* or *Unreachable*, whether sonoff2hue could use the bridge when it last checked, and unknown
-  before the first check. Its attributes are the bridge's *Address*, the *Message* while it is unreachable, and the
-  time it was *Checked*.
+- *Status*: what sonoff2hue is doing: *Running*, *Error*, *Invalid configuration* or *Not configured*. Its attributes
+  are the *Message*, the *Problems*, and *Since*, the time either of them or the state last changed. While it runs, the
+  *Message* counts the switches and their lights, such as "2 wall switches toggle 5 lights; 1 is missing.", and the
+  *Problems* say what is missing.
 - *eWeLink devices seen*: how many eWeLink devices sonoff2hue has heard on the LAN, mapped or not. Its attributes are
   *Listening*, whether it listens, and the time of the *Last packet*.
 
@@ -286,24 +210,22 @@ Each switch's device:
 - *Press*: an event entity that fires at each press that sonoff2hue acts on, with the announcement's *Sequence
   number*.
 - *Last action*: what came of the last press: *Turned on*, *Turned off*, *Failed* or *Dropped*, the newer of the last
-  toggle and the last error. Its attributes are the *Time*; for a toggle, how many lights, rooms and zones *Changed*,
-  were *Unchanged* or *Failed*, and the *Elapsed (ms)*; the *Message* of a failure; and what the switch *Toggles*,
-  such as `light 'Ceiling'` and `group 'Hallway'`. A light, room or zone whose name another one of its kind has
-  shows its id after the name too, as *Switch settings* lists it.
+  toggle and the last error. Its attributes are the *Time*; for a toggle, how many lights *Changed*, were *Unchanged* or
+  *Failed*, and the *Elapsed (ms)*; the *Message* of a failure; and the lights that the switch *Toggles*, by their
+  entity ids, such as `light.ceiling`.
 - *Online*: *Online* if the MINIR4M was heard in the last 5 minutes, else *Offline*, also when it was never heard. Its
   attributes are what sonoff2hue knows of it: its *Address*, *Last seen*, *Last press* and *Sequence number*, whether it
   is *Encrypted*, *Device key set*, *Detached relay*, and a *Decode error*.
-- *Test toggle*: a button that toggles the switch's lights, rooms and zones once, as a press does: those that are on the
-  bridge, and the log line names the others. If it can't toggle any, for example because none of them is on the bridge,
-  the button reports why.
+- *Test toggle*: a button that toggles the switch's lights once, as a press does: those that are in Home Assistant, and
+  the log line names the others. If it can't toggle any, for example because none of them is in Home Assistant any
+  more, the button reports why.
 
-*Reachable*, *eWeLink devices seen* and *Online* are diagnostic entities, and *Test toggle* a configuration entity.
-*Press* fires only while sonoff2hue runs the switches, which it starts once the bridge answers. *Online*'s *Last press*
-counts every press that the LAN heard, also before that. After a restart or a reload, *Last action* is unknown until
-the next press.
+*eWeLink devices seen* and *Online* are diagnostic entities, and *Test toggle* a configuration entity. *Press* fires
+only while sonoff2hue runs the switches, while *Status* is *Running*. *Online*'s *Last press* counts every press that
+the LAN heard. After a restart or a reload, *Last action* is unknown until the next press.
 
-When you give a switch another name or another MINIR4M, or pair another bridge, the devices and entities stay, with
-their entity ids, history and automations.
+When you give a switch another name or another MINIR4M, its device and entities stay, with their entity ids, history
+and automations.
 
 ## Presses in automations
 
@@ -340,38 +262,27 @@ The events' data:
 - both: `device_id`, the id of the switch's Home Assistant device; `switch_id`, the MINIR4M's device id in lowercase;
   and `name`, the switch's name, or null;
 - `sonoff2hue_press`: `seq`, the announcement's sequence number;
-- `sonoff2hue_toggle`: `targets`, such as `light 'Ceiling'` or `group 'Hallway'`, as *Last action* shows them, and
-  `result`:
-  - `toggled`, with `turned_on` (true or false), `changed` and `unchanged` (how many targets it switched, and how many
-    were already so), `failed` (how many the bridge didn't switch) and `elapsed_ms`;
-  - `failed`, when the toggle couldn't run, or `dropped`, when the press waited more than 5 seconds for the bridge,
-    each with `message`.
+- `sonoff2hue_toggle`: `targets`, the switch's lights by their entity ids, as *Last action* shows them, and `result`:
+  - `toggled`, with `turned_on` (true or false), `changed` and `unchanged` (how many lights it switched, and how many
+    were already so), `failed` (how many it couldn't switch) and `elapsed_ms`;
+  - `failed`, when the toggle couldn't run, or `dropped`, when the press waited more than 5 seconds for the one before
+    it, each with `message`.
 
 ## Repairs
 
 sonoff2hue reports these in Settings → System → Repairs:
 
-- *The Hue bridge's certificate is not pinned*: sonoff2hue doesn't check the bridge's certificate, because the imported
-  `sonoff2hue.yaml` had no `certificateSha256`. Select *Submit* in the repair, which opens *Reconfigure*, and pair the
-  bridge again.
-- *The Hue bridge's certificate changed*: the bridge's certificate isn't the pinned one, so sonoff2hue doesn't talk to
-  it. Either the bridge was replaced or reset, or another device now has its address. For a replaced or reset bridge,
-  select *Submit* in the repair and pair it again. Otherwise, sonoff2hue looks for the bridge on your network and
-  goes on at its new address once it finds it, as Troubleshooting describes; or *Reconfigure* with that address.
-- *The Hue bridge answers at another address*: the bridge no longer answers at its address, and a bridge with its
-  bridge id answers at another one. Its certificate isn't pinned, so nothing proves that this is your bridge, and
-  sonoff2hue doesn't use that address by itself. Select *Submit* in the repair, which opens *Reconfigure*, choose
-  *Find bridges* and the bridge at the new address, which is selected when it is found, and press its link button:
-  this pairs it there and pins its certificate. The repair goes away when the bridge answers at its address again,
-  or when its address changes.
-- *The configuration has problems*: the switches or the bridge's settings can't be used as they are, and it lists why,
-  such as a switch without any light, room or zone, or a device id that two switches have. Until it's fixed, no switch
-  toggles anything. Fix the switch with *Edit switch*, or pair the bridge again with *Reconfigure*.
-- *Some lights, rooms or zones of … are missing*: the switch can't toggle some of its lights, rooms or zones, and it
-  lists why: one isn't on the bridge, for example because it was deleted in the Hue app, a name matches several of them,
-  or a room or zone has no lights. The switch goes on toggling the others, and when none is left, each press fails.
-  The other switches aren't affected. Edit the switch to choose them again, or fix them in the Hue app: sonoff2hue
-  looks for them again every minute, and the repair goes once it finds them.
+- *The configuration has problems*: the switches can't be used as they are, and it lists why, such as a device id that
+  two switches have, or a switch without its device id. Until it's fixed, no switch toggles anything. Fix the switch
+  with *Edit switch*, or delete it.
+- *Some lights of … are missing*: some of the switch's lights were removed from Home Assistant or are disabled, and it
+  lists them. The switch goes on toggling its other lights, and when none is left, each press fails. The other switches
+  aren't affected. Select *Submit* in the repair to edit the switch and choose its lights again. The repair goes away
+  once the switch has all its lights again: when they come back or are enabled again, or when you save the switch
+  without them.
+- *Choose the lights of … again*: after the update from sonoff2hue 1.x, sonoff2hue found no light in Home Assistant for
+  some of the switch's lights, rooms or zones, and it lists them as 1.x named them. Select *Submit* in the repair to
+  edit the switch and choose their lights. The repair goes away once you save the switch.
 - *… is not in detached relay mode*: the MINIR4M reports that its relay isn't detached, so the wall switch cuts the
   power to the lights. sonoff2hue can tell when it decrypts the announcements with the switch's device key. Turn on
   **Detach relay** in the eWeLink app; the repair goes away with the switch's next announcement.
@@ -384,10 +295,11 @@ sonoff2hue reports these in Settings → System → Repairs:
 **Activity.** Home Assistant's Activity panel, the logbook, shows the changes of sonoff2hue's entities, and each
 device's page shows those of its own. Each press shows as the switch's *Press*, and what came of it as the switch's
 *Last action*: *Turned on*, *Turned off*, *Failed* or *Dropped*. The logbook lists *Last action* only when its state
-changes, so a press with the same outcome as the one before shows as *Press* alone. Changes of *Online*, *Status* and
-*Reachable* show too. The details are in the entities' attributes: each press's *Sequence number* in *Press*, and the
-last outcome's time, counts and message in *Last action*. Home Assistant's log and the diagnostics' activity have a line
-for each press and each toggle, once the info lines are on.
+changes, so a press with the same outcome as the one before shows as *Press* alone. Changes of *Online* and *Status*
+show too, and so do the lights' own changes, with the switch's *Press* as their cause, or *Test toggle* for its
+toggles. The details are in the entities' attributes: each press's *Sequence number* in *Press*, and the last outcome's
+time, counts and message in *Last action*. Home Assistant's log and the diagnostics' activity have a line for each press
+and each toggle, once the info lines are on.
 
 **Log.** Home Assistant's log, in Settings → System → Logs, shows sonoff2hue's warnings and errors. Its other lines,
 such as each press, each toggle and each ignored relay or setting change, are info and debug lines, which Home
@@ -406,18 +318,16 @@ Assistant's default log level hides. To see them:
 **Diagnostics.** The ⋮ menu of the sonoff2hue entry has *Download diagnostics*. Besides Home Assistant's own
 information, the file has:
 
-- `config`: the bridge and the switches, as stored;
-- `status`: what sonoff2hue is doing, whether the bridge is reachable, where it answered instead when its certificate
-  isn't pinned, and each switch with its MINIR4M, the lights, rooms and zones found on the bridge and the problems
-  with those that aren't, and its last action and error;
+- `config`: the switches, as stored;
+- `status`: what sonoff2hue is doing, and each switch with its MINIR4M, the lights that it toggles and the problems with
+  those that it can't, and its last action and error;
 - `lan_devices`: every eWeLink device heard on the LAN, with its address, type, `seq`, last press and whether it is
   online;
 - `activity`: sonoff2hue's last 1,000 log lines, at the levels that the log shows. Turn on debug logging before you
   reproduce a problem, so that they include the info and debug lines.
 
-The application key, the certificate pin and the device keys show as `**REDACTED**`, or as null when none is set. The
-file still names your switches, their device ids and addresses, the bridge's address, and your lights, rooms and zones:
-look through it before you share it.
+The device keys show as `**REDACTED**`, or as null when none is set. The file still names your switches, their device
+ids and addresses, and your lights: look through it before you share it.
 
 ## Troubleshooting
 
@@ -434,9 +344,9 @@ look through it before you share it.
     2½ minutes old, so operate the wall switch, or wait.
   - When sonoff2hue can't listen on the network, the log warns "mDNS socket error (…); retrying in 5s."
 - **A switch is *Offline*, or the log warns "Not seen on the LAN yet: …".** sonoff2hue hasn't heard that MINIR4M in
-  the last 5 minutes, or since it connected to the bridge. It asks for it every 30 seconds while it hasn't heard it
-  since then, and while its last answer is more than 2½ minutes old, until it is *Offline*. Check that the MINIR4M has
-  power and Wi-Fi, and its device id.
+  the last 5 minutes, or since it started its switches. It asks for it every 30 seconds while it hasn't heard it since
+  then, and while its last answer is more than 2½ minutes old, until it is *Offline*. Check that the MINIR4M has power
+  and Wi-Fi, and its device id.
 - **A switch goes *Offline* for a few minutes, about once an hour.** Some MINIR4Ms stop receiving multicast for a while,
   for example when the Wi-Fi access point renews the network's group key, every hour by default on some. Such a MINIR4M
   still sends, so its presses toggle the lights, but it doesn't hear sonoff2hue's multicast queries. So when a switch's
@@ -452,62 +362,52 @@ look through it before you share it.
   - Check that the presses arrive: the switch's *Online* has the time of the *Last press* that the LAN heard. With
     debug logging on, the log names each new announcement of a mapped switch and what sonoff2hue made of it: online,
     wall switch operated, or ignored as a relay change, a settings change or a restart.
-  - Check the bridge's *Status*. sonoff2hue runs the switches only while it is *Running*, and its *Message*, its
-    *Problems* and Repairs say why it isn't. *Press* fires for each press that it acts on, and *Last action* says what
-    came of it.
-  - Check Repairs for *Some lights, rooms or zones of … are missing*: the switch toggles only what it finds on the
-    bridge. When it finds none, *Last action* is *Failed*, with the *Message* "None of the lights, rooms and zones of
-    this switch is on the Hue bridge."
+  - Check sonoff2hue's *Status*. It runs the switches only while it is *Running*, and its *Message*, its *Problems* and
+    Repairs say why it isn't. *Press* fires for each press that it acts on, and *Last action* says what came of it.
+  - Check Repairs for *Some lights of … are missing* and *Choose the lights of … again*: the switch toggles only the
+    lights that it finds in Home Assistant. When it finds none, *Last action* is *Failed*, with the *Message* "None of
+    the lights of this switch is in Home Assistant."
   - Check that nothing else toggles the same lights on each press, such as sonoff2hue in a second Home Assistant: two
     toggles per press leave the lights as they were.
+- **A light doesn't switch.** The log warns "Could not switch light.… on: …" with the reason, *Last action*'s *Failed*
+  counts the light, and its *Message* says how many couldn't be switched, such as "1 of 2 lights could not be
+  switched." The reasons:
+  - "it is unavailable": Home Assistant has the light, but can't reach it now, for example because the Hue bulb has no
+    power, or the Hue integration can't reach the bridge. Check the light's own integration.
+  - "it didn't answer within 5 s": the light's integration didn't switch it within 5 seconds.
+  - Any other reason is the one that the light's integration gave, such as "Request failed: …" from the Hue
+    integration.
+
+  *Test toggle* toggles the switch's lights as a press does, so you can try them without the wall switch.
 - **The lights toggle when you change something in the eWeLink app.** Add the switch's device key.
-- **The bridge can't be reached.** *Reachable* is *Unreachable*, with the reason as its *Message*, such as "Hue bridge
-  not reachable: No route to host (192.0.2.10:443)" or "Hue bridge request timed out.", and the log warns "Hue bridge
-  at … not reachable (…); retrying every 10 s." or "Hue bridge unavailable: …". Check the bridge's power and network,
-  and that Home Assistant reaches it over HTTPS. Presses that wait more than 5 seconds for the bridge are dropped.
-  - Its address may have changed, for example when your router's DHCP gave it another one. Once the bridge has been
-    unreachable for a minute, sonoff2hue looks for it on your network while it stays so: with mDNS every 5 minutes,
-    and with Philips Hue's discovery service every 15 minutes, the most that the service allows. The log says "The Hue
-    bridge at … has been unreachable for 60 s; looking for it on the network.", and so does the *Status* while
-    sonoff2hue connects.
-  - With a pinned certificate, when sonoff2hue finds a bridge with its bridge id and that certificate at another
-    address, it saves the new address and goes on there, and the log warns "The Hue bridge … moved from … to …; saved
-    its new address." A bridge with another certificate isn't used.
-  - Without one, the repair *The Hue bridge answers at another address* offers to pair the bridge there.
-  - An address that you entered as a host name, such as `hue-bridge.local`, is never replaced: the name has to lead
-    to the bridge.
-  - To keep the bridge's address from changing, reserve one for it in your router's DHCP settings.
-- **"The Hue bridge TLS certificate does not match the pinned certificateSha256."** The bridge was replaced or reset, or
-  another device now has its address: see the repair *The Hue bridge's certificate changed*.
-- **Pairing doesn't work.** If *Find bridges* finds none, enter the bridge's address. "No Hue bridge answered at …"
-  gives the reason, such as "Connection refused (192.0.2.10:443)", "The request timed out." or "HTTP 404 Not Found":
-  check the address, and that Home Assistant reaches the bridge over HTTPS. Then press the round link button on top of
-  the bridge within 60 seconds after sonoff2hue shows the bridge; if the time runs out, choose *Retry*.
 - ***Add switch* says "The sonoff2hue integration isn't loaded".** Reload the integration from the ⋮ menu of the
   sonoff2hue entry, then try again.
 
 ## Limitations
 
 - Single, double and long presses can't be told apart: that information only goes to the eWeLink cloud.
-- A press while sonoff2hue starts, after a change of its bridge or switches, or while the network reconnects only sets
-  the baseline.
-- A press that waited more than 5 seconds for an unreachable bridge is dropped, not replayed later.
-- sonoff2hue finds a bridge that moved to another address only with mDNS, on Home Assistant's network, or with
-  Philips Hue's discovery service, which lists the new address only once the bridge has reported it. It moves to that
-  address by itself only with a pinned certificate.
-- One Hue bridge per Home Assistant.
+- A press while sonoff2hue starts, after a change of its switches, or while the network reconnects only sets the
+  baseline.
+- A press that waited more than 5 seconds for the one before it is dropped, not replayed later.
+- The lights switch as fast as their integration switches them. The Hue integration keeps a connection to the bridge
+  open for 15 seconds after each request. Measured on one Hue Bridge v2: a room switched in about 30 ms within those 15
+  seconds, and in about 0.2 seconds after a longer pause, as the integration first connects to the bridge again.
+  sonoff2hue 1.x kept a connection of its own open, and switched a room in about 60 ms either way.
+- Creating a Hue room or zone isn't possible from sonoff2hue: Home Assistant has no action for it. Create it in the Hue
+  app.
 
 ## Development
 
 Run `scripts/setup` once: it makes `.venv` with Python 3.14 and the pinned tools, with [uv](https://docs.astral.sh/uv/).
 Then `scripts/check` runs what CI runs: ruff, its formatter, mypy and the tests.
 
-- The tests need no network, Hue bridge or MINIR4M. They build the switches' mDNS packets (`tests/engine/packets.py`),
-  run a fake Hue bridge on 127.0.0.1 (`tools/fake_hue`), and use fake sockets.
-- The mDNS layer, `engine/dns.py`, `engine/mdns.py`, the announcements of `engine/ewelink.py` and the mDNS part of Hue
-  discovery in `engine/hue_setup.py`, keeps its behavior exactly. Its recorded cases have to pass unchanged:
-  `tests/engine/mdns_packets.json` (packets, with the messages, announcements and probes read from them) and
-  `tests/engine/mdns_text.json` (its own rules for white space and letter case, for every character).
+- The tests need no network, light or MINIR4M. They build the switches' mDNS packets (`tests/engine/packets.py`) and use
+  fake sockets, and Home Assistant gets lights of the tests' own, whose `light.turn_on` and `light.turn_off` actions
+  record their calls (`tests/fakes.py`).
+- The mDNS layer, `engine/dns.py`, `engine/mdns.py` and the announcements of `engine/ewelink.py`, keeps its behavior
+  exactly. Its recorded cases have to pass unchanged: `tests/engine/mdns_packets.json` (packets, with the messages,
+  announcements and probes read from them) and `tests/engine/mdns_text.json` (its own rules for white space and letter
+  case, for every character).
 - sonoff2hue listens with its own mDNS socket. `tests/test_own_mdns.py` fails when a module imports python-zeroconf,
   Home Assistant's `zeroconf` or `network` integration, or the resolver that answers `.local` names with zeroconf; when
   the engine (`custom_components/sonoff2hue/engine`) imports Home Assistant; or when the manifest has a zeroconf or
@@ -515,47 +415,38 @@ Then `scripts/check` runs what CI runs: ruff, its formatter, mypy and the tests.
 
 ### Running Home Assistant locally
 
-`scripts/develop` runs a local Home Assistant 2026.11 with the integration from this checkout, and a fake Hue bridge
-(`tools/fake_hue`) and a simulated wall switch, so you can work without hardware. It needs `scripts/setup` done, and
-curl.
+`scripts/develop` runs a local Home Assistant 2026.11 with the integration from this checkout, three lights of its own
+and a simulated wall switch, so you can work without hardware. It needs `scripts/setup` done.
 
 ```sh
-scripts/develop            # Home Assistant on http://127.0.0.1:8123, the fake Hue bridge in the background
-scripts/develop hass       # Home Assistant alone, for example with the fake bridge in another terminal
-scripts/develop fake-hue   # the fake Hue bridge alone, in the foreground
+scripts/develop            # Home Assistant on http://127.0.0.1:8123, until Ctrl+C
+scripts/develop setup      # only prepare Home Assistant's environment and configuration folder
 scripts/develop press      # one press of the simulated wall switch (press 3: three presses)
-scripts/develop lights     # the fake bridge's lights, rooms and zones, and every PUT it received
 ```
 
 - The first run makes `.dev/venv` with uv: the Home Assistant release that `requirements_test.txt` pins, and the
   packages it would otherwise install at its first start (`requirements_dev.txt`), most of all its 117 MB frontend.
-  After that, Home Assistant starts in a few seconds and installs nothing. Ctrl+C stops it, and the fake bridge with it.
+  After that, Home Assistant starts in a few seconds and installs nothing. Ctrl+C stops it.
 - Open http://127.0.0.1:8123 and create a throwaway user. The integration is under Settings → Devices & services →
-  *Add integration* → sonoff2hue: choose *Enter the bridge address* and enter the fake bridge's, `127.0.0.1:18443`.
-- *Add switch* on the integration's page maps a MINIR4M to lights: choose *Press the wall switch*, then run
-  `scripts/develop press`, and the simulated switch `1000abcdef` is selected (or *Enter the device ID* takes it). The
-  fake bridge's lights, rooms and zones are offered, and once the switch is added, `scripts/develop press` toggles its
-  lights. *Edit switch* changes one, and its menu deletes it.
+  *Add integration* → sonoff2hue: select *Submit*, and *Add switch* opens.
+- In *Add switch*, choose *Press the wall switch*, then run `scripts/develop press`, and the simulated switch
+  `1000abcdef` is selected (or *Enter the device ID* takes it). *Switch settings* offers Home Assistant's lights, among
+  them the configuration's three, Hallway, Living room and Porch: template lights, each kept on or off by an input
+  boolean. Once the switch is added, `scripts/develop press` toggles its lights. *Edit switch* changes one, and its
+  menu deletes it.
 - Home Assistant listens on 127.0.0.1 only. `SONOFF2HUE_DEV_PORT=8124 scripts/develop` moves it to another port, also
   later.
 - It loads `custom_components/sonoff2hue` from this checkout, with nothing copied or linked: it runs from the
   repository root with `python -m homeassistant`, which puts the root first on Python's module path. So it doesn't load
   other custom integrations from `.dev/config/custom_components`. After changing the integration's code, restart Home
   Assistant; when it is restarted from its UI, `scripts/develop` starts it again.
-- Its configuration is `.dev/config/configuration.yaml`, a copy of `tools/develop/configuration.yaml`: the logbook, and
-  the integration's log at debug level. Home Assistant's log goes to the terminal and to
+- Its configuration is `.dev/config/configuration.yaml`, a copy of `tools/develop/configuration.yaml`: the logbook, the
+  integration's log at debug level, and the lights. Home Assistant's log goes to the terminal and to
   `.dev/config/home-assistant.log`.
 - Home Assistant reports that it couldn't set up `assist_pipeline` and `assist_satellite`: their requirements,
   pymicro-vad and pyspeex-noise, have no wheels for Python 3.14 and need a C++ compiler, so `scripts/develop` has it
   skip them. Without ffmpeg and libjpeg-turbo on the machine, it also logs errors about those. sonoff2hue needs none of
   them.
-- The fake Hue bridge listens on https://127.0.0.1:18443, with its link button always pressed: pairing with
-  `127.0.0.1:18443` succeeds at once. It makes a new certificate at every start, so pair again after restarting it.
-  Its log is `.dev/fake-hue.log`; `FAKE_HUE_PORT` and `FAKE_HUE_BIND` change where it listens.
-  `https://127.0.0.1:18443/_fake/` lists its test endpoints. `POST /_fake/rename/{id}?name=…` and
-  `POST /_fake/delete/{id}` change a light, room or zone as the Hue app does, until the fake bridge starts again, so
-  you can watch the integration follow a rename or skip what is gone. The ids are fixed: `FakeIds` in
-  `tools/fake_hue/bridge.py`.
 - `scripts/develop press` sends the eWeLink announcements of a press of the made-up MINIR4M `1000abcdef`
   (`SONOFF2HUE_DEV_DEVICE` chooses another): the last `seq` again, then the next, which `.dev/seq` keeps. Their
   multicast TTL is 0, so they loop back to this machine and never reach the network. They come from
@@ -573,47 +464,47 @@ scripts/develop lights     # the fake bridge's lights, rooms and zones, and ever
 ### The end-to-end test
 
 `scripts/e2e` tests the integration end to end, as CI's *End-to-end* job does: a real Home Assistant with the
-integration from this checkout, the fake Hue bridge and the simulated wall switch, all on this machine. It needs
-`scripts/setup` done.
+integration from this checkout, the development configuration's lights and the simulated wall switch, all on this
+machine. It needs `scripts/setup` done.
 
 ```sh
 scripts/e2e
 ```
 
 - It sets up the development Home Assistant as `scripts/develop setup` does, but in a configuration folder of its own,
-  `.dev/e2e/config`, and starts it and the fake bridge on 127.0.0.1, on ports that are free at that moment, so it runs
-  next to `scripts/develop`.
-- Through Home Assistant's API, as its frontend does, it onboards a throwaway user, sets up sonoff2hue with the fake
-  bridge's address and its link button pressed, and adds a switch with *Add switch*: a made-up MINIR4M, new at each
-  run, which a press of the simulated switch identifies, with the light `Hallway` and the room `Living room` picked
-  from the bridge's lists.
-- It presses the switch twice and checks what the fake bridge was asked to switch (on, then off), the integration's
-  `sonoff2hue_press` and `sonoff2hue_toggle` events, its status in its diagnostics, its entities *Status*, *Last
-  action* and *Press*, and its log. Then it renames the light on the fake bridge, as the Hue app does, and restarts
-  Home Assistant: the integration must follow the rename and save the light's new name in the switch, the switch's
-  last `seq` again must be no press, and the next one a press that switches the light by its new name. Last, it
-  deletes the light: the next press must switch the room and leave the light out, *Status* must stay running and name
-  the missing light, Repairs must list the switch's issue, and the press after that must switch the room alone.
-- Once `.dev/venv` exists, it takes about 15 seconds. A pass deletes `.dev/e2e`. A failure prints the integration's
-  lines of Home Assistant's log and keeps the folder: `hass.log` (Home Assistant's output), `fake-hue.log` and
+  `.dev/e2e/config`, and starts it on 127.0.0.1, on a port that is free at that moment, so it runs next to
+  `scripts/develop`.
+- Through Home Assistant's API, as its frontend does, it onboards a throwaway user, sets up sonoff2hue with its one
+  confirmation, and adds a switch in *Add switch*, which the setup opens: a made-up MINIR4M, new at each run, which a
+  press of the simulated switch identifies, with two of the lights.
+- It presses the switch twice and checks the lights' states, the integration's `sonoff2hue_press` and
+  `sonoff2hue_toggle` events, its status in its diagnostics, its entities *Status*, *Last action* and *Press*, and its
+  log. Then, through the entity registry's API, as Home Assistant's UI does, it gives one light another entity id and
+  disables the other: the switch must follow the new entity id without starting again, and leave the disabled light out
+  with a repair. It restarts Home Assistant: the switch's last `seq` again must be no press, and the next one a press.
+- Last, with Home Assistant stopped, it turns the stored configuration into sonoff2hue 1.x's, starts Home Assistant
+  again, and checks the migration: the entry and its switch, the service device and its entities, *Reachable* gone,
+  and the repair *Choose the lights of … again*. It fixes the repair as a user does, through the repair and *Edit
+  switch*, which the repair opens, and presses the switch.
+- Once `.dev/venv` exists, it takes about 20 seconds. A pass deletes `.dev/e2e`. A failure prints the integration's
+  lines of Home Assistant's log and keeps the folder: `hass.log` (Home Assistant's output) and
   `config/home-assistant.log*`.
 
 ### Debugging in VS Code
 
-[.vscode/launch.json](.vscode/launch.json) runs Home Assistant and the fake Hue bridge under the debugger, on Linux (WSL
-2 included) and macOS. It needs the Python and Python Debugger extensions, which VS Code recommends when you open the
-folder, and `scripts/setup` done.
+[.vscode/launch.json](.vscode/launch.json) runs Home Assistant under the debugger, on Linux (WSL 2 included) and macOS.
+It needs the Python and Python Debugger extensions, which VS Code recommends when you open the folder, and
+`scripts/setup` done.
 
-- **sonoff2hue: Home Assistant and fake Hue bridge** starts both and stops them together. Before Home Assistant starts,
-  the task *Set up the development Home Assistant* runs `scripts/develop setup`; once it listens, VS Code opens it in
-  your browser.
-- Breakpoints in `custom_components/sonoff2hue` and `tools/fake_hue` are hit, as these are the files that run. Just My
-  Code is off for Home Assistant, so you can step into its code too.
+- **Home Assistant** starts it. Before it starts, the task *Set up the development Home Assistant* runs
+  `scripts/develop setup`; once it listens, VS Code opens it in your browser.
+- Breakpoints in `custom_components/sonoff2hue` are hit, as these are the files that run. Just My Code is off, so you
+  can step into Home Assistant's code too.
 - Stop sends Ctrl+C: Home Assistant shuts down and saves its state, and a second Stop kills it. While it is still
   starting, as its UI says, Ctrl+C or Stop abandons the start instead, without saving.
 - A restart from Home Assistant's UI ends the debug session: start it again to load code changes.
-- **Press the simulated wall switch** and **Show the fake Hue bridge's lights** (Terminal → Run Task) run
-  `scripts/develop press` and `scripts/develop lights`. The state is in `.dev/`, as with `scripts/develop`.
+- **Press the simulated wall switch** (Terminal → Run Task) runs `scripts/develop press`. The state is in `.dev/`, as
+  with `scripts/develop`.
 
 ## Releases
 
