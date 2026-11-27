@@ -1484,7 +1484,14 @@ Home Assistant through its MCP server:
   `tests/testing_config` by default. pytest-homeassistant's `hass_tmp_config_dir` gives a temporary folder instead,
   through an override of `hass_config_dir`.
 - **The Marketplace's install** is recorded in `.storage/marketplace.repositories`: per repository `installed`,
-  `version_installed` (the tag, such as `v1.1.0`) and `installed_commit`.
+  `version_installed` (the tag, such as `v1.1.0`) and `installed_commit`. Its update entity, `update.<domain>`:
+  - `update.install` with a `version` installs that tag (`SPECIFIC_VERSION`), once the user has accepted the
+    Marketplace's warning, even before the Marketplace knows that the tag is a release;
+  - its `async_update` does nothing, so `homeassistant.update_entity` asks GitHub for nothing;
+  - the repository's ⋮ menu in the Marketplace has *Refresh information*, which does ask GitHub
+    (`marketplace/repository/refresh`).
+
+  Otherwise it asks every 48 hours for a repository added from its link, and every 6 hours for the catalog's.
 
 ## Decisions
 
@@ -2857,6 +2864,38 @@ Home Assistant through its MCP server:
     context ids, not on the screen.
   - **The log:** no warning or error of sonoff2hue in the 4 hours after the restart, only Home Assistant's notice about
     custom integrations.
+- 2026-11-27: release 2.0.0, by hand (decisions 29, 37 and 40), with the owner's yes, as GitHub Actions wasn't to be
+  relied on.
+  - **Merged:** #59 (the switch to Home Assistant's lights) and #60 (`Release 2.0.0`, the version and
+    `.github/release-notes/v2.0.0.md`), by fast-forwarding `main` to 3656e6a, past the ruleset's required checks with
+    the admin bypass.
+  - **Checked first,** with `release.sh` locally:
+    - the manifest's version on 3656e6a is 2.0.0;
+    - the released versions are 1.0.0 and 1.1.0, so 2.0.0 is higher, Latest, and its notes start at `v1.1.0`;
+    - there was no tag `v2.0.0`;
+    - after the merge, `check-main` passed.
+  - **Published:**
+    - the annotated tag `git tag -a v2.0.0 -m "sonoff2hue 2.0.0"` on 3656e6a was pushed;
+    - then `gh release create v2.0.0 --verify-tag --title "sonoff2hue 2.0.0" --notes-file
+      .github/release-notes/v2.0.0.md --latest` published the Release at 14:35:59 UTC.
+  - **The Release:**
+    - "sonoff2hue 2.0.0", neither a draft nor a pre-release, immutable and Latest;
+    - its notes are the notes file, and the tag names 3656e6a;
+    - `gh release verify v2.0.0` (gh 2.106.0) verified its attestation;
+    - the tag's source archive holds the 34 files of `custom_components/sonoff2hue` at the tag, each the same by
+      SHA-256.
+  - **The runs that the pushes started:**
+    - CI, Commits and Validate on #59 and #60, and CI and Validate on `main`, all passed; nothing waited for them;
+    - *Release* on the tag (run 46017376082) found the Release and left it as it was;
+    - *Tag the release* (run 46017530058) found `v2.0.0` on the commit and tagged nothing.
+  - **The Marketplace:**
+    - On the user's Home Assistant, `update.sonoff2hue` still offered v1.1.0 as the latest. The Marketplace asks
+      GitHub for a repository added from its link only every 48 hours, and `homeassistant.update_entity` refreshes
+      nothing, as the entity's `async_update` is empty.
+    - `update.install` with `version: v2.0.0` installed the tag: `version_installed` became `v2.0.0` at 3656e6a, and
+      the folder held the tag's 34 files, each the same by SHA-256.
+    - After `ha core restart`, the entry loaded and *Status* read "4 wall switches toggle 17 lights." without
+      problems. Every switch was *Online*, no *Press* fired, and the log had no warning or error of sonoff2hue.
 
 ## Status
 
@@ -2922,8 +2961,12 @@ Home Assistant through its MCP server:
   the minutes past the hour, and stayed *Online* (Verification log)
 - [x] Release 1.1.0: the tag `v1.1.0` on 839693b and its immutable GitHub Release "sonoff2hue 1.1.0", Latest
   (Verification log)
-- [ ] Home Assistant's lights instead of the Hue bridge (decision 40), as 2.0.0: measured on 2026-11-27, where the go
+- [x] Home Assistant's lights instead of the Hue bridge (decision 40), as 2.0.0: measured on 2026-11-27, where the go
   rule failed, and chosen anyway. The engine and the Home Assistant layer on light entities, the migration of 1.x
-  entries, the tests and the tooling, the README and this file are done and checked locally, and the live test on the
-  user's Home Assistant OS migrated its 4 switches and toggled real presses (Verification log). Release 2.0.0, by hand,
-  is left
+  entries, the tests and the tooling, the README and this file, checked locally; the live test on the user's Home
+  Assistant OS migrated its 4 switches and toggled real presses; merged as #59 (Verification log)
+- [x] Release 2.0.0: the tag `v2.0.0` on 3656e6a and its immutable GitHub Release "sonoff2hue 2.0.0", Latest, made by
+  hand; the user's Home Assistant runs it through the Marketplace's update (Verification log)
+- [ ] The Hue integration's idle connections (decision 40): a draft of an issue for aiohue, home-assistant-libs/aiohue,
+  proposes keeping its pooled connections longer than its 60 s keep-alive, which would bring a press after a pause near
+  the warm 29 ms. The owner decides whether to file it
