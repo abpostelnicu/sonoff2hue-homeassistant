@@ -75,7 +75,8 @@ toggle its light entities instead of pairing the bridge itself. The user's choic
 
 The measurement missed that rule: a room after idle took 193 ms, against 59 ms over the direct connection, because of
 how the Hue integration's library handles its connections (Research findings). The user chose to switch anyway, as
-2.0.0 (decision 40), and asked for a draft of an issue about it for that library, aiohue.
+2.0.0 (decision 40), and asked for a draft of an issue about it for that library, aiohue, which the owner then asked
+to post (home-assistant-libs/aiohue#712).
 
 ## How to work in this repository
 
@@ -1412,7 +1413,10 @@ Home Assistant through its MCP server:
   others, which close after 15 s idle: a command after a pause opens a new TCP and TLS connection. 429 and 503 are
   retried up to 25 times, 0.5 s, 0.75 s and so on apart. `set_state` always sends its PUT, also for a light that is in
   that state already. A failure is `HomeAssistantError("Request failed: …")`. aiohue 4.9.2 and its `main` haven't
-  changed any of this, and Home Assistant 2026.12.0b0 pins 4.9.2.
+  changed any of this, and Home Assistant 2026.12.0b0 pins 4.9.2. aiohue's `request()` retries only the answers 429
+  and 503, not a failed connection; aiohttp 3.14.5 itself retries an idempotent request (GET, HEAD, OPTIONS, TRACE, PUT,
+  DELETE) once on a new connection when a reused one fails with `ClientOSError` or `ServerDisconnectedError`
+  (`retry_persistent_connection` in `ClientSession._request`).
 - **Light actions.** `light.turn_on` and `light.turn_off` on several entities call them side by side
   (`asyncio.gather`) and raise only the first failure. Unavailable entities are skipped without an error
   (`helpers/service.py`), and `turn_off` calls an entity whatever its state.
@@ -2896,6 +2900,18 @@ Home Assistant through its MCP server:
       the folder held the tag's 34 files, each the same by SHA-256.
     - After `ha core restart`, the entry loaded and *Status* read "4 wall switches toggle 17 lights." without
       problems. Every switch was *Online*, no *Press* fired, and the log had no warning or error of sonoff2hue.
+- 2026-11-27: the issue for aiohue (decision 40), filed at the owner's request as home-assistant-libs/aiohue#712.
+  - **Checked before filing:** the repository takes issues and has no issue template. No issue reports this: #191
+    (HTTP/2, open) is related, and the issue links it.
+  - **The claims, read again** in aiohue at 4.9.0 and 4.9.2:
+    - the connector of `create_request`;
+    - `EventStream`'s keep-alive every 60 s;
+    - Home Assistant's `HueBridgeV2(host, app_key)`.
+  - **A correction:** the draft said that aiohue's `request()` retries a dead connection, but it retries only the
+    answers 429 and 503. The issue says instead that aiohttp 3.14.5 retries an idempotent request once on a new
+    connection.
+  - **The text:** GitHub's markdown API rendered it with its table, its code block and the link to #191, and the posted
+    body is the text as checked.
 
 ## Status
 
@@ -2967,6 +2983,7 @@ Home Assistant through its MCP server:
   Assistant OS migrated its 4 switches and toggled real presses; merged as #59 (Verification log)
 - [x] Release 2.0.0: the tag `v2.0.0` on 3656e6a and its immutable GitHub Release "sonoff2hue 2.0.0", Latest, made by
   hand; the user's Home Assistant runs it through the Marketplace's update (Verification log)
-- [ ] The Hue integration's idle connections (decision 40): a draft of an issue for aiohue, home-assistant-libs/aiohue,
-  proposes keeping its pooled connections longer than its 60 s keep-alive, which would bring a press after a pause near
-  the warm 29 ms. The owner decides whether to file it
+- [ ] The Hue integration's idle connections (decision 40): home-assistant-libs/aiohue#712, filed on 2026-11-27 at the
+  owner's request, proposes keeping aiohue's pooled connections longer than its 60 s keep-alive
+  (`keepalive_timeout=90`), which would bring a press after a pause near the warm 29 ms. Waiting for aiohue's
+  maintainers, then for a Home Assistant release that pins the fix (Verification log)
