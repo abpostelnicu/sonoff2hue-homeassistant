@@ -1,59 +1,37 @@
-"""The runtime of the config entry (decision 23), in Home Assistant: the LAN on a fake network and a Hue bridge in memory,
-or the fake Hue bridge over HTTPS on 127.0.0.1, with time moved by ``freezer``."""
+"""The runtime of the config entry (decision 23), in Home Assistant: the LAN on a fake network, the lights in Home
+Assistant's state machine with ``light`` actions of the tests' own (decision 40), and time moved by ``freezer``."""
 
 import asyncio
-from datetime import timedelta
 import logging
 import string
 from types import MappingProxyType
 from typing import Any
 
 from freezegun.api import FrozenDateTimeFactory
-from homeassistant.components.repairs import FlowType, repairs_flow_manager
-from homeassistant.config_entries import (
-    SOURCE_REAUTH,
-    ConfigEntry,
-    ConfigEntryState,
-    ConfigSubentry,
-    ConfigSubentryData,
-)
-from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResultType
-from homeassistant.helpers import device_registry as dr, issue_registry as ir
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.config_entries import ConfigEntryState, ConfigSubentry, ConfigSubentryData
+from homeassistant.core import Context, HomeAssistant, ServiceCall
+from homeassistant.helpers import device_registry as dr, entity_registry as er, issue_registry as ir
 from homeassistant.helpers.translation import async_get_translations
-from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
 import pytest
 from pytest_homeassistant.common import MockConfigEntry, async_capture_events, async_mock_signal
-from pytest_homeassistant.components.repairs import process_repair_fix_flow, start_repair_fix_flow
-from pytest_homeassistant.typing import ClientSessionGenerator
 
-from custom_components.sonoff2hue import repairs, runtime
+from custom_components.sonoff2hue import runtime
 from custom_components.sonoff2hue.const import (
-    CONF_APP_KEY,
-    CONF_BRIDGE_ID,
-    CONF_BRIDGE_IP,
-    CONF_CERTIFICATE_SHA256,
     CONF_DEVICE_ID,
     CONF_DEVICE_KEY,
-    CONF_GROUPS,
-    CONF_LIGHTS,
     CONF_NAME,
+    CONF_TARGETS,
+    CONF_UNMIGRATED,
     DOMAIN,
     EVENT_PRESS,
     EVENT_TOGGLE,
     SUBENTRY_SWITCH,
 )
-from custom_components.sonoff2hue.engine import mdns, supervisor, toggler
-from custom_components.sonoff2hue.engine.config import EngineConfig, HueSettings, SwitchSettings
-from custom_components.sonoff2hue.engine.hue_client import CERTIFICATE_MISMATCH
-from custom_components.sonoff2hue.engine.hue_setup import DiscoveredBridge, get_bridge_info
-from custom_components.sonoff2hue.engine.runner import NO_TARGETS, ResolvedSwitches
+from custom_components.sonoff2hue.engine import mdns
+from custom_components.sonoff2hue.engine.config import EngineConfig, SwitchSettings
+from custom_components.sonoff2hue.engine.runner import NO_TARGETS
 from custom_components.sonoff2hue.engine.status import PRESS_DROPPED, ServiceState
-from custom_components.sonoff2hue.engine.supervisor import KEY_REJECTED, TARGETS_CHECK_INTERVAL, BridgeMoved
-from custom_components.sonoff2hue.engine.targets import EntryKey, RememberedResource, Renamed
-from custom_components.sonoff2hue.remembered import SAVE_DELAY
 from custom_components.sonoff2hue.runtime import (
     INTEGRATION_LOGGER,
     SIGNAL_CONFIG_CHANGED,
@@ -66,69 +44,25 @@ from custom_components.sonoff2hue.runtime import (
     SwitchTestResult,
     config_from_entry,
 )
-from tools.fake_hue.bridge import BRIDGE_ID as FAKE_BRIDGE_ID
-from tools.fake_hue.server import create_certificate
 
-from .engine.fakes import until
-from .fakes import (
-    APP_KEY,
-    BRIDGE_ADDRESS,
-    BRIDGE_ID,
-    DEVICE_ID,
-    DEVICE_KEY,
-    OTHER_DEVICE_ID,
-    PIN,
-    Bridge,
-    Finder,
-    Lan,
-    bridge_info,
-    paired,
-    relay,
-    switch,
-)
-from .hue import FakeHueHost
+from .fakes import CEILING, DEVICE_ADDRESS, DEVICE_ID, DEVICE_KEY, OTHER_DEVICE_ID, Lan, Lights, entry, relay, switch
+from .platforms import PRESS, RUNNING, settle, start, state_of, tick
 
-RUNNING = "1 wall switch toggles 1 Hue light, room or zone."
-BRIDGE_DOWN = "Hue bridge returned 503 Service Unavailable for GET /clip/v2/resource/bridge"
-RESTARTING = "Configuration changed; restarting the bridge."
-UNAUTHORIZED = '{"errors":[{"description":"unauthorized user"}]}'
-HALL = "Hall (1000abcdef)"
+HALL = f"Hall ({DEVICE_ID})"
+RESTARTING = "Configuration changed; restarting the switches."
+LISTENING = "Listening for wall switch presses."
+SUPERVISOR = "custom_components.sonoff2hue.engine.supervisor"
+RUNNER = "custom_components.sonoff2hue.engine.runner"
+UNKNOWN_TARGET = "0123456789abcdef0123456789abcdef"
+"""A made-up entity registry id, which the registry has never had."""
 
 
-@pytest.fixture(autouse=True)
-def no_retry_delay(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The toggler retries a failed request at once, instead of after 300 ms."""
-    monkeypatch.setattr(toggler, "RETRY_DELAY", 0)
+def subentry_of(config_entry: MockConfigEntry, device_id: str = DEVICE_ID) -> ConfigSubentry:
+    return next(subentry for subentry in config_entry.subentries.values() if subentry.unique_id == device_id)
 
 
-async def settle() -> None:
-    """Lets the event loop run what is ready: with the LAN and the bridge in memory, nothing waits for I/O."""
-    for _ in range(20):
-        await asyncio.sleep(0)
-
-
-async def tick(freezer: FrozenDateTimeFactory, seconds: float) -> None:
-    """Moves the frozen time, which the event loop's clock follows, and runs the timers that are due. The loop runs a
-    timer once its clock is past it by its resolution, 1 ns, which a monotonic clock of epoch seconds can't show, so
-    time moves a microsecond more."""
-    freezer.tick(timedelta(seconds=seconds, microseconds=1))
-    await settle()
-
-
-async def start(hass: HomeAssistant, entry: MockConfigEntry) -> Sonoff2HueData:
-    if hass.config_entries.async_get_entry(entry.entry_id) is None:
-        entry.add_to_hass(hass)
-    assert await hass.config_entries.async_setup(entry.entry_id)
-    await settle()
-    return entry.runtime_data
-
-
-def subentry_of(entry: MockConfigEntry, device_id: str = DEVICE_ID) -> ConfigSubentry:
-    return next(subentry for subentry in entry.subentries.values() if subentry.unique_id == device_id)
-
-
-def new_subentry(device_id: str, name: str, lights: list[str]) -> ConfigSubentry:
-    data = {CONF_DEVICE_ID: device_id, CONF_NAME: name, CONF_DEVICE_KEY: None, CONF_LIGHTS: lights, CONF_GROUPS: []}
+def new_subentry(device_id: str, name: str, targets: list[str]) -> ConfigSubentry:
+    data = {CONF_DEVICE_ID: device_id, CONF_NAME: name, CONF_DEVICE_KEY: None, CONF_TARGETS: targets}
     return ConfigSubentry(data=MappingProxyType(data), subentry_type=SUBENTRY_SWITCH, title=name, unique_id=device_id)
 
 
@@ -136,22 +70,19 @@ def logged(caplog: pytest.LogCaptureFixture, logger: str) -> list[str]:
     return [record.getMessage() for record in caplog.records if record.name == logger]
 
 
-def reauth_flows(hass: HomeAssistant) -> list[Any]:
-    return [flow for flow in hass.config_entries.flow.async_progress() if flow["context"]["source"] == SOURCE_REAUTH]
-
-
 def issues(hass: HomeAssistant) -> dict[str, ir.IssueEntry]:
     return {issue_id: issue for (domain, issue_id), issue in ir.async_get(hass).issues.items() if domain == DOMAIN}
 
 
 async def check_texts(hass: HomeAssistant, issue: ir.IssueEntry) -> None:
-    """The issue's texts are in ``translations/en.json``, with the placeholders they use."""
+    """The issue's texts are in ``translations/en.json``, with the placeholders they use: a fixable one's are those of
+    its repair flow."""
     texts = await async_get_translations(hass, "en", "issues", [DOMAIN])
     prefix = f"component.{DOMAIN}.issues.{issue.translation_key}"
     keys = [f"{prefix}.title"]
     if issue.is_fixable:
-        keys += [f"{prefix}.fix_flow.step.confirm.title", f"{prefix}.fix_flow.step.confirm.description"]
-        keys += [f"{prefix}.fix_flow.abort.reconfigure", f"{prefix}.fix_flow.abort.not_loaded"]
+        keys += [f"{prefix}.fix_flow.step.confirm.{key}" for key in ("title", "description")]
+        keys += [f"{prefix}.fix_flow.abort.{reason}" for reason in ("edit_switch", "not_found", "not_loaded")]
     else:
         keys.append(f"{prefix}.description")
     given = set(issue.translation_placeholders or {})
@@ -161,26 +92,65 @@ async def check_texts(hass: HomeAssistant, issue: ir.IssueEntry) -> None:
         assert used <= given, f"{key} uses {sorted(used - given)}, which the issue doesn't give"
 
 
+def switch_device(hass: HomeAssistant, config_entry: MockConfigEntry) -> dict[str, Any]:
+    """How the bus events name the switch Hall: by the device that the platforms made for its subentry."""
+    device = dr.async_get(hass).async_get_device_by_identifier((DOMAIN, DEVICE_ID), config_entry.entry_id)
+    assert device is not None
+    assert device.config_subentry_id == subentry_of(config_entry).subentry_id
+    return {"device_id": device.id, "switch_id": DEVICE_ID, "name": "Hall"}
+
+
+def rename(hass: HomeAssistant, entity_id: str, new_entity_id: str) -> None:
+    """Gives a light another entity id in the entity registry, as its settings do; its integration then shows its state
+    under the new one."""
+    state = hass.states.get(entity_id)
+    assert state is not None
+    er.async_get(hass).async_update_entity(entity_id, new_entity_id=new_entity_id)
+    hass.states.async_remove(entity_id)
+    hass.states.async_set(new_entity_id, state.state, state.attributes)
+
+
+class Stubborn:
+    """``light`` actions that never answer, and that end only when let go once they are cancelled, as an integration
+    may take its time to stop a request."""
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self.let_go = asyncio.Event()
+        self.ended = False
+        for service in ("turn_on", "turn_off"):
+            hass.services.async_register("light", service, self._handle)
+
+    async def _handle(self, call: ServiceCall) -> None:
+        try:
+            await asyncio.get_running_loop().create_future()
+        except asyncio.CancelledError:
+            await self.let_go.wait()
+            self.ended = True
+            raise
+
+
 # The configuration.
 
 
-def test_the_configuration_is_the_entrys_data_and_its_switches_as_stored() -> None:
-    entry = paired(
-        switch(" 1000ABCDEF ", None, lights=[" ceiling "], groups=["room:Hall"], key=DEVICE_KEY),
+def test_the_configuration_is_the_entrys_switches_as_stored() -> None:
+    """In the subentries' order; a subentry of another type isn't a switch."""
+    config_entry = entry(
+        switch(" 1000ABCDEF ", None, targets=[" light.ceiling ", UNKNOWN_TARGET], key=DEVICE_KEY),
         ConfigSubentryData(data={}, subentry_type="other", title="Other", unique_id=None),
-        switch(OTHER_DEVICE_ID, "Desk", lights=["Desk"]),
-        ConfigSubentryData(data={CONF_DEVICE_ID: None}, subentry_type=SUBENTRY_SWITCH, title="", unique_id=None),
+        switch(OTHER_DEVICE_ID, "Desk", targets=["light.desk"]),
+        ConfigSubentryData(
+            data={CONF_DEVICE_ID: None, CONF_TARGETS: None}, subentry_type=SUBENTRY_SWITCH, title="", unique_id=None
+        ),
     )
 
-    assert config_from_entry(entry) == EngineConfig(
-        HueSettings(BRIDGE_ADDRESS, BRIDGE_ID, APP_KEY, PIN),
+    assert config_from_entry(config_entry) == EngineConfig(
         [
-            SwitchSettings(" 1000ABCDEF ", None, DEVICE_KEY, [" ceiling "], ["room:Hall"]),
-            SwitchSettings(OTHER_DEVICE_ID, "Desk", None, ["Desk"], []),
-            SwitchSettings("", None, None, [], []),
-        ],
+            SwitchSettings(" 1000ABCDEF ", None, DEVICE_KEY, [" light.ceiling ", UNKNOWN_TARGET]),
+            SwitchSettings(OTHER_DEVICE_ID, "Desk", None, ["light.desk"]),
+            SwitchSettings("", None, None, []),
+        ]
     )
-    assert config_from_entry(MockConfigEntry(domain=DOMAIN)) == EngineConfig()
+    assert config_from_entry(entry()) == EngineConfig()
 
 
 # Starting and stopping.
@@ -194,106 +164,118 @@ def test_the_runtimes_listener_is_on_the_network() -> None:
     assert listener._network_watcher is mdns.watch_network_changes
 
 
-async def test_a_runtime_that_never_started_stops_at_once(hass: HomeAssistant, lan: Lan, bridge: Bridge) -> None:
+async def test_a_runtime_that_never_started_stops_at_once(hass: HomeAssistant, lan: Lan) -> None:
     """As when the entry's setup fails before the runtime starts."""
-    entry = paired(switch())
-    entry.add_to_hass(hass)
-    runtime_data = Sonoff2HueData.create(hass, entry)
+    config_entry = entry(switch())
+    config_entry.add_to_hass(hass)
+    runtime_data = Sonoff2HueData.create(hass, config_entry)
 
     await runtime_data.async_stop()
 
-    assert (lan.network.transports, bridge.created) == ([], 0)
+    assert lan.network.transports == []
     assert runtime_data.activity not in INTEGRATION_LOGGER.handlers
 
 
-async def test_the_runtime_runs_the_lan_monitor_and_the_bridge_until_it_unloads(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge
+async def test_the_runtime_runs_the_lan_monitor_and_the_switches_until_it_unloads(
+    hass: HomeAssistant, lan: Lan
 ) -> None:
-    entry = paired(switch())
-    runtime_data = await start(hass, entry)
+    config_entry = entry(switch())
+    runtime_data = await start(hass, config_entry)
 
     (transport,) = lan.network.transports
     assert not transport.closed
     assert lan.network.watching
     assert runtime_data.registry.listening
-    snapshot = runtime_data.status.snapshot()
-    assert (snapshot.service.state, snapshot.service.message) == (ServiceState.RUNNING, RUNNING)
-    assert snapshot.hue.reachable is True
-    assert runtime_data.config == config_from_entry(entry)
+    service = runtime_data.status.service
+    assert (service.state, service.message) == (ServiceState.RUNNING, RUNNING)
+    assert runtime_data.config == config_from_entry(config_entry)
     assert runtime_data.activity in INTEGRATION_LOGGER.handlers
-    assert (bridge.created, bridge.closed) == (1, 0)
 
-    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert await hass.config_entries.async_unload(config_entry.entry_id)
 
     assert transport.closed
     assert not lan.network.watching
     assert not runtime_data.registry.listening
-    assert (bridge.created, bridge.closed) == (1, 1)
+    assert all(task.done() for task in runtime_data._supervisor_tasks)
     assert runtime_data.activity not in INTEGRATION_LOGGER.handlers
-    assert entry.state is ConfigEntryState.NOT_LOADED
+    assert config_entry.state is ConfigEntryState.NOT_LOADED
 
 
-async def test_a_reload_starts_a_new_runtime_after_the_old_one_stopped(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge
-) -> None:
-    entry = paired(switch())
-    first = await start(hass, entry)
+async def test_a_reload_starts_a_new_runtime_after_the_old_one_stopped(hass: HomeAssistant, lan: Lan) -> None:
+    config_entry = entry(switch())
+    first = await start(hass, config_entry)
 
-    assert await hass.config_entries.async_reload(entry.entry_id)
+    assert await hass.config_entries.async_reload(config_entry.entry_id)
     await settle()
 
-    second = entry.runtime_data
+    second = config_entry.runtime_data
     assert second is not first
     assert [transport.closed for transport in lan.network.transports] == [True, False]
-    assert (bridge.created, bridge.closed) == (2, 1)
-    assert second.status.snapshot().service.state is ServiceState.RUNNING
+    assert second.status.service.state is ServiceState.RUNNING
     assert INTEGRATION_LOGGER.handlers.count(second.activity) == 1
     assert first.activity not in INTEGRATION_LOGGER.handlers
 
 
-async def test_home_assistant_stopping_ends_the_runtime(hass: HomeAssistant, lan: Lan, bridge: Bridge) -> None:
-    runtime_data = await start(hass, paired(switch()))
+async def test_home_assistant_stopping_ends_the_runtime(hass: HomeAssistant, lan: Lan) -> None:
+    config_entry = entry(switch())
+    runtime_data = await start(hass, config_entry)
 
     await hass.async_stop()
     # Home Assistant doesn't wait for the tasks it cancels when it stops.
     await settle()
 
     assert lan.network.transports[0].closed
-    assert (bridge.created, bridge.closed) == (1, 1)
+    assert all(task.done() for task in runtime_data._supervisor_tasks)
     assert runtime_data.activity not in INTEGRATION_LOGGER.handlers
-    # Stopped: no reauthentication, and no change is applied.
-    runtime_data._on_key_rejected()
-    runtime_data.async_config_changed()
-    assert bridge.created == 1
+    # Stopped: a change is no longer applied.
+    subentry = subentry_of(config_entry)
+    hass.config_entries.async_update_subentry(
+        config_entry, subentry, data={**subentry.data, CONF_TARGETS: ["light.desk"]}
+    )
+    await settle()
+
+    assert runtime_data.config.switches[0].targets == [CEILING]
+    assert len(runtime_data._supervisor_tasks) == 1
+
+
+async def test_removing_the_entry_deletes_what_version_1_kept_for_it(
+    hass: HomeAssistant, lan: Lan, hass_storage: dict[str, Any]
+) -> None:
+    """Version 1's store of the lights, rooms and zones that each switch found, if it was never migrated."""
+    config_entry = entry(switch())
+    key = f"{DOMAIN}.{config_entry.entry_id}"
+    hass_storage[key] = {"version": 1, "minor_version": 1, "key": key, "data": {"resources": []}}
+    await start(hass, config_entry)
+
+    assert await hass.config_entries.async_remove(config_entry.entry_id)
+
+    assert key not in hass_storage
 
 
 # Presses, toggles and their events.
 
 
 async def test_a_press_toggles_the_lights_and_fires_the_events(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+    hass: HomeAssistant, lan: Lan, lights: Lights, freezer: FrozenDateTimeFactory
 ) -> None:
-    entry = paired(switch())
-    runtime_data = await start(hass, entry)
+    lights.add("ceiling")
+    config_entry = entry(switch())
+    runtime_data = await start(hass, config_entry)
     presses = async_capture_events(hass, EVENT_PRESS)
     toggles = async_capture_events(hass, EVENT_TOGGLE)
-    # The events name the switch's device, which the platforms made for its subentry.
-    device = dr.async_get(hass).async_get_device_by_identifier((DOMAIN, DEVICE_ID), entry.entry_id)
-    assert device is not None
-    assert device.config_subentry_id == subentry_of(entry).subentry_id
-    hall = {"device_id": device.id, "switch_id": DEVICE_ID, "name": "Hall"}
+    hall = switch_device(hass, config_entry)
 
     lan.broadcast(1)
     lan.broadcast(2)
     await settle()
 
-    assert bridge.puts() == [("l1", True)]
+    assert lights.turned() == [("turn_on", CEILING)]
     assert [event.data for event in presses] == [{**hall, "seq": 2}]
     assert [event.data for event in toggles] == [
         {
             **hall,
             "result": "toggled",
-            "targets": ["light 'Ceiling'"],
+            "targets": [CEILING],
             "turned_on": True,
             "changed": 1,
             "unchanged": 0,
@@ -305,21 +287,27 @@ async def test_a_press_toggles_the_lights_and_fires_the_events(
     assert action is not None
     assert (action.turned_on, action.changed) == (True, 1)
 
-    bridge.fail("/clip/v2/resource/light", 503)
+    # A light that Home Assistant can't switch counts as failed.
+    lights.fail(CEILING)
     lan.broadcast(3)
     await settle()
 
     assert presses[-1].data == {**hall, "seq": 3}
     assert toggles[-1].data == {
         **hall,
-        "result": "failed",
-        "targets": ["light 'Ceiling'"],
-        "message": "Hue bridge returned 503 Service Unavailable for GET /clip/v2/resource/light",
+        "result": "toggled",
+        "targets": [CEILING],
+        "turned_on": False,
+        "changed": 0,
+        "unchanged": 0,
+        "failed": 1,
+        "elapsed_ms": 0,
     }
 
-    # A press that waits more than 5 seconds for the bridge is dropped.
-    bridge.heal()
-    held = bridge.hold("/clip/v2/resource/light")
+    # A press that waits more than 5 seconds for the lights is dropped: the press before it waits for a light that
+    # doesn't answer within 5 seconds.
+    lights.heal()
+    held = lights.hold(CEILING)
     lan.broadcast(4)
     lan.broadcast(5)
     await settle()
@@ -328,49 +316,82 @@ async def test_a_press_toggles_the_lights_and_fires_the_events(
     await settle()
 
     assert [event.data["seq"] for event in presses] == [2, 3, 4, 5]
-    assert [event.data["result"] for event in toggles] == ["toggled", "failed", "toggled", "dropped"]
-    assert toggles[-1].data == {**hall, "result": "dropped", "targets": ["light 'Ceiling'"], "message": PRESS_DROPPED}
-    assert bridge.puts() == [("l1", True), ("l1", False)]
+    assert [event.data["result"] for event in toggles] == ["toggled", "toggled", "toggled", "dropped"]
+    assert (toggles[2].data["failed"], toggles[2].data["elapsed_ms"]) == (1, 6000)
+    assert toggles[-1].data == {**hall, "result": "dropped", "targets": [CEILING], "message": PRESS_DROPPED}
+    assert lights.turned() == [("turn_off", CEILING), ("turn_off", CEILING)]
 
 
-async def test_a_switch_without_a_subentry_names_no_device(hass: HomeAssistant, lan: Lan, bridge: Bridge) -> None:
-    """A switch that the configuration has but whose subentry is gone, as while a change is applied."""
-    runtime_data = await start(hass, paired(switch()))
-
-    assert runtime_data._switch_device_id(SwitchSettings(OTHER_DEVICE_ID)) is None
-
-
-async def test_a_target_whose_name_another_light_has_shows_its_id_wherever_it_is_named(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, caplog: pytest.LogCaptureFixture
+async def test_a_press_its_events_and_its_lights_changes_share_a_context_of_their_own(
+    hass: HomeAssistant, lan: Lan, lights: Lights
 ) -> None:
-    """In the status, the bus events and the log, as the switch dialog lists such a light."""
-    caplog.set_level(logging.INFO, logger=INTEGRATION_LOGGER.name)
-    bridge.names["l2"] = "Ceiling"
-    runtime_data = await start(hass, paired(switch(lights=["l2", "l1"])))
+    """Each press has a context of its own: its events, its Press and its toggle's light actions carry it, so the
+    lights' new states do too, and the logbook shows their changes as the press's. The switch test's actions carry the
+    context that it is given."""
+    lights.add("ceiling")
+    desk = lights.add("desk")
+    runtime_data = await start(hass, entry(switch(targets=[CEILING, lights.target(desk)])))
+    presses = async_capture_events(hass, EVENT_PRESS)
     toggles = async_capture_events(hass, EVENT_TOGGLE)
+
+    def contexts() -> set[str]:
+        return {state_of(hass, entity_id).context.id for entity_id in (PRESS, CEILING, desk)}
+
+    lan.broadcast(1)
+    lan.broadcast(2)
+    await settle()
+    first = presses[0].context
+    assert contexts() == {first.id}
+
+    lan.broadcast(3)
+    await settle()
+    second = presses[1].context
+    assert second.id != first.id
+    assert contexts() == {second.id}
+    assert [event.context.id for event in toggles] == [first.id, second.id]
+
+    tested = Context()
+    await runtime_data.async_test_toggle(DEVICE_ID, tested)
+    assert {state_of(hass, entity_id).context.id for entity_id in (CEILING, desk)} == {tested.id}
+
+
+async def test_a_switch_with_nothing_left_to_toggle_fires_its_presses_and_fails_each_toggle(
+    hass: HomeAssistant, lan: Lan
+) -> None:
+    """Its presses reach automations as before, and each toggle event says why nothing was toggled."""
+    config_entry = entry(switch(targets=[UNKNOWN_TARGET]))
+    runtime_data = await start(hass, config_entry)
+    presses = async_capture_events(hass, EVENT_PRESS)
+    toggles = async_capture_events(hass, EVENT_TOGGLE)
+    hall = switch_device(hass, config_entry)
+
+    assert runtime_data.status.service.message == "1 wall switch toggles 0 lights; 1 is missing."
 
     lan.broadcast(1)
     lan.broadcast(2)
     await settle()
 
-    labels = ["light 'Ceiling' (l2)", "light 'Ceiling' (l1)"]
-    assert runtime_data.status.snapshot().switches[0].targets == tuple(labels)
-    assert [event.data["targets"] for event in toggles] == [labels]
-    messages = logged(caplog, "custom_components.sonoff2hue.engine.runner")
-    assert f"{HALL} -> {', '.join(labels)}" in messages
-    assert any(message.startswith(f"{HALL}: turned ON {', '.join(labels)} in ") for message in messages)
+    assert [event.data for event in presses] == [{**hall, "seq": 2}]
+    assert [event.data for event in toggles] == [{**hall, "result": "failed", "targets": [], "message": NO_TARGETS}]
 
 
-# The status and the bridge across time.
+async def test_a_switch_without_a_subentry_names_no_device(hass: HomeAssistant, lan: Lan) -> None:
+    """A switch that the configuration has but whose subentry is gone, as while a change is applied."""
+    runtime_data = await start(hass, entry(switch()))
+
+    assert runtime_data._switch_device_id(SwitchSettings(OTHER_DEVICE_ID)) is None
+
+
+# The status.
 
 
 async def test_each_published_snapshot_goes_out_on_the_signal(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+    hass: HomeAssistant, lan: Lan, freezer: FrozenDateTimeFactory
 ) -> None:
-    entry = paired(switch())
-    entry.add_to_hass(hass)
-    snapshots = async_mock_signal(hass, SIGNAL_STATUS.format(entry.entry_id))
-    await start(hass, entry)
+    config_entry = entry(switch())
+    config_entry.add_to_hass(hass)
+    snapshots = async_mock_signal(hass, SIGNAL_STATUS.format(config_entry.entry_id))
+    await start(hass, config_entry)
 
     assert snapshots == []
 
@@ -387,51 +408,18 @@ async def test_each_published_snapshot_goes_out_on_the_signal(
     assert snapshots[-1][0].switches[0].last_seen_at is not None
 
 
-async def test_the_bridge_is_waited_for_and_watched_across_time(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
-) -> None:
-    bridge.fail("/clip/v2/resource/bridge", 503)
-    runtime_data = await start(hass, paired(switch()))
-    status = runtime_data.status
-
-    waiting = f"Waiting for the Hue bridge at {BRIDGE_ADDRESS}: {BRIDGE_DOWN}"
-    assert (status.service.state, status.service.message) == (ServiceState.CONNECTING, waiting)
-    assert (status.snapshot().hue.reachable, status.snapshot().hue.message) == (False, BRIDGE_DOWN)
-
-    await tick(freezer, 10)
-
-    assert status.service.state is ServiceState.CONNECTING
-    assert sum(request.path == "/clip/v2/resource/bridge" for request in bridge.requests) == 2
-
-    bridge.heal()
-    await tick(freezer, 10)
-
-    assert (status.service.state, status.service.message) == (ServiceState.RUNNING, RUNNING)
-    assert (status.snapshot().hue.reachable, status.snapshot().hue.message) == (True, None)
-
-    # The runner's keep-alive, every 45 seconds, watches the bridge; the state stays running.
-    bridge.fail("/clip/v2/resource/bridge", 503)
-    await tick(freezer, 45)
-
-    assert (status.snapshot().hue.reachable, status.snapshot().hue.message) == (False, BRIDGE_DOWN)
-    assert status.service.state is ServiceState.RUNNING
-
-    bridge.heal()
-    await tick(freezer, 45)
-
-    assert status.snapshot().hue.reachable is True
-
-
 # Changes of the configuration.
 
 
 async def test_a_switch_added_changed_and_removed_restarts_only_the_supervisor(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, caplog: pytest.LogCaptureFixture
+    hass: HomeAssistant, lan: Lan, lights: Lights, caplog: pytest.LogCaptureFixture
 ) -> None:
     caplog.set_level(logging.INFO, logger=INTEGRATION_LOGGER.name)
-    entry = paired(switch())
-    runtime_data = await start(hass, entry)
-    entry_id = entry.entry_id
+    lights.add("ceiling")
+    desk = lights.add("desk")
+    config_entry = entry(switch())
+    runtime_data = await start(hass, config_entry)
+    entry_id = config_entry.entry_id
     configs = async_mock_signal(hass, SIGNAL_CONFIG_CHANGED.format(entry_id))
     added = async_mock_signal(hass, SIGNAL_SUBENTRY_ADDED.format(entry_id))
     updated = async_mock_signal(hass, SIGNAL_SUBENTRY_UPDATED.format(entry_id))
@@ -441,62 +429,60 @@ async def test_a_switch_added_changed_and_removed_restarts_only_the_supervisor(
     lan.broadcast(7, OTHER_DEVICE_ID)
     await settle()
     listener, lan_task = runtime_data.listener, runtime_data._lan_task
-    supervisor = "custom_components.sonoff2hue.engine.supervisor"
 
-    def kept() -> None:
-        """The listener's socket, the LAN registry and the switch's last action stay."""
-        assert entry.state is ConfigEntryState.LOADED
-        assert entry.runtime_data is runtime_data
+    def kept(restarts: int) -> None:
+        """The listener's socket and the LAN registry stay, and the supervisor restarted ``restarts`` times."""
+        assert config_entry.state is ConfigEntryState.LOADED
+        assert config_entry.runtime_data is runtime_data
         assert (runtime_data.listener, runtime_data._lan_task) == (listener, lan_task)
         assert [transport.closed for transport in lan.network.transports] == [False]
         assert [(device.device_id, device.seq) for device in runtime_data.registry.snapshot()] == [
             (OTHER_DEVICE_ID, 7),
             (DEVICE_ID, 2),
         ]
+        assert logged(caplog, SUPERVISOR).count(RESTARTING) == restarts
+        assert logged(caplog, RUNNER).count(LISTENING) == 1 + restarts
 
     # Added.
-    desk = new_subentry(OTHER_DEVICE_ID, "Desk", ["Desk"])
-    hass.config_entries.async_add_subentry(entry, desk)
+    desk_switch = new_subentry(OTHER_DEVICE_ID, "Desk", [lights.target(desk)])
+    hass.config_entries.async_add_subentry(config_entry, desk_switch)
     await settle()
 
-    kept()
-    assert logged(caplog, supervisor).count(RESTARTING) == 1
-    assert (bridge.created, bridge.closed) == (2, 1)
-    assert runtime_data.config == config_from_entry(entry)
+    kept(restarts=1)
+    assert runtime_data.config == config_from_entry(config_entry)
     assert [switch.device_id for switch in runtime_data.config.switches] == [DEVICE_ID, OTHER_DEVICE_ID]
     snapshot = runtime_data.status.snapshot()
-    assert snapshot.service.message == "2 wall switches toggle 2 Hue lights, rooms and zones."
+    assert snapshot.service.message == "2 wall switches toggle 2 lights."
+    # The switch's last action stays.
     assert snapshot.switches[0].last_action is not None
     assert configs == [(runtime_data.config,)]
-    assert added == [(desk,)]
+    assert added == [(desk_switch,)]
 
     # Changed.
-    hass.config_entries.async_update_subentry(entry, desk, data={**desk.data, CONF_LIGHTS: ["Ceiling", "Desk"]})
+    hass.config_entries.async_update_subentry(
+        config_entry, desk_switch, data={**desk_switch.data, CONF_TARGETS: [CEILING, lights.target(desk)]}
+    )
     await settle()
 
-    kept()
-    assert logged(caplog, supervisor).count(RESTARTING) == 2
-    assert (bridge.created, bridge.closed) == (3, 2)
-    assert runtime_data.status.snapshot().service.message == "2 wall switches toggle 3 Hue lights, rooms and zones."
-    assert updated == [(desk,)]
+    kept(restarts=2)
+    assert runtime_data.status.snapshot().service.message == "2 wall switches toggle 3 lights."
+    assert updated == [(desk_switch,)]
 
-    # A new title changes nothing that the supervisor runs.
-    hass.config_entries.async_update_subentry(entry, desk, title="Desk switch")
-    hass.config_entries.async_update_entry(entry, title="Hue")
+    # A new title changes nothing that the switches run.
+    hass.config_entries.async_update_subentry(config_entry, desk_switch, title="Desk switch")
+    hass.config_entries.async_update_entry(config_entry, title="Lights")
     await settle()
 
-    assert (bridge.created, bridge.closed) == (3, 2)
+    kept(restarts=2)
     assert len(configs) == 2
-    assert updated == [(desk,), (desk,)]
+    assert updated == [(desk_switch,), (desk_switch,)]
 
     # Removed.
-    hall = subentry_of(entry)
-    hass.config_entries.async_remove_subentry(entry, hall.subentry_id)
+    hall = subentry_of(config_entry)
+    hass.config_entries.async_remove_subentry(config_entry, hall.subentry_id)
     await settle()
 
-    kept()
-    assert logged(caplog, supervisor).count(RESTARTING) == 3
-    assert (bridge.created, bridge.closed) == (4, 3)
+    kept(restarts=3)
     assert [switch.device_id for switch in runtime_data.status.snapshot().switches] == [OTHER_DEVICE_ID]
     assert removed == [(hall.subentry_id,)]
     assert len(configs) == 3
@@ -504,11 +490,11 @@ async def test_a_switch_added_changed_and_removed_restarts_only_the_supervisor(
 
 
 async def test_a_new_device_key_reaches_the_lan_monitor(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+    hass: HomeAssistant, lan: Lan, freezer: FrozenDateTimeFactory
 ) -> None:
     """The LAN monitor takes a new tracker with the new configuration's keys."""
-    entry = paired(switch())
-    runtime_data = await start(hass, entry)
+    config_entry = entry(switch())
+    runtime_data = await start(hass, config_entry)
     lan.broadcast(1, params=relay(detached=False), key=DEVICE_KEY)
     await settle()
 
@@ -516,8 +502,10 @@ async def test_a_new_device_key_reaches_the_lan_monitor(
     assert device is not None
     assert (device.detached, device.summary) == (None, None)
 
-    subentry = subentry_of(entry)
-    hass.config_entries.async_update_subentry(entry, subentry, data={**subentry.data, CONF_DEVICE_KEY: DEVICE_KEY})
+    subentry = subentry_of(config_entry)
+    hass.config_entries.async_update_subentry(
+        config_entry, subentry, data={**subentry.data, CONF_DEVICE_KEY: DEVICE_KEY}
+    )
     await settle()
     lan.broadcast(2, params=relay(detached=False), key=DEVICE_KEY)
     await tick(freezer, 0.5)
@@ -528,508 +516,210 @@ async def test_a_new_device_key_reaches_the_lan_monitor(
     assert f"not_detached_{DEVICE_ID}" in issues(hass)
 
 
-async def test_the_new_supervisor_starts_once_the_old_one_has_closed_its_client(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge
+async def test_the_new_supervisor_starts_once_the_old_one_has_stopped(
+    hass: HomeAssistant, lan: Lan, caplog: pytest.LogCaptureFixture, freezer: FrozenDateTimeFactory
 ) -> None:
-    entry = paired(switch())
-    runtime_data = await start(hass, entry)
-    closing = asyncio.Event()
-    close = bridge.close
-
-    async def slow_close() -> None:
-        await closing.wait()
-        await close()
-
-    bridge.close = slow_close  # type: ignore[method-assign]
-    subentry = subentry_of(entry)
-
-    hass.config_entries.async_update_subentry(entry, subentry, data={**subentry.data, CONF_LIGHTS: ["Desk"]})
+    """Two changes while the first supervisor waits for the toggle that it stopped to end: the last configuration runs
+    after both supervisors stopped, and the stopped toggle fires nothing."""
+    caplog.set_level(logging.INFO, logger=INTEGRATION_LOGGER.name)
+    stubborn = Stubborn(hass)
+    hass.states.async_set(CEILING, "off")
+    config_entry = entry(switch())
+    runtime_data = await start(hass, config_entry)
+    toggles = async_capture_events(hass, EVENT_TOGGLE)
+    lan.broadcast(1)
+    lan.broadcast(2)
     await settle()
-    # Two changes while the first supervisor closes its client: the last configuration runs after both stopped.
+    subentry = subentry_of(config_entry)
+
     hass.config_entries.async_update_subentry(
-        entry, subentry, data={**subentry.data, CONF_LIGHTS: [], CONF_GROUPS: ["Hall"]}
+        config_entry, subentry, data={**subentry.data, CONF_TARGETS: ["light.desk"]}
+    )
+    await settle()
+    hass.config_entries.async_update_subentry(
+        config_entry, subentry, data={**subentry.data, CONF_TARGETS: ["light.lamp"]}
     )
     await settle()
 
-    assert (bridge.created, bridge.closed) == (1, 0)
-    assert len(runtime_data._supervisor_tasks) == 3
+    assert [task.done() for task in runtime_data._supervisor_tasks] == [False, True, False]
+    assert runtime_data.status.snapshot().switches[0].targets == (CEILING,)
+    assert logged(caplog, RUNNER).count(LISTENING) == 1
 
-    closing.set()
+    stubborn.let_go.set()
     await settle()
 
-    assert (bridge.created, bridge.closed) == (2, 1)
-    assert runtime_data.status.snapshot().switches[0].targets == ("group 'Hall'",)
+    assert stubborn.ended
     assert [task.done() for task in runtime_data._supervisor_tasks] == [True, True, False]
+    assert runtime_data.status.snapshot().switches[0].targets == ("light.lamp",)
+    assert logged(caplog, RUNNER).count(LISTENING) == 2
+    # Only the supervisor that ran says that it restarts.
+    assert logged(caplog, SUPERVISOR).count(RESTARTING) == 1
+    assert toggles == []
 
 
-async def test_unloading_lets_a_stopping_supervisor_close_its_client(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge
+async def test_unloading_lets_a_supervisor_that_a_change_stopped_end(
+    hass: HomeAssistant, lan: Lan, freezer: FrozenDateTimeFactory
 ) -> None:
-    """A supervisor that a change stopped is cancelled once: unloading the entry waits for it to close its client."""
-    entry = paired(switch())
-    await start(hass, entry)
-    closing = asyncio.Event()
-    close = bridge.close
-
-    async def slow_close() -> None:
-        await closing.wait()
-        await close()
-
-    bridge.close = slow_close  # type: ignore[method-assign]
-    subentry = subentry_of(entry)
-    hass.config_entries.async_update_subentry(entry, subentry, data={**subentry.data, CONF_LIGHTS: ["Desk"]})
+    """It is cancelled once: unloading the entry waits for the toggle that it stopped to end."""
+    stubborn = Stubborn(hass)
+    hass.states.async_set(CEILING, "off")
+    config_entry = entry(switch())
+    await start(hass, config_entry)
+    lan.broadcast(1)
+    lan.broadcast(2)
+    await settle()
+    subentry = subentry_of(config_entry)
+    hass.config_entries.async_update_subentry(
+        config_entry, subentry, data={**subentry.data, CONF_TARGETS: ["light.desk"]}
+    )
     await settle()
 
-    unloading = hass.async_create_task(hass.config_entries.async_unload(entry.entry_id))
+    unloading = hass.async_create_task(hass.config_entries.async_unload(config_entry.entry_id))
     await settle()
 
     assert not unloading.done()
 
-    closing.set()
+    stubborn.let_go.set()
 
     assert await unloading
-    assert (bridge.created, bridge.closed) == (1, 1)
+    assert stubborn.ended
     assert lan.network.transports[0].closed
 
 
-# The remembered resources (decision 32).
-
-SUPERVISOR = "custom_components.sonoff2hue.engine.supervisor"
+# The lights followed in the entity registry (decision 40).
 
 
-def store_key(entry: MockConfigEntry) -> str:
-    return f"{DOMAIN}.{entry.entry_id}"
-
-
-def record(entry: str, kind: str, resource_id: str, name: str, *, switch_id: str = DEVICE_ID) -> dict[str, str]:
-    """A record of the store: what an entry of a switch found."""
-    field = "lights" if kind == "light" else "groups"
-    return {"switch": switch_id, "field": field, "entry": entry, "kind": kind, "id": resource_id, "name": name}
-
-
-def remember(hass_storage: dict[str, Any], entry: MockConfigEntry, *records: dict[str, str], bridge_id: str) -> None:
-    """The store as an earlier run left it."""
-    key = store_key(entry)
-    data = {"bridge_id": bridge_id, "resources": list(records)}
-    hass_storage[key] = {"version": 1, "minor_version": 1, "key": key, "data": data}
-
-
-async def test_what_each_entry_found_is_remembered_for_the_paired_bridge(
-    hass: HomeAssistant, hass_storage: dict[str, Any], lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+async def test_a_light_given_another_entity_id_is_toggled_under_it_without_a_restart(
+    hass: HomeAssistant, lan: Lan, lights: Lights, caplog: pytest.LogCaptureFixture
 ) -> None:
-    entry = paired(switch(lights=[" CEILING "], groups=["Hall"]))
-    await start(hass, entry)
-
-    # Written 10 seconds after the change.
-    assert store_key(entry) not in hass_storage
-    await tick(freezer, SAVE_DELAY)
-
-    assert hass_storage[store_key(entry)]["version"] == 1
-    assert hass_storage[store_key(entry)]["data"] == {
-        "bridge_id": BRIDGE_ID,
-        "resources": [record("ceiling", "light", "l1", "Ceiling"), record("hall", "room", "r1", "Hall")],
-    }
-
-
-async def test_a_renamed_light_is_followed_and_its_new_name_saved_in_its_switch_once(
-    hass: HomeAssistant,
-    hass_storage: dict[str, Any],
-    lan: Lan,
-    bridge: Bridge,
-    caplog: pytest.LogCaptureFixture,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """The store, of the same bridge, without regard to the case of its id, follows the rename; the new name replaces
-    the entry, which restarts the supervisor once, and that one finds the light by its new name."""
+    """The switch keeps the light by its registry id: the switches are resolved again, and the runner goes on with its
+    baselines."""
     caplog.set_level(logging.INFO, logger=INTEGRATION_LOGGER.name)
-    entry = paired(switch(lights=["Ceiling", "Desk"]))
-    remember(hass_storage, entry, record("ceiling", "light", "l1", "Ceiling"), bridge_id=BRIDGE_ID.lower())
-    bridge.names["l1"] = "Ceiling lamp"
-    updates: list[dict[str, Any]] = []
-    update_subentry = hass.config_entries.async_update_subentry
-
-    def counted(entry: Any, subentry: ConfigSubentry, **changes: Any) -> bool:
-        updates.append(changes)
-        return update_subentry(entry, subentry, **changes)
-
-    monkeypatch.setattr(hass.config_entries, "async_update_subentry", counted)
-    runtime_data = await start(hass, entry)
+    ceiling = lights.add("ceiling")
+    config_entry = entry(switch(targets=[lights.target(ceiling)]))
+    runtime_data = await start(hass, config_entry)
+    lan.broadcast(1)
     await settle()
 
-    assert subentry_of(entry).data[CONF_LIGHTS] == ["Ceiling lamp", "Desk"]
-    assert [list(changes) for changes in updates] == [["data"]]
-    assert logged(caplog, "custom_components.sonoff2hue.runtime") == [
-        f"{HALL}: light 'Ceiling' was renamed to 'Ceiling lamp' on the Hue bridge; saved the new name."
-    ]
-    assert logged(caplog, SUPERVISOR).count(RESTARTING) == 1
-    assert (bridge.created, bridge.closed) == (2, 1)
-    snapshot = runtime_data.status.snapshot()
-    assert (snapshot.service.state, snapshot.service.problems) == (ServiceState.RUNNING, ())
-    assert snapshot.switches[0].targets == ("light 'Ceiling lamp'", "light 'Desk'")
-    assert runtime_data.remembered.resources == {
-        EntryKey(DEVICE_ID, "lights", "ceiling lamp"): RememberedResource("light", "l1", "Ceiling lamp"),
-        EntryKey(DEVICE_ID, "lights", "desk"): RememberedResource("light", "l2", "Desk"),
-    }
-
-    lan.broadcast(1)
+    rename(hass, ceiling, "light.hall_ceiling")
+    await settle()
     lan.broadcast(2)
     await settle()
 
-    assert bridge.puts() == [("l1", True), ("l2", True)]
+    assert lights.turned() == [("turn_on", "light.hall_ceiling")]
+    assert runtime_data.status.snapshot().switches[0].targets == ("light.hall_ceiling",)
+    assert f"{HALL} -> light.hall_ceiling" in logged(caplog, RUNNER)
+    assert logged(caplog, RUNNER).count(LISTENING) == 1
+    assert RESTARTING not in logged(caplog, SUPERVISOR)
 
 
-async def test_a_renamed_entry_whose_new_spelling_the_switch_already_has_is_dropped(
-    hass: HomeAssistant, hass_storage: dict[str, Any], lan: Lan, bridge: Bridge
+async def test_a_removed_light_raises_a_repair_and_the_others_still_toggle_until_it_is_back(
+    hass: HomeAssistant, lan: Lan, lights: Lights, caplog: pytest.LogCaptureFixture, freezer: FrozenDateTimeFactory
 ) -> None:
-    """The other entry names the light by its new name already, so the switch keeps it once."""
-    entry = paired(switch(lights=["Ceiling", "Desk", "ceiling lamp"]))
-    remember(hass_storage, entry, record("ceiling", "light", "l1", "Ceiling"), bridge_id=BRIDGE_ID)
-    bridge.names["l1"] = "Ceiling lamp"
-
-    runtime_data = await start(hass, entry)
-    await settle()
-
-    assert subentry_of(entry).data[CONF_LIGHTS] == ["Desk", "ceiling lamp"]
-    assert runtime_data.status.snapshot().switches[0].targets == ("light 'Desk'", "light 'Ceiling lamp'")
-
-
-async def test_a_room_that_two_switches_found_renamed_saves_both_and_restarts_the_supervisor_once(
-    hass: HomeAssistant, hass_storage: dict[str, Any], lan: Lan, bridge: Bridge, caplog: pytest.LogCaptureFixture
-) -> None:
+    """Decision 32: the switches run on, the switch toggles the lights that Home Assistant has, and its issue, a
+    warning, leads to its settings. A light added again has its registry id again."""
     caplog.set_level(logging.INFO, logger=INTEGRATION_LOGGER.name)
-    entry = paired(
-        switch(lights=[], groups=["room:Hall"]), switch(OTHER_DEVICE_ID, "Porch", lights=["Desk"], groups=["hall "])
-    )
-    remember(
-        hass_storage,
-        entry,
-        record("room:hall", "room", "r1", "Hall"),
-        record("hall", "room", "r1", "Hall", switch_id=OTHER_DEVICE_ID),
-        bridge_id=BRIDGE_ID,
-    )
-    bridge.names["r1"] = "Hallway"
-    entry.add_to_hass(hass)
-    configs = async_mock_signal(hass, SIGNAL_CONFIG_CHANGED.format(entry.entry_id))
-
-    runtime_data = await start(hass, entry)
-    await settle()
-
-    # Both subentries are saved before the configuration changes, once.
-    assert configs == [(runtime_data.config,)]
-    assert [dict(subentry_of(entry, device).data) for device in (DEVICE_ID, OTHER_DEVICE_ID)] == [
-        {**switch(lights=[], groups=["room:Hallway"])["data"]},
-        {**switch(OTHER_DEVICE_ID, "Porch", lights=["Desk"], groups=["room:Hallway"])["data"]},
-    ]
-    assert logged(caplog, "custom_components.sonoff2hue.runtime") == [
-        f"{HALL}: room 'Hall' was renamed to 'Hallway' on the Hue bridge; saved the new name.",
-        "Porch (1000999999): room 'Hall' was renamed to 'Hallway' on the Hue bridge; saved the new name.",
-    ]
-    assert logged(caplog, SUPERVISOR).count(RESTARTING) == 1
-    assert (bridge.created, bridge.closed) == (2, 1)
-    assert [s.targets for s in runtime_data.status.snapshot().switches] == [
-        ("group 'Hallway'",),
-        ("light 'Desk'", "group 'Hallway'"),
-    ]
-
-
-async def test_a_rename_is_saved_only_while_the_switch_has_its_entry_and_its_configuration_is_current(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge
-) -> None:
-    """The user may have changed the switch meanwhile; the supervisor of a newer configuration resolves again."""
-    entry = paired(switch(lights=["Desk"]))
-    runtime_data = await start(hass, entry)
-    lamp = RememberedResource("light", "l1", "Ceiling lamp")
-    ceiling = EntryKey(DEVICE_ID, "lights", "ceiling")
-    rename = Renamed(ceiling, "Ceiling", "Ceiling", lamp, "Ceiling lamp")
-
-    runtime_data._on_resolved(ResolvedSwitches(runtime_data.config, [], {}, [rename]))
-    await settle()
-
-    assert subentry_of(entry).data[CONF_LIGHTS] == ["Desk"]
-    assert bridge.created == 1
-
-    earlier = runtime_data.config
-    subentry = subentry_of(entry)
-    hass.config_entries.async_update_subentry(entry, subentry, data={**subentry.data, CONF_LIGHTS: ["Ceiling"]})
-    await settle()
-    runtime_data._on_resolved(ResolvedSwitches(earlier, [], {ceiling: lamp}, [rename]))
-    await settle()
-
-    assert subentry_of(entry).data[CONF_LIGHTS] == ["Ceiling"]
-    assert bridge.created == 2
-    # What the current supervisor found, not what the earlier configuration's report said.
-    assert runtime_data.remembered.resources[ceiling] == RememberedResource("light", "l1", "Ceiling")
-
-
-async def test_remembered_resources_of_another_bridge_are_never_used(
-    hass: HomeAssistant, hass_storage: dict[str, Any], lan: Lan, bridge: Bridge
-) -> None:
-    entry = paired(switch(lights=["Ceiling", "Desk"]))
-    remember(hass_storage, entry, record("ceiling", "light", "l1", "Ceiling"), bridge_id="001788FFFE000002")
-    bridge.names["l1"] = "Ceiling lamp"
-
-    runtime_data = await start(hass, entry)
-
-    assert subentry_of(entry).data[CONF_LIGHTS] == ["Ceiling", "Desk"]
-    assert runtime_data.status.snapshot().switches[0].problems == (
-        f"{HALL}: no Hue light named 'Ceiling'. Known lights: 'Ceiling lamp', 'Desk'",
-    )
-
-
-async def test_the_remembered_resources_forget_removed_switches_and_entries_and_another_bridges(
-    hass: HomeAssistant, hass_storage: dict[str, Any], lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
-) -> None:
-    entry = paired(switch(lights=["Ceiling", "Desk"]), switch(OTHER_DEVICE_ID, None, lights=[], groups=["Hall"]))
-    await start(hass, entry)
-    await tick(freezer, SAVE_DELAY)
-
-    def stored() -> list[tuple[str, str]]:
-        return [(item["switch"], item["entry"]) for item in hass_storage[store_key(entry)]["data"]["resources"]]
-
-    assert stored() == [(DEVICE_ID, "ceiling"), (DEVICE_ID, "desk"), (OTHER_DEVICE_ID, "hall")]
-
-    # The bridge stops answering, so only the configuration's changes reach the store.
-    bridge.fail("/clip/v2/resource/bridge", 503)
-    hall = subentry_of(entry)
-    hass.config_entries.async_update_subentry(entry, hall, data={**hall.data, CONF_LIGHTS: ["Desk"]})
-    hass.config_entries.async_remove_subentry(entry, subentry_of(entry, OTHER_DEVICE_ID).subentry_id)
-    await settle()
-    await tick(freezer, SAVE_DELAY)
-
-    assert stored() == [(DEVICE_ID, "desk")]
-
-    hass.config_entries.async_update_entry(entry, data={**entry.data, CONF_BRIDGE_ID: "001788FFFE000002"})
-    await settle()
-    await tick(freezer, SAVE_DELAY)
-
-    assert hass_storage[store_key(entry)]["data"] == {"bridge_id": "001788FFFE000002", "resources": []}
-
-
-async def test_the_remembered_resources_are_written_as_the_entry_unloads_and_removed_with_it(
-    hass: HomeAssistant, hass_storage: dict[str, Any], lan: Lan, bridge: Bridge
-) -> None:
-    entry = paired(switch())
-    await start(hass, entry)
-    assert store_key(entry) not in hass_storage
-
-    assert await hass.config_entries.async_unload(entry.entry_id)
-
-    assert hass_storage[store_key(entry)]["data"]["resources"] == [record("ceiling", "light", "l1", "Ceiling")]
-
-    await start(hass, entry)
-    assert await hass.config_entries.async_remove(entry.entry_id)
-
-    assert store_key(entry) not in hass_storage
-
-
-async def test_a_light_deleted_while_running_is_missing_after_the_next_press_and_the_rest_still_toggles(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
-) -> None:
-    """The bridge's 404 has the switches resolved again at once (decision 32): the status runs on with the problem, the
-    repair comes, and the runner, which doesn't restart, toggles the rest."""
-    entry = paired(switch(lights=["Ceiling", "Desk"]))
-    runtime_data = await start(hass, entry)
+    ceiling = lights.add("ceiling")
+    desk = lights.add("desk")
+    config_entry = entry(switch(targets=[lights.target(ceiling), lights.target(desk)]))
+    runtime_data = await start(hass, config_entry)
     toggles = async_capture_events(hass, EVENT_TOGGLE)
     lan.broadcast(1)
-    bridge.deleted.add("l2")
 
-    lan.broadcast(2)
-    await settle()
+    er.async_get(hass).async_remove(desk)
+    hass.states.async_remove(desk)
     await tick(freezer, 0.5)
 
-    desk = f"{HALL}: no Hue light named 'Desk'. Known lights: 'Ceiling'"
+    removed = f"{HALL}: {desk} was removed from Home Assistant."
     service = runtime_data.status.service
     assert (service.state, service.message, service.problems) == (
         ServiceState.RUNNING,
-        "1 wall switch toggles 1 Hue light, room or zone; 1 is missing.",
-        (desk,),
+        "1 wall switch toggles 1 light; 1 is missing.",
+        (removed,),
     )
-    assert issues(hass)[f"missing_targets_{DEVICE_ID}"].translation_placeholders == {
-        "name": HALL,
-        "problems": f"- {desk}",
-    }
+    issue = issues(hass)[f"missing_targets_{DEVICE_ID}"]
+    assert (issue.translation_key, issue.severity, issue.is_fixable, issue.config_entry_id) == (
+        "missing_targets",
+        ir.IssueSeverity.WARNING,
+        True,
+        config_entry.entry_id,
+    )
+    assert issue.data == {"entry_id": config_entry.entry_id, "subentry_id": subentry_of(config_entry).subentry_id}
+    assert issue.translation_placeholders == {"name": HALL, "problems": f"- {removed}"}
+    await check_texts(hass, issue)
+
+    lan.broadcast(2)
+    await settle()
+
+    assert lights.turned() == [("turn_on", ceiling)]
+
+    lights.add("desk", on=True)
+    await tick(freezer, 0.5)
+
+    assert issues(hass) == {}
+    assert runtime_data.status.service.message == "1 wall switch toggles 2 lights."
 
     lan.broadcast(3)
     await settle()
 
-    assert bridge.puts() == [("l1", True), ("l2", True), ("l1", False)]
-    assert [(event.data["targets"], event.data["changed"], event.data["failed"]) for event in toggles] == [
-        (["light 'Ceiling'", "light 'Desk'"], 1, 1),
-        (["light 'Ceiling'"], 1, 0),
-    ]
-    assert bridge.created == 1
+    assert sorted(lights.turned()) == [("turn_off", ceiling), ("turn_off", desk)]
+    assert [event.data["targets"] for event in toggles] == [[ceiling], [ceiling, desk]]
+    assert logged(caplog, SUPERVISOR) == [removed]
+    assert logged(caplog, RUNNER).count(LISTENING) == 1
 
 
-async def test_a_rename_found_while_running_is_saved_as_one_found_at_the_start(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory, caplog: pytest.LogCaptureFixture
+async def test_a_disabled_light_is_left_out_until_it_is_enabled(
+    hass: HomeAssistant, lan: Lan, lights: Lights, freezer: FrozenDateTimeFactory
 ) -> None:
-    """Within the 15 minutes after which the switches are resolved again; then the supervisor restarts once."""
-    caplog.set_level(logging.INFO, logger=INTEGRATION_LOGGER.name)
-    entry = paired(switch(lights=["Ceiling"]))
-    runtime_data = await start(hass, entry)
-    bridge.names["l1"] = "Ceiling lamp"
+    ceiling = lights.add("ceiling")
+    desk = lights.add("desk")
+    config_entry = entry(switch(targets=[lights.target(ceiling), lights.target(desk)]))
+    runtime_data = await start(hass, config_entry)
+    registry = er.async_get(hass)
+    lan.broadcast(1)
 
-    await tick(freezer, TARGETS_CHECK_INTERVAL - 1)
-    assert subentry_of(entry).data[CONF_LIGHTS] == ["Ceiling"]
-    await tick(freezer, 1)
+    registry.async_update_entity(desk, disabled_by=er.RegistryEntryDisabler.USER)
+    await tick(freezer, 0.5)
+
+    disabled = f"{HALL}: {desk} is disabled."
+    assert runtime_data.status.service.problems == (disabled,)
+    assert issues(hass)[f"missing_targets_{DEVICE_ID}"].translation_placeholders == {
+        "name": HALL,
+        "problems": f"- {disabled}",
+    }
+
+    lan.broadcast(2)
     await settle()
 
-    assert subentry_of(entry).data[CONF_LIGHTS] == ["Ceiling lamp"]
-    assert logged(caplog, "custom_components.sonoff2hue.runtime") == [
-        f"{HALL}: light 'Ceiling' was renamed to 'Ceiling lamp' on the Hue bridge; saved the new name."
-    ]
-    assert logged(caplog, SUPERVISOR).count(RESTARTING) == 1
-    assert (bridge.created, bridge.closed) == (2, 1)
-    assert runtime_data.status.snapshot().switches[0].targets == ("light 'Ceiling lamp'",)
+    assert lights.turned() == [("turn_on", ceiling)]
 
+    registry.async_update_entity(desk, disabled_by=None)
+    await tick(freezer, 0.5)
 
-async def test_the_switch_test_resolves_with_the_remembered_resources(
-    hass: HomeAssistant, hass_storage: dict[str, Any], lan: Lan, bridge: Bridge
-) -> None:
-    """Another light took the name: the entry stays with the light that it found, as a press does."""
-    entry = paired(switch(lights=["Ceiling"]))
-    remember(hass_storage, entry, record("ceiling", "light", "l1", "Ceiling"), bridge_id=BRIDGE_ID)
-    bridge.names["l2"] = "Ceiling"
-    runtime_data = await start(hass, entry)
-
-    result = await runtime_data.async_test_toggle(DEVICE_ID)
-
-    assert (result.targets, result.problems) == (("light 'Ceiling' (l1)",), ())
-    assert bridge.puts() == [("l1", True)]
-
-
-# Reauthentication.
-
-
-async def test_a_key_rejected_at_the_start_starts_one_reauthentication(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge
-) -> None:
-    bridge.fail("/clip/v2/resource/bridge", 403, UNAUTHORIZED)
-    entry = paired(switch())
-    runtime_data = await start(hass, entry)
-    await hass.async_block_till_done()
-
-    assert (runtime_data.status.service.state, runtime_data.status.service.message) == (
-        ServiceState.ERROR,
-        KEY_REJECTED,
-    )
-    (flow,) = reauth_flows(hass)
-    assert (flow["step_id"], flow["context"]["entry_id"]) == ("reauth_confirm", entry.entry_id)
-
-    # The supervisor starts again after a change, and the bridge rejects the key again: still one.
-    subentry = subentry_of(entry)
-    hass.config_entries.async_update_subentry(entry, subentry, data={**subentry.data, CONF_LIGHTS: ["Desk"]})
-    await settle()
-    await hass.async_block_till_done()
-
-    assert bridge.created == 2
-    assert len(reauth_flows(hass)) == 1
-
-
-async def test_a_key_rejected_while_running_starts_one_reauthentication(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
-) -> None:
-    runtime_data = await start(hass, paired(switch()))
-    bridge.fail("/clip/v2/resource/bridge", 401, UNAUTHORIZED)
-
-    await tick(freezer, 45)
-    await hass.async_block_till_done()
-
-    assert len(reauth_flows(hass)) == 1
-
-    await tick(freezer, 45)
-    await hass.async_block_till_done()
-
-    assert len(reauth_flows(hass)) == 1
-    # The bridge goes on running and is shown as unreachable.
-    assert runtime_data.status.service.state is ServiceState.RUNNING
-    assert runtime_data.status.snapshot().hue.reachable is False
-
-
-@pytest.mark.usefixtures("lan")
-async def test_reauthentication_restarts_the_bridge_with_the_new_key(
-    hass: HomeAssistant, fake_hue_pressed: FakeHueHost, caplog: pytest.LogCaptureFixture
-) -> None:
-    """Over HTTPS with the fake bridge, which knows no key "revoked": no reload, the supervisor starts again."""
-    caplog.set_level(logging.INFO, logger=INTEGRATION_LOGGER.name)
-    entry = paired(
-        switch(lights=["Hallway"]),
-        address=fake_hue_pressed.address,
-        app_key="revoked",
-        pin=fake_hue_pressed.fingerprint,
-        bridge_id=FAKE_BRIDGE_ID,
-    )
-    runtime_data = await start(hass, entry)
-    await until(lambda: runtime_data.status.service.state is ServiceState.ERROR)
-    await hass.async_block_till_done()
-    (flow,) = reauth_flows(hass)
-
-    result = await hass.config_entries.flow.async_configure(flow["flow_id"], {})
-    assert result["type"] is FlowResultType.SHOW_PROGRESS
-    await hass.async_block_till_done()
-    result = await hass.config_entries.flow.async_configure(flow["flow_id"])
-
-    assert (result["type"], result["reason"]) == (FlowResultType.ABORT, "reauth_successful")
-    await until(lambda: runtime_data.status.service.state is ServiceState.RUNNING)
-    assert entry.runtime_data is runtime_data
-    assert fake_hue_pressed.bridge.is_authorized(entry.data[CONF_APP_KEY])
-    assert runtime_data.config.hue.app_key == entry.data[CONF_APP_KEY]
-    # The supervisor that waited for a change after the rejected key restarted.
-    assert logged(caplog, "custom_components.sonoff2hue.engine.supervisor").count(RESTARTING) == 1
-    assert reauth_flows(hass) == []
-
-
-@pytest.mark.usefixtures("lan")
-async def test_reconfiguring_restarts_the_bridge_without_a_reload(
-    hass: HomeAssistant, fake_hue_pressed: FakeHueHost
-) -> None:
-    app_key = await fake_hue_pressed.pair()
-    entry = paired(
-        switch(lights=["Hallway"]),
-        address=fake_hue_pressed.address,
-        app_key=app_key,
-        pin=fake_hue_pressed.fingerprint,
-        bridge_id=FAKE_BRIDGE_ID,
-    )
-    runtime_data = await start(hass, entry)
-    await until(lambda: runtime_data.status.service.state is ServiceState.RUNNING)
-
-    result = await entry.start_reconfigure_flow(hass)
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "address"})
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"address": fake_hue_pressed.address})
-    await hass.async_block_till_done()
-    result = await hass.config_entries.flow.async_configure(result["flow_id"])
-
-    assert (result["type"], result["reason"]) == (FlowResultType.ABORT, "reconfigure_successful")
-    assert entry.data[CONF_APP_KEY] != app_key
-    assert runtime_data.config.hue.app_key == entry.data[CONF_APP_KEY]
-    # A new key: the bridge's reachability starts over, and the new supervisor reaches the bridge with it.
-    assert runtime_data.status.snapshot().hue.reachable is None
-    await until(lambda: runtime_data.status.snapshot().hue.reachable is True)
-    await until(lambda: runtime_data.status.service.state is ServiceState.RUNNING)
-    assert entry.runtime_data is runtime_data
-    assert [task.done() for task in runtime_data._supervisor_tasks] == [True, False]
+    assert issues(hass) == {}
+    assert runtime_data.status.snapshot().switches[0].targets == (ceiling, desk)
 
 
 # Repairs.
 
 
 async def test_a_switch_not_in_detached_mode_and_one_that_cannot_be_decoded_raise_issues(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+    hass: HomeAssistant, lan: Lan, freezer: FrozenDateTimeFactory
 ) -> None:
-    entry = paired(switch(key=DEVICE_KEY))
-    await start(hass, entry)
+    config_entry = entry(switch(key=DEVICE_KEY))
+    await start(hass, config_entry)
 
     lan.broadcast(1, params=relay(detached=False), key=DEVICE_KEY)
     await tick(freezer, 0.5)
 
     issue = issues(hass)[f"not_detached_{DEVICE_ID}"]
-    assert (issue.translation_key, issue.severity, issue.is_fixable) == (
+    assert (issue.translation_key, issue.severity, issue.is_fixable, issue.data) == (
         "not_detached",
         ir.IssueSeverity.WARNING,
         False,
+        None,
     )
-    assert (issue.translation_placeholders, issue.config_entry_id) == ({"name": HALL}, entry.entry_id)
+    assert (issue.translation_placeholders, issue.config_entry_id) == ({"name": HALL}, config_entry.entry_id)
     await check_texts(hass, issue)
 
     lan.broadcast(2, params=relay(detached=True), key=DEVICE_KEY)
@@ -1055,11 +745,11 @@ async def test_a_switch_not_in_detached_mode_and_one_that_cannot_be_decoded_rais
     assert issues(hass) == {}
 
 
-async def test_the_issues_of_a_removed_switch_go_with_it(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+async def test_the_issues_of_a_removed_switch_go_with_it_and_all_go_at_unload(
+    hass: HomeAssistant, lan: Lan, freezer: FrozenDateTimeFactory
 ) -> None:
-    entry = paired(switch(key=DEVICE_KEY), switch(OTHER_DEVICE_ID, None, key=DEVICE_KEY))
-    await start(hass, entry)
+    config_entry = entry(switch(key=DEVICE_KEY), switch(OTHER_DEVICE_ID, None, key=DEVICE_KEY))
+    await start(hass, config_entry)
     lan.broadcast(1, params=relay(detached=False), key=DEVICE_KEY)
     lan.broadcast(1, OTHER_DEVICE_ID, params=relay(detached=False), key=DEVICE_KEY)
     await tick(freezer, 0.5)
@@ -1067,148 +757,22 @@ async def test_the_issues_of_a_removed_switch_go_with_it(
     assert set(issues(hass)) == {f"not_detached_{DEVICE_ID}", f"not_detached_{OTHER_DEVICE_ID}"}
     assert issues(hass)[f"not_detached_{OTHER_DEVICE_ID}"].translation_placeholders == {"name": OTHER_DEVICE_ID}
 
-    hass.config_entries.async_remove_subentry(entry, subentry_of(entry).subentry_id)
+    hass.config_entries.async_remove_subentry(config_entry, subentry_of(config_entry).subentry_id)
     await settle()
     await tick(freezer, 0.5)
 
     assert set(issues(hass)) == {f"not_detached_{OTHER_DEVICE_ID}"}
 
-    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert await hass.config_entries.async_unload(config_entry.entry_id)
 
     assert issues(hass) == {}
 
 
-async def test_a_switchs_missing_lights_rooms_or_zones_raise_its_own_issue_until_they_are_found(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+async def test_a_configuration_with_errors_raises_an_issue_until_it_is_fixed(
+    hass: HomeAssistant, lan: Lan, freezer: FrozenDateTimeFactory
 ) -> None:
-    """Decision 32: the service runs, the switch toggles what is on the bridge, and its issue is a warning; the
-    configuration has no problem."""
-    entry = paired(switch(lights=["Ceiling", "Kitchen"], groups=["Garden"]), switch(OTHER_DEVICE_ID, None))
-    runtime_data = await start(hass, entry)
-    await tick(freezer, 0.5)
-
-    kitchen = f"{HALL}: no Hue light named 'Kitchen'. Known lights: 'Ceiling', 'Desk'"
-    garden = f"{HALL}: no Hue room or zone named 'Garden'. Known: 'room:Hall'"
-    service = runtime_data.status.service
-    assert (service.state, service.message, service.problems) == (
-        ServiceState.RUNNING,
-        "2 wall switches toggle 2 Hue lights, rooms and zones; 2 are missing.",
-        (kitchen, garden),
-    )
-    assert set(issues(hass)) == {f"missing_targets_{DEVICE_ID}"}
-    issue = issues(hass)[f"missing_targets_{DEVICE_ID}"]
-    assert (issue.translation_key, issue.severity, issue.is_fixable, issue.config_entry_id) == (
-        "missing_targets",
-        ir.IssueSeverity.WARNING,
-        False,
-        entry.entry_id,
-    )
-    assert issue.translation_placeholders == {"name": HALL, "problems": f"- {kitchen}\n- {garden}"}
-    await check_texts(hass, issue)
-
-    lan.broadcast(1)
-    lan.broadcast(2)
-    await settle()
-
-    assert bridge.puts() == [("l1", True)]
-
-    subentry = subentry_of(entry)
-    hass.config_entries.async_update_subentry(
-        entry, subentry, data={**subentry.data, CONF_LIGHTS: ["Ceiling"], CONF_GROUPS: ["Hall"]}
-    )
-    await settle()
-    await tick(freezer, 0.5)
-
-    assert issues(hass) == {}
-
-
-async def test_a_switch_with_nothing_left_to_toggle_fires_its_presses_and_fails_each_toggle(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge
-) -> None:
-    """Its presses reach automations as before, and each toggle event says why nothing was toggled."""
-    entry = paired(switch(lights=["Kitchen"]))
-    await start(hass, entry)
-    presses = async_capture_events(hass, EVENT_PRESS)
-    toggles = async_capture_events(hass, EVENT_TOGGLE)
-    device = dr.async_get(hass).async_get_device_by_identifier((DOMAIN, DEVICE_ID), entry.entry_id)
-    assert device is not None
-    hall = {"device_id": device.id, "switch_id": DEVICE_ID, "name": "Hall"}
-
-    lan.broadcast(1)
-    lan.broadcast(2)
-    await settle()
-
-    assert [event.data for event in presses] == [{**hall, "seq": 2}]
-    assert [event.data for event in toggles] == [{**hall, "result": "failed", "targets": [], "message": NO_TARGETS}]
-    assert bridge.puts() == []
-
-
-async def test_an_unpinned_certificate_raises_an_issue_until_one_is_pinned(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
-) -> None:
-    entry = paired(switch(), pin=None)
-    await start(hass, entry)
-
-    issue = issues(hass)["certificate_not_pinned"]
-    assert (issue.translation_key, issue.severity, issue.is_fixable) == (
-        "certificate_not_pinned",
-        ir.IssueSeverity.WARNING,
-        True,
-    )
-    assert (issue.data, issue.translation_placeholders) == ({"entry_id": entry.entry_id}, {})
-    await check_texts(hass, issue)
-
-    hass.config_entries.async_update_entry(entry, data={**entry.data, CONF_CERTIFICATE_SHA256: PIN})
-    await settle()
-    await tick(freezer, 0.5)
-
-    assert issues(hass) == {}
-
-
-async def test_an_unpaired_bridge_raises_no_certificate_issue(hass: HomeAssistant, lan: Lan, bridge: Bridge) -> None:
-    await start(hass, paired(switch(), app_key=None, pin=None))
-
-    assert issues(hass) == {}
-
-
-async def test_a_changed_certificate_raises_an_issue_until_the_bridge_is_paired_again(
-    hass: HomeAssistant, lan: Lan, fake_hue_pressed: FakeHueHost
-) -> None:
-    """Over HTTPS with the fake bridge, whose certificate isn't the pinned one."""
-    app_key = await fake_hue_pressed.pair()
-    entry = paired(
-        switch(lights=["Hallway"]),
-        address=fake_hue_pressed.address,
-        app_key=app_key,
-        pin="00" * 32,
-        bridge_id=FAKE_BRIDGE_ID,
-    )
-    runtime_data = await start(hass, entry)
-    await until(lambda: "certificate_changed" in issues(hass))
-
-    assert runtime_data.status.snapshot().hue.message == CERTIFICATE_MISMATCH
-    issue = issues(hass)["certificate_changed"]
-    assert (issue.translation_key, issue.severity, issue.is_fixable) == (
-        "certificate_changed",
-        ir.IssueSeverity.ERROR,
-        True,
-    )
-    await check_texts(hass, issue)
-
-    hass.config_entries.async_update_entry(
-        entry, data={**entry.data, CONF_CERTIFICATE_SHA256: fake_hue_pressed.fingerprint}
-    )
-    await until(lambda: issues(hass) == {})
-
-    assert runtime_data.status.service.state is ServiceState.RUNNING
-
-
-async def test_an_unexpected_configuration_problem_shows_its_message(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
-) -> None:
-    entry = paired(switch(lights=[" "]))
-    await start(hass, entry)
-    await tick(freezer, 0.5)
+    config_entry = entry(switch(targets=[" "]), switch(OTHER_DEVICE_ID, None, targets=[CEILING, ""]))
+    await start(hass, config_entry)
 
     issue = issues(hass)["invalid_config"]
     assert (issue.translation_key, issue.severity, issue.is_fixable) == (
@@ -1218,543 +782,217 @@ async def test_an_unexpected_configuration_problem_shows_its_message(
     )
     assert issue.translation_placeholders == {
         "message": "The configuration has errors.",
-        "problems": "- switches[0] ('Hall'): empty light/group name.",
+        "problems": "- switches[0] ('Hall'): empty light.\n- switches[1]: empty light.",
     }
     await check_texts(hass, issue)
 
-
-# Repair flows.
-
-
-@pytest.mark.usefixtures("lan", "bridge")
-async def test_the_repair_leads_to_the_reconfigure_flow(hass: HomeAssistant) -> None:
-    assert await async_setup_component(hass, "repairs", {})
-    entry = paired(switch(), pin=None)
-    await start(hass, entry)
-    manager = repairs_flow_manager(hass)
-    assert manager is not None
-
-    result = await manager.async_init(DOMAIN, context={"issue_id": "certificate_not_pinned"})
-
-    assert (result["type"], result["step_id"]) == (FlowResultType.FORM, "confirm")
-
-    result = await manager.async_configure(result["flow_id"], {})
-
-    assert (result["type"], result["reason"]) == (FlowResultType.ABORT, "reconfigure")
-    flow_type, flow_id = result["next_flow"]
-    assert flow_type is FlowType.CONFIG_FLOW
-    flow = hass.config_entries.flow.async_get(flow_id)
-    assert (flow["context"]["source"], flow["context"]["entry_id"], flow["step_id"]) == (
-        "reconfigure",
-        entry.entry_id,
-        "reconfigure",
-    )
-    # The issue stays until the bridge is paired again.
-    assert "certificate_not_pinned" in issues(hass)
-
-
-@pytest.mark.usefixtures("lan", "bridge", "socket_enabled")
-async def test_the_frontend_gets_the_reconfigure_flow_as_the_next_flow(
-    hass: HomeAssistant, hass_client: ClientSessionGenerator
-) -> None:
-    assert await async_setup_component(hass, "repairs", {})
-    await start(hass, paired(switch(), pin=None))
-    client = await hass_client()
-
-    result = await start_repair_fix_flow(client, DOMAIN, "certificate_not_pinned")
-    result = await process_repair_fix_flow(client, result["flow_id"], {})
-
-    assert (result["type"], result["reason"]) == ("abort", "reconfigure")
-    assert result["next_flow"][0] == "config_flow"
-    assert hass.config_entries.flow.async_get(result["next_flow"][1])["step_id"] == "reconfigure"
-
-
-@pytest.mark.usefixtures("lan", "bridge")
-async def test_the_repair_of_a_removed_entry_ends(hass: HomeAssistant) -> None:
-    assert await async_setup_component(hass, "repairs", {})
-    entry = paired(switch(), pin=None)
-    await start(hass, entry)
-    manager = repairs_flow_manager(hass)
-    assert manager is not None
-    result = await manager.async_init(DOMAIN, context={"issue_id": "certificate_not_pinned"})
-
-    assert await hass.config_entries.async_remove(entry.entry_id)
-    result = await manager.async_configure(result["flow_id"], {})
-
-    assert (result["type"], result["reason"]) == (FlowResultType.ABORT, "not_loaded")
-    assert hass.config_entries.flow.async_progress() == []
-
-
-async def test_a_repair_without_its_entry_ends(hass: HomeAssistant) -> None:
-    flow = await repairs.async_create_fix_flow(hass, "certificate_changed", None)
-    flow.hass = hass
-
-    result = await flow.async_step_confirm({})
-
-    assert (result["type"], result["reason"]) == (FlowResultType.ABORT, "not_loaded")
-
-
-# Following the bridge to a new address (decision 33).
-
-OLD_ADDRESS = "192.0.2.10"
-NEW_ADDRESS = "192.0.2.20"
-LISTED_ID = BRIDGE_ID.lower()
-"""The bridge id as mDNS and Signify's endpoint list it."""
-
-
-def moved_to(bridge: Bridge, finder: Finder, address: str, certificate: str = PIN) -> None:
-    """The bridge no longer answers at the old address, and the search lists it at ``address``."""
-    bridge.moved_from.add(OLD_ADDRESS)
-    finder.listed = [DiscoveredBridge(address, LISTED_ID, "mDNS")]
-    finder.bridges = {address: bridge_info(address, certificate)}
-
-
-async def test_the_bridge_found_at_a_new_address_with_its_pin_is_saved_once_without_a_reload(
-    hass: HomeAssistant,
-    lan: Lan,
-    bridge: Bridge,
-    finder: Finder,
-    freezer: FrozenDateTimeFactory,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """The entry's address changes once, which restarts the supervisor once, and the switches toggle there."""
-    caplog.set_level(logging.INFO, logger=INTEGRATION_LOGGER.name)
-    entry = paired(switch(), address=OLD_ADDRESS)
-    entry.add_to_hass(hass)
-    addresses: list[str] = []
-
-    async def changed(hass: HomeAssistant, entry: ConfigEntry) -> None:
-        addresses.append(entry.data[CONF_BRIDGE_IP])
-
-    stop_following = entry.add_update_listener(changed)
-    moved_to(bridge, finder, NEW_ADDRESS)
-    runtime_data = await start(hass, entry)
-    await tick(freezer, 59)
-
-    assert (finder.searches, addresses) == ([], [])
-
-    await tick(freezer, 1)
-    await settle()
-
-    assert (entry.data[CONF_BRIDGE_IP], runtime_data.config.hue.bridge_ip) == (NEW_ADDRESS, NEW_ADDRESS)
-    assert addresses == [NEW_ADDRESS]
-    assert entry.runtime_data is runtime_data
-    assert [task.done() for task in runtime_data._supervisor_tasks] == [True, False]
-    assert logged(caplog, "custom_components.sonoff2hue.runtime") == [
-        f"The Hue bridge {BRIDGE_ID} moved from {OLD_ADDRESS} to {NEW_ADDRESS}; saved its new address."
-    ]
-    # The move, then the restart that it causes.
-    lines = [record.getMessage() for record in caplog.records]
-    assert lines.index(RESTARTING) == lines.index(logged(caplog, "custom_components.sonoff2hue.runtime")[0]) + 1
-    assert logged(caplog, SUPERVISOR).count(RESTARTING) == 1
-    status = runtime_data.status
-    assert (status.service.state, status.snapshot().hue.bridge_ip, status.snapshot().hue.reachable) == (
-        ServiceState.RUNNING,
-        NEW_ADDRESS,
-        True,
-    )
-
-    lan.broadcast(1)
-    lan.broadcast(2)
-    await settle()
-    await tick(freezer, 3600)
-
-    assert bridge.puts() == [("l1", True)]
-    assert (addresses, finder.searches) == ([NEW_ADDRESS], [(True, True)])
-    assert issues(hass) == {}
-    stop_following()
-
-
-async def test_a_bridge_that_moved_keeps_its_remembered_lights_rooms_and_zones(
-    hass: HomeAssistant,
-    hass_storage: dict[str, Any],
-    lan: Lan,
-    bridge: Bridge,
-    finder: Finder,
-    freezer: FrozenDateTimeFactory,
-) -> None:
-    """They belong to the bridge's id, which its address doesn't change: a light renamed meanwhile is followed at the
-    new address (decision 32)."""
-    entry = paired(switch(), address=OLD_ADDRESS)
-    remember(hass_storage, entry, record("ceiling", "light", "l1", "Ceiling"), bridge_id=BRIDGE_ID)
-    moved_to(bridge, finder, NEW_ADDRESS)
-    bridge.names["l1"] = "Ceiling lamp"
-    await start(hass, entry)
-    await tick(freezer, 60)
-    await settle()
-    await tick(freezer, 0.5)
-
-    assert entry.data[CONF_BRIDGE_IP] == NEW_ADDRESS
-    assert subentry_of(entry).data[CONF_LIGHTS] == ["Ceiling lamp"]
-    assert issues(hass) == {}
-
-
-async def test_a_bridge_found_with_another_certificate_is_not_used(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, finder: Finder, freezer: FrozenDateTimeFactory
-) -> None:
-    entry = paired(switch(), address=OLD_ADDRESS)
-    moved_to(bridge, finder, NEW_ADDRESS, certificate="CD" * 32)
-    runtime_data = await start(hass, entry)
-    await tick(freezer, 60)
-    await tick(freezer, 0.5)
-
-    assert entry.data[CONF_BRIDGE_IP] == OLD_ADDRESS
-    assert runtime_data.status.service.state is ServiceState.CONNECTING
-    assert issues(hass) == {}
-
-
-async def test_a_move_is_saved_only_while_its_configuration_is_current(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge
-) -> None:
-    """The configuration may have changed meanwhile, and its own supervisor looks for the bridge again."""
-    entry = paired(switch(), address=OLD_ADDRESS)
-    runtime_data = await start(hass, entry)
-    earlier = runtime_data.config
-    subentry = subentry_of(entry)
-    hass.config_entries.async_update_subentry(entry, subentry, data={**subentry.data, CONF_LIGHTS: ["Desk"]})
-    await settle()
-
-    runtime_data._on_bridge_moved(BridgeMoved(earlier, NEW_ADDRESS))
-    await settle()
-
-    assert entry.data[CONF_BRIDGE_IP] == OLD_ADDRESS
-    # The supervisors of the configuration at the start and after the switch's change; none for the move.
-    assert bridge.created == 2
-
-    runtime_data._on_bridge_moved(BridgeMoved(runtime_data.config, NEW_ADDRESS))
-    await settle()
-
-    assert entry.data[CONF_BRIDGE_IP] == NEW_ADDRESS
-    assert bridge.created == 3
-
-
-async def test_the_searches_keep_their_rates_across_the_restarts_of_the_supervisor(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, finder: Finder, freezer: FrozenDateTimeFactory
-) -> None:
-    """Every supervisor of the entry gets the same search, so a change of the switches doesn't ask sooner."""
-    entry = paired(switch(), address=OLD_ADDRESS)
-    bridge.moved_from.add(OLD_ADDRESS)
-    await start(hass, entry)
-    await tick(freezer, 60)
-
-    assert finder.searches == [(True, True)]
-
-    subentry = subentry_of(entry)
-    hass.config_entries.async_update_subentry(entry, subentry, data={**subentry.data, CONF_LIGHTS: ["Desk"]})
-    await settle()
-    # The new supervisor's 60 s end at 120 s, before mDNS is due again, at 360 s.
-    await tick(freezer, 60)
-
-    assert finder.searches == [(True, True)]
-
-    await tick(freezer, 240)
-
-    assert finder.searches == [(True, True), (True, False)]
-
-
-async def test_the_search_for_the_bridge_is_the_engines_discovery_on_home_assistants_session(
-    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """For 5 seconds, as the setup flow searches, with Home Assistant's shared session for Signify's endpoint, a public
-    host name; each bridge it lists is read with ``get_bridge_info``."""
-    calls: list[tuple[object, float, bool, bool]] = []
-    found = [DiscoveredBridge(NEW_ADDRESS, LISTED_ID, "mDNS")]
-
-    async def discover(session: object, duration: float, *, mdns: bool, cloud: bool) -> list[DiscoveredBridge]:
-        calls.append((session, duration, mdns, cloud))
-        return found
-
-    monkeypatch.setattr(runtime, "discover", discover)
-    search = runtime.new_bridge_search(hass)
-    first = search.next_at(0.0)
-
-    assert await search.find(first) == found
-    assert await search.find(first + 300) == found
-    assert calls == [
-        (async_get_clientsession(hass), 5.0, True, True),
-        (async_get_clientsession(hass), 5.0, True, False),
-    ]
-    assert search.read is get_bridge_info
-
-
-@pytest.mark.usefixtures("socket_enabled")
-async def test_the_bridge_is_followed_to_its_new_address_over_https(
-    hass: HomeAssistant, lan: Lan, finder: Finder, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
-    """Two fake bridges with one certificate and the bridge id. The first stops, as if the bridge's address had changed,
-    and the search lists the second: sonoff2hue reads it without the application key, compares its certificate with
-    the pin, saves its address and switches the lights there. The second one has the key that sonoff2hue paired, as
-    the bridge has at its new address. The search's 60 s are shortened here; the engine's tests keep them."""
-    caplog.set_level(logging.INFO, logger=INTEGRATION_LOGGER.name)
-    monkeypatch.setattr(supervisor, "SEARCH_AFTER", 0.1)
-    certificate = create_certificate()
-    first = await FakeHueHost.start(certificate=certificate)
-    second = await FakeHueHost.start(certificate=certificate)
-    running = [first, second]
-    try:
-        entry = paired(
-            switch(lights=["Hallway"]),
-            address=first.address,
-            app_key=await second.pair(),
-            pin=first.fingerprint,
-            bridge_id=FAKE_BRIDGE_ID,
+    for subentry in config_entry.subentries.values():
+        hass.config_entries.async_update_subentry(
+            config_entry, subentry, data={**subentry.data, CONF_TARGETS: [CEILING]}
         )
-        await first.stop()
-        running.remove(first)
-        finder.read = get_bridge_info
-        finder.listed = [DiscoveredBridge(second.address, FAKE_BRIDGE_ID.lower(), "mDNS")]
-        runtime_data = await start(hass, entry)
-        await until(lambda: runtime_data.status.service.state is ServiceState.RUNNING)
-
-        assert (entry.data[CONF_BRIDGE_IP], runtime_data.status.snapshot().hue.bridge_ip) == (
-            second.address,
-            second.address,
-        )
-        assert entry.runtime_data is runtime_data
-        assert logged(caplog, "custom_components.sonoff2hue.runtime") == [
-            f"The Hue bridge {FAKE_BRIDGE_ID} moved from {first.address} to {second.address}; saved its new address."
-        ]
-
-        lan.broadcast(1)
-        lan.broadcast(2)
-        await until(lambda: second.bridge.puts == ["light 'Hallway' on"])
-    finally:
-        for host in running:
-            await host.stop()
-
-
-async def raise_bridge_moved(
-    hass: HomeAssistant, bridge: Bridge, finder: Finder, freezer: FrozenDateTimeFactory
-) -> MockConfigEntry:
-    """An entry without a pin whose bridge the search finds at another address, which raises the repair."""
-    entry = paired(switch(), address=OLD_ADDRESS, pin=None)
-    moved_to(bridge, finder, NEW_ADDRESS, certificate="CD" * 32)
-    await start(hass, entry)
-    await tick(freezer, 60)
+    # The switches start again, then the status shows them.
+    await settle()
     await tick(freezer, 0.5)
-    return entry
+
+    assert issues(hass) == {}
 
 
-async def test_without_a_pin_the_bridge_found_at_a_new_address_raises_a_repair_until_it_answers_at_its_own(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, finder: Finder, freezer: FrozenDateTimeFactory
+async def test_a_migrated_switchs_lights_without_a_light_raise_its_issue_until_it_is_saved(
+    hass: HomeAssistant, lan: Lan, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """The address isn't used: without a pin, the client checks no certificate. The repair offers to pair the bridge
-    there."""
-    entry = await raise_bridge_moved(hass, bridge, finder, freezer)
+    """The lights, rooms and zones of version 1 that the migration found no light for (decision 40). Saving the switch
+    drops them, which changes nothing that the switches run."""
+    caplog.set_level(logging.INFO, logger=INTEGRATION_LOGGER.name)
+    config_entry = entry(switch(extra={CONF_UNMIGRATED: ["Pendant", "room:Hall"]}), switch(OTHER_DEVICE_ID, "Porch"))
+    await start(hass, config_entry)
 
-    issue = issues(hass)["bridge_moved"]
+    assert set(issues(hass)) == {f"unmigrated_{DEVICE_ID}"}
+    issue = issues(hass)[f"unmigrated_{DEVICE_ID}"]
     assert (issue.translation_key, issue.severity, issue.is_fixable, issue.config_entry_id) == (
-        "bridge_moved",
+        "unmigrated",
         ir.IssueSeverity.WARNING,
         True,
-        entry.entry_id,
+        config_entry.entry_id,
     )
-    assert (issue.data, issue.translation_placeholders) == (
-        {"entry_id": entry.entry_id},
-        {"address": OLD_ADDRESS, "found": NEW_ADDRESS},
-    )
+    assert issue.data == {"entry_id": config_entry.entry_id, "subentry_id": subentry_of(config_entry).subentry_id}
+    assert issue.translation_placeholders == {"name": HALL, "entries": "- `Pendant`\n- `room:Hall`"}
     await check_texts(hass, issue)
-    assert entry.data[CONF_BRIDGE_IP] == OLD_ADDRESS
 
-    bridge.moved_from.clear()
-    await tick(freezer, 10)
-    await tick(freezer, 0.5)
-
-    assert set(issues(hass)) == {"certificate_not_pinned"}
-    assert entry.runtime_data.status.service.state is ServiceState.RUNNING
-
-
-async def test_the_repair_for_the_bridge_found_goes_when_its_address_changes(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, finder: Finder, freezer: FrozenDateTimeFactory
-) -> None:
-    entry = await raise_bridge_moved(hass, bridge, finder, freezer)
-    assert "bridge_moved" in issues(hass)
-
-    hass.config_entries.async_update_entry(entry, data={**entry.data, CONF_BRIDGE_IP: NEW_ADDRESS})
+    subentry = subentry_of(config_entry)
+    data = {key: value for key, value in subentry.data.items() if key != CONF_UNMIGRATED}
+    hass.config_entries.async_update_subentry(config_entry, subentry, data=data)
     await settle()
-    await tick(freezer, 0.5)
 
-    assert set(issues(hass)) == {"certificate_not_pinned"}
-
-
-@pytest.mark.usefixtures("lan")
-async def test_the_repair_for_the_bridge_found_leads_to_the_reconfigure_flow(
-    hass: HomeAssistant, bridge: Bridge, finder: Finder, freezer: FrozenDateTimeFactory
-) -> None:
-    """Its text names both addresses; reconfigure's search selects the bridge that it finds with the paired id."""
-    assert await async_setup_component(hass, "repairs", {})
-    entry = await raise_bridge_moved(hass, bridge, finder, freezer)
-    manager = repairs_flow_manager(hass)
-    assert manager is not None
-
-    result = await manager.async_init(DOMAIN, context={"issue_id": "bridge_moved"})
-
-    assert (result["type"], result["step_id"], result["description_placeholders"]) == (
-        FlowResultType.FORM,
-        "confirm",
-        {"address": OLD_ADDRESS, "found": NEW_ADDRESS},
-    )
-
-    result = await manager.async_configure(result["flow_id"], {})
-
-    assert (result["type"], result["reason"]) == (FlowResultType.ABORT, "reconfigure")
-    flow_type, flow_id = result["next_flow"]
-    assert flow_type is FlowType.CONFIG_FLOW
-    flow = hass.config_entries.flow.async_get(flow_id)
-    assert (flow["context"]["source"], flow["context"]["entry_id"], flow["step_id"]) == (
-        "reconfigure",
-        entry.entry_id,
-        "reconfigure",
-    )
-    # The issue stays until the bridge answers at its address, or the address changes.
-    assert "bridge_moved" in issues(hass)
+    assert issues(hass) == {}
+    assert RESTARTING not in logged(caplog, SUPERVISOR)
 
 
 # The switch test.
 
 
 async def test_the_switch_test_toggles_and_logs(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, caplog: pytest.LogCaptureFixture, freezer: FrozenDateTimeFactory
+    hass: HomeAssistant, lan: Lan, lights: Lights, caplog: pytest.LogCaptureFixture, freezer: FrozenDateTimeFactory
 ) -> None:
     caplog.set_level(logging.INFO, logger=INTEGRATION_LOGGER.name)
-    runtime_data = await start(hass, paired(switch(lights=["Ceiling"], groups=["Hall"])))
-    created = bridge.created
+    lights.add("ceiling")
+    desk = lights.add("desk")
+    runtime_data = await start(hass, entry(switch(targets=[CEILING, lights.target(desk)])))
+    presses = async_capture_events(hass, EVENT_PRESS)
+    toggles = async_capture_events(hass, EVENT_TOGGLE)
 
     result = await runtime_data.async_test_toggle(f" {DEVICE_ID.upper()} ")
 
-    assert result == SwitchTestResult(True, 2, 0, 0, 0, ("light 'Ceiling'", "group 'Hall'"))
-    assert bridge.puts() == [("l1", True), ("g1", True)]
-    assert logged(caplog, INTEGRATION_LOGGER.name) == [
-        f"{HALL}: test from Home Assistant turned ON light 'Ceiling', group 'Hall'."
-    ]
-    # A client of its own, closed afterwards.
-    assert (bridge.created - created, bridge.closed) == (1, 1)
+    assert result == SwitchTestResult(True, 2, 0, 0, 0, (CEILING, desk))
+    assert sorted(lights.turned()) == [("turn_on", CEILING), ("turn_on", desk)]
+    assert logged(caplog, INTEGRATION_LOGGER.name) == [f"{HALL}: test from Home Assistant turned ON {CEILING}, {desk}."]
 
-    result = await runtime_data.async_test_toggle(DEVICE_ID)
+    # It takes as long as its lights take.
+    held = lights.hold(desk)
+    testing = hass.async_create_task(runtime_data.async_test_toggle(DEVICE_ID))
+    await tick(freezer, 0.25)
+    held.set()
+    result = await testing
 
-    assert result == SwitchTestResult(False, 2, 0, 0, 0, ("light 'Ceiling'", "group 'Hall'"))
+    assert result == SwitchTestResult(False, 2, 0, 0, 250, (CEILING, desk))
     # The test isn't a press: no events, and no last action.
+    await settle()
+    assert (presses, toggles) == ([], [])
     assert runtime_data.status.snapshot().switches[0].last_action is None
 
 
-@pytest.mark.parametrize(
-    ("entry", "device_id", "message"),
-    [
-        (paired(switch()), OTHER_DEVICE_ID, f"No switch with device id {OTHER_DEVICE_ID} is configured."),
-        (paired(switch()), " ", "No switch with device id   is configured."),
-        (
-            paired(switch(), app_key=None),
-            DEVICE_ID,
-            "Pair the Hue bridge first: reconfigure the sonoff2hue integration.",
-        ),
-        (
-            paired(switch(), address="not a host"),
-            DEVICE_ID,
-            "'not a host' is not a valid Hue bridge address.",
-        ),
-    ],
-    ids=["unknown switch", "blank id", "not paired", "unusable settings"],
-)
-@pytest.mark.usefixtures("lan")
-async def test_the_switch_test_refuses_with_its_reasons(
-    hass: HomeAssistant, bridge: Bridge, entry: MockConfigEntry, device_id: str, message: str
+async def test_the_switch_test_counts_and_logs_a_light_that_fails(
+    hass: HomeAssistant, lan: Lan, lights: Lights, caplog: pytest.LogCaptureFixture, freezer: FrozenDateTimeFactory
 ) -> None:
-    runtime_data = await start(hass, entry)
-    created = bridge.created
+    caplog.set_level(logging.INFO, logger=INTEGRATION_LOGGER.name)
+    lights.add("ceiling")
+    desk = lights.add("desk")
+    runtime_data = await start(hass, entry(switch(targets=[CEILING, desk])))
+    lights.fail(CEILING, "Request failed: the light didn't answer")
+
+    result = await runtime_data.async_test_toggle(DEVICE_ID)
+
+    assert result == SwitchTestResult(True, 1, 0, 1, 0, (CEILING, desk))
+    assert logged(caplog, INTEGRATION_LOGGER.name) == [
+        f"Could not switch {CEILING} on: Request failed: the light didn't answer",
+        f"{HALL}: test from Home Assistant turned ON {CEILING}, {desk}.",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("device_id", "message"),
+    [
+        (OTHER_DEVICE_ID, f"No switch with device id {OTHER_DEVICE_ID} is configured."),
+        (" ", "No switch with device id   is configured."),
+    ],
+    ids=["unknown switch", "blank id"],
+)
+async def test_the_switch_test_refuses_a_switch_that_isnt_configured(
+    hass: HomeAssistant, lan: Lan, lights: Lights, device_id: str, message: str
+) -> None:
+    lights.add("ceiling")
+    runtime_data = await start(hass, entry(switch()))
 
     with pytest.raises(SwitchTestError) as caught:
         await runtime_data.async_test_toggle(device_id)
 
-    assert str(caught.value).startswith(message)
-    assert caught.value.problems == ()
-    assert bridge.created == created
+    assert (str(caught.value), caught.value.problems) == (message, ())
+    assert lights.turned() == []
 
 
-@pytest.mark.usefixtures("lan")
-async def test_the_switch_test_lists_the_targets_not_on_the_bridge(hass: HomeAssistant, bridge: Bridge) -> None:
-    """When none of them is: the runner would toggle nothing either."""
-    runtime_data = await start(hass, paired(switch(lights=["Kitchen"], groups=["Garden"])))
+async def test_the_switch_test_names_the_lights_that_home_assistant_doesnt_have(
+    hass: HomeAssistant, lan: Lan, lights: Lights
+) -> None:
+    """When it has none of them: the runner would toggle nothing either."""
+    desk = lights.add("desk")
+    er.async_get(hass).async_update_entity(desk, disabled_by=er.RegistryEntryDisabler.USER)
+    runtime_data = await start(hass, entry(switch(targets=[UNKNOWN_TARGET, lights.target(desk)])))
 
     with pytest.raises(SwitchTestError) as caught:
         await runtime_data.async_test_toggle(DEVICE_ID)
 
-    problems = (
-        f"{HALL}: no Hue light named 'Kitchen'. Known lights: 'Ceiling', 'Desk'",
-        f"{HALL}: no Hue room or zone named 'Garden'. Known: 'room:Hall'",
-    )
+    problems = (f"{HALL}: a light was removed from Home Assistant.", f"{HALL}: {desk} is disabled.")
     assert caught.value.problems == problems
     assert str(caught.value) == " ".join(problems)
-    assert bridge.puts() == []
-    assert bridge.closed == bridge.created - 1
+    assert lights.turned() == []
 
 
-@pytest.mark.usefixtures("lan")
-async def test_the_switch_test_toggles_what_is_on_the_bridge_and_names_what_is_missing(
-    hass: HomeAssistant, bridge: Bridge, caplog: pytest.LogCaptureFixture
+async def test_the_switch_test_of_a_switch_without_lights_says_so(hass: HomeAssistant, lan: Lan) -> None:
+    runtime_data = await start(hass, entry(switch(targets=[])))
+
+    with pytest.raises(SwitchTestError) as caught:
+        await runtime_data.async_test_toggle(DEVICE_ID)
+
+    assert (str(caught.value), caught.value.problems) == (NO_TARGETS, ())
+
+
+LIGHT_REMOVED = "a light was removed from Home Assistant."
+DESK_REMOVED = "light.desk was removed from Home Assistant."
+
+
+@pytest.mark.parametrize(
+    ("unknown", "missing", "line"),
+    [
+        ([], [DESK_REMOVED], f"1 is missing: {DESK_REMOVED}"),
+        ([UNKNOWN_TARGET], [LIGHT_REMOVED, DESK_REMOVED], f"2 are missing: {LIGHT_REMOVED}; {DESK_REMOVED}"),
+    ],
+    ids=["one", "two"],
+)
+async def test_the_switch_test_toggles_the_lights_that_home_assistant_has_and_names_the_others(
+    hass: HomeAssistant,
+    lan: Lan,
+    lights: Lights,
+    caplog: pytest.LogCaptureFixture,
+    freezer: FrozenDateTimeFactory,
+    unknown: list[str],
+    missing: list[str],
+    line: str,
 ) -> None:
     """As the runner does (decision 32): the result and the log line name what is missing."""
     caplog.set_level(logging.INFO, logger=INTEGRATION_LOGGER.name)
-    runtime_data = await start(hass, paired(switch(lights=["Ceiling", "Kitchen"], groups=["Garden", "Hall"])))
+    lights.add("ceiling")
+    desk = lights.add("desk")
+    desk_target = lights.target(desk)
+    er.async_get(hass).async_remove(desk)
+    runtime_data = await start(hass, entry(switch(targets=[CEILING, *unknown, desk_target])))
+    caplog.clear()
 
     result = await runtime_data.async_test_toggle(DEVICE_ID)
 
-    kitchen = "no Hue light named 'Kitchen'. Known lights: 'Ceiling', 'Desk'"
-    garden = "no Hue room or zone named 'Garden'. Known: 'room:Hall'"
-    assert result == SwitchTestResult(
-        True, 2, 0, 0, 0, ("light 'Ceiling'", "group 'Hall'"), (f"{HALL}: {kitchen}", f"{HALL}: {garden}")
-    )
-    assert bridge.puts() == [("l1", True), ("g1", True)]
-    assert logged(caplog, INTEGRATION_LOGGER.name) == [
-        f"{HALL}: test from Home Assistant turned ON light 'Ceiling', group 'Hall'; 2 are missing: {kitchen}; {garden}"
-    ]
-
-
-@pytest.mark.usefixtures("lan")
-async def test_the_switch_test_gives_the_bridges_error(hass: HomeAssistant, bridge: Bridge) -> None:
-    runtime_data = await start(hass, paired(switch()))
-    bridge.fail("/clip/v2/resource/light", 503)
-
-    with pytest.raises(SwitchTestError, match=r"^Hue bridge returned 503 Service Unavailable for GET /clip/v2/"):
-        await runtime_data.async_test_toggle(DEVICE_ID)
-
-    assert bridge.closed == bridge.created - 1
+    problems = tuple(f"{HALL}: {problem}" for problem in missing)
+    assert result == SwitchTestResult(True, 1, 0, 0, 0, (CEILING,), problems)
+    assert lights.turned() == [("turn_on", CEILING)]
+    assert logged(caplog, INTEGRATION_LOGGER.name) == [f"{HALL}: test from Home Assistant turned ON {CEILING}; {line}"]
 
 
 # The activity.
 
 
 async def test_the_activity_has_what_the_integration_logs_at_its_level(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, caplog: pytest.LogCaptureFixture
+    hass: HomeAssistant, lan: Lan, caplog: pytest.LogCaptureFixture
 ) -> None:
     """Home Assistant's level decides, as for its own log: warnings by default, info and debug lines when asked."""
     caplog.set_level(logging.WARNING, logger=INTEGRATION_LOGGER.name)
-    bridge.fail("/clip/v2/resource/bridge", 503)
-    runtime_data = await start(hass, paired(switch()))
+    runtime_data = await start(hass, entry(switch(targets=[UNKNOWN_TARGET])))
 
     entries = runtime_data.activity.get(0, 1000)
     assert [(entry.level, entry.category, entry.message) for entry in entries] == [
-        (
-            "warning",
-            "supervisor",
-            f"Hue bridge at {BRIDGE_ADDRESS} not reachable ({BRIDGE_DOWN}); retrying every 10 s.",
-        )
+        ("warning", "supervisor", f"{HALL}: a light was removed from Home Assistant.")
     ]
 
     caplog.set_level(logging.DEBUG, logger=INTEGRATION_LOGGER.name)
-    bridge.heal()
-    lan.broadcast(1, OTHER_DEVICE_ID)
     subentry = subentry_of(runtime_data.entry)
     hass.config_entries.async_update_subentry(
-        runtime_data.entry, subentry, data={**subentry.data, CONF_LIGHTS: ["Desk"]}
+        runtime_data.entry, subentry, data={**subentry.data, CONF_TARGETS: [CEILING]}
     )
     await settle()
-
-    messages = [entry.message for entry in runtime_data.activity.get(entries[-1].id, 1000)]
-    assert RESTARTING in messages
-    assert "Listening for wall switch presses." in messages
-    assert any(message.startswith("Ignoring unconfigured eWeLink device") for message in messages) is False
-    lan.broadcast(2, OTHER_DEVICE_ID)
+    lan.broadcast(1, OTHER_DEVICE_ID)
     await settle()
-    assert [entry.message for entry in runtime_data.activity.get(0, 1000)][-1] == (
-        "Ignoring unconfigured eWeLink device 1000999999 at 192.0.2.5."
+
+    later = [(entry.level, entry.category, entry.message) for entry in runtime_data.activity.get(entries[-1].id, 1000)]
+    assert ("information", "supervisor", RESTARTING) in later
+    assert ("information", "runner", LISTENING) in later
+    assert later[-1] == (
+        "debug",
+        "runner",
+        f"Ignoring unconfigured eWeLink device {OTHER_DEVICE_ID} at {DEVICE_ADDRESS}.",
     )

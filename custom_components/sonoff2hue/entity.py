@@ -1,15 +1,15 @@
 """The devices of the integration and what their entities share (decision 25).
 
-The Hue bridge has a device, identified by the bridge id, with the service's state, the bridge's reachability and the
-eWeLink devices seen on the LAN. Each ``switch`` subentry has a device, identified by the switch's normalized eWeLink
-device id and named by the subentry's title, with that switch's presses, last action, presence on the LAN and test. An
-entity's unique id is its device's identifier, an underscore and its translation key.
+The config entry has a service device, "sonoff2hue", identified by the entry's id, with the service's state and the
+eWeLink devices seen on the LAN (decision 40). Each ``switch`` subentry has a device, identified by the switch's
+normalized eWeLink device id and named by the subentry's title, with that switch's presses, last action, presence on
+the LAN and test. An entity's unique id is its device's identifier, an underscore and its translation key.
 
 The entities show the runtime's state: the status tracker's snapshots, which come on ``SIGNAL_STATUS``, and the LAN
 registry. A platform adds the entities of the switches that exist when it is set up, and those of a switch added later
 when ``SIGNAL_SUBENTRY_ADDED`` brings it; Home Assistant removes a removed switch's device and entities itself.
-:func:`async_track_devices` keeps the devices and the unique ids in step with the bridge id and the switches' device ids
-and titles, which reconfiguring can change.
+:func:`async_track_devices` keeps the devices and the unique ids in step with the switches' device ids and titles, which
+editing a switch can change.
 """
 
 from collections.abc import Callable, Iterable
@@ -18,12 +18,12 @@ from typing import Any, Final
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr, entity_registry as er
-from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import CONF_BRIDGE_ID, CONF_DEVICE_ID, CONF_DEVICE_KEY, CONF_NAME, DOMAIN, SUBENTRY_SWITCH
+from .const import CONF_DEVICE_ID, CONF_DEVICE_KEY, CONF_NAME, DOMAIN, SUBENTRY_SWITCH
 from .engine.config import SwitchSettings
 from .engine.status import StatusSnapshot
 from .runtime import (
@@ -35,17 +35,16 @@ from .runtime import (
     Sonoff2HueData,
 )
 
-BRIDGE_NAME: Final = "Hue bridge"
-BRIDGE_MANUFACTURER: Final = "Signify Netherlands B.V."
-"""The maker of Hue bridges, as their CLIP v2 device resource and Home Assistant's Hue integration name it."""
+SERVICE_NAME: Final = "sonoff2hue"
+"""The name of the config entry's service device; a migrated entry's device was named "Hue bridge" before, and its
+entities keep their entity ids, such as ``sensor.hue_bridge_status``."""
 SWITCH_MANUFACTURER: Final = "SONOFF"
 SWITCH_MODEL: Final = "MINIR4M"
 
 
-def bridge_identifier(entry: Sonoff2HueConfigEntry) -> str:
-    """The bridge device's identifier: the paired bridge's id, which pairing always stores, else the entry's id."""
-    bridge_id: str | None = entry.data.get(CONF_BRIDGE_ID)
-    return bridge_id or entry.entry_id
+def service_identifier(entry: Sonoff2HueConfigEntry) -> str:
+    """The service device's identifier: the entry's id."""
+    return entry.entry_id
 
 
 def switch_of(subentry: ConfigSubentry) -> SwitchSettings:
@@ -85,15 +84,15 @@ class Sonoff2HueEntity(Entity):
         """Takes what the entity shows from ``snapshot``."""
 
 
-class BridgeEntity(Sonoff2HueEntity):
-    """An entity of the bridge's device, which follows the status tracker's snapshots."""
+class ServiceEntity(Sonoff2HueEntity):
+    """An entity of the service device, which follows the status tracker's snapshots."""
 
     def __init__(self, data: Sonoff2HueData, key: str) -> None:
         super().__init__(data, key)
-        identifier = bridge_identifier(data.entry)
+        identifier = service_identifier(data.entry)
         self._attr_unique_id = f"{identifier}_{key}"
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, identifier)}, name=BRIDGE_NAME, manufacturer=BRIDGE_MANUFACTURER
+            identifiers={(DOMAIN, identifier)}, name=SERVICE_NAME, entry_type=DeviceEntryType.SERVICE
         )
 
     async def async_added_to_hass(self) -> None:
@@ -157,11 +156,10 @@ def async_add_switch_entities(
 
 @callback
 def async_track_devices(hass: HomeAssistant, entry: Sonoff2HueConfigEntry) -> CALLBACK_TYPE:
-    """Keeps the devices in step with the entry: a new bridge id, or a switch's new device id, becomes its device's
-    identifier and the start of its entities' unique ids, and a switch's new title its device's name. It looks now,
-    for the changes made while the entry wasn't loaded, then after each change of the entry; returns a function that
-    stops it. Without it, a switch added with a device id that another switch had before would take that switch's
-    device."""
+    """Keeps the devices in step with the entry: a switch's new device id becomes its device's identifier and the
+    start of its entities' unique ids, and a switch's new title its device's name. It looks now, for the changes made
+    while the entry wasn't loaded, then after each change of the entry; returns a function that stops it. Without it, a
+    switch added with a device id that another switch had before would take that switch's device."""
 
     @callback
     def update(*_: Any) -> None:
@@ -184,8 +182,8 @@ def async_track_devices(hass: HomeAssistant, entry: Sonoff2HueConfigEntry) -> CA
 
 @callback
 def _async_update_devices(hass: HomeAssistant, entry: Sonoff2HueConfigEntry) -> None:
-    # The identifier and the name of each device, by its subentry: the bridge's device has none, and keeps its name.
-    wanted: dict[str | None, tuple[str, str | None]] = {None: (bridge_identifier(entry), None)}
+    # The identifier and the name of each device, by its subentry: the service device has none, and keeps its name.
+    wanted: dict[str | None, tuple[str, str | None]] = {None: (service_identifier(entry), None)}
     for subentry in entry.subentries.values():
         if subentry.subentry_type == SUBENTRY_SWITCH:
             wanted[subentry.subentry_id] = (switch_of(subentry).normalized_device_id, subentry.title)
@@ -201,6 +199,9 @@ def _async_update_devices(hass: HomeAssistant, entry: Sonoff2HueConfigEntry) -> 
         if name is not None and device.name != name:
             devices.async_update_device(device.id, name=name)
         if old == identifier:
+            continue
+        if devices.async_get_device_by_identifier((DOMAIN, identifier), entry.entry_id) is not None:
+            # Another device has it already, such as the service device when another device has no subentry either.
             continue
         if name is None:
             devices.async_update_device(device.id, new_identifiers={(DOMAIN, identifier)})

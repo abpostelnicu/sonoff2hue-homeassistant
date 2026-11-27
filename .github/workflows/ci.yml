@@ -91,10 +91,10 @@ jobs:
       - name: Set up Python and the tools
         run: scripts/setup
 
-      - name: Home Assistant, the fake Hue bridge and a simulated wall switch (scripts/e2e)
+      - name: Home Assistant, its template lights and a simulated wall switch (scripts/e2e)
         run: scripts/e2e
 
-      - name: Keep Home Assistant's and the fake bridge's logs
+      - name: Keep Home Assistant's logs
         if: failure()
         uses: actions/upload-artifact@v7
         with:

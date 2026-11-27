@@ -1,89 +1,12 @@
-"""The fake Hue bridge and the simulated wall switch of the end-to-end test, run as ``scripts/develop`` runs them."""
+"""The simulated wall switch of the end-to-end test, run as ``scripts/develop press`` runs it."""
 
 import asyncio
 import contextlib
-import os
 from pathlib import Path
 import signal
 import sys
 
-import aiohttp
-
-from . import POLL_INTERVAL, StepError
-
-
-class FakeHueBridge:
-    """The fake Hue bridge, ``python -m tools.fake_hue``, in a process of its own on 127.0.0.1, with its link button
-    released until the test presses it. Its ``/_fake/`` endpoints show what it was asked to switch."""
-
-    def __init__(self, root: Path, port: int, log: Path, session: aiohttp.ClientSession) -> None:
-        self.root = root
-        self.port = port
-        self.address = f"127.0.0.1:{port}"
-        """Its address, as the setup flow takes it."""
-        self.log = log
-        self._session = session
-        self._process: asyncio.subprocess.Process | None = None
-
-    async def start(self) -> None:
-        """Starts it and waits until it answers."""
-        environment = os.environ | {
-            "FAKE_HUE_BIND": "127.0.0.1",
-            "FAKE_HUE_PORT": str(self.port),
-            "FAKE_HUE_LINK_BUTTON": "released",
-        }
-        with self.log.open("w", encoding="utf-8") as log:
-            self._process = process = await asyncio.create_subprocess_exec(
-                sys.executable,
-                "-m",
-                "tools.fake_hue",
-                cwd=self.root,
-                env=environment,
-                stdin=asyncio.subprocess.DEVNULL,
-                stdout=log,
-                stderr=asyncio.subprocess.STDOUT,
-                start_new_session=True,
-            )
-        while True:
-            if process.returncode is not None:
-                raise StepError(f"The fake Hue bridge exited with code {process.returncode}; see its log, {self.log}.")
-            with contextlib.suppress(aiohttp.ClientConnectionError):
-                await self.get("/_fake/")
-                return
-            await asyncio.sleep(POLL_INTERVAL)
-
-    async def get(self, path: str) -> str:
-        return await self._request("GET", path)
-
-    async def post(self, path: str, params: dict[str, str] | None = None) -> str:
-        return await self._request("POST", path, params)
-
-    async def puts(self) -> list[str]:
-        """Every PUT it got, in order: what each switched, such as ``light 'Hallway' on``."""
-        return (await self.get("/_fake/puts")).splitlines()
-
-    async def _request(self, method: str, path: str, params: dict[str, str] | None = None) -> str:
-        # Its certificate is made at each start, and only the integration pins it.
-        url = f"https://{self.address}{path}"
-        async with self._session.request(method, url, params=params, ssl=False) as response:
-            text = await response.text()
-            if response.status >= 300:
-                raise StepError(f"The fake Hue bridge answered {method} {path} with {response.status}: {text}")
-            return text
-
-    async def stop(self) -> None:
-        """Stops it as Ctrl+C does."""
-        process = self._process
-        if process is None or process.returncode is not None:
-            return
-        with contextlib.suppress(ProcessLookupError):
-            process.send_signal(signal.SIGINT)
-        try:
-            async with asyncio.timeout(10):
-                await process.wait()
-        except TimeoutError:
-            process.kill()
-            await process.wait()
+from . import StepError
 
 
 class SimulatedSwitch:

@@ -1,11 +1,13 @@
-"""The switch settings' rules (engine/config.py): device ids stripped and lowercased, compared without regard to case,
-and blank values by Python's white space."""
+"""The switches' settings (engine/config.py): device ids stripped and lowercased, compared without regard to case,
+blank values by Python's white space, and the checks before the switches run."""
 
 import pytest
 
-from custom_components.sonoff2hue.engine.config import ConfigError, EngineConfig, HueSettings, SwitchSettings
+from custom_components.sonoff2hue.engine.config import ConfigError, EngineConfig, SwitchSettings
 
-PAIRED = HueSettings(bridge_ip="192.0.2.20", app_key="test-app-key")
+CEILING = "light.ceiling"
+CEILING_ID = "0123456789abcdef0123456789abcdef"
+"""How a switch's settings keep a light that the entity registry has: by its registry id."""
 
 
 @pytest.mark.parametrize(
@@ -31,7 +33,7 @@ def test_the_display_name_is_the_name_and_the_device_id(name: str | None, displa
 
 def test_switches_are_found_by_device_id_without_regard_to_case() -> None:
     hall, street = SwitchSettings(" 1000AbCdEf ", "Hall"), SwitchSettings("1000Straße", "Street")
-    config = EngineConfig(PAIRED, [hall, street])
+    config = EngineConfig([hall, street])
 
     assert config.find_switch("1000ABCDEF") is hall
     assert config.find_switch("1000STRASSE") is street
@@ -40,13 +42,31 @@ def test_switches_are_found_by_device_id_without_regard_to_case() -> None:
     assert not hall.has_device_id("1000abcde")
 
 
+def test_switches_that_each_have_their_device_can_run_also_one_without_lights() -> None:
+    """A switch without any light, as one migrated from version 1 can be, runs too: each of its presses fails, while
+    the other switches toggle theirs (decision 32)."""
+    EngineConfig(
+        [
+            SwitchSettings("1000abcdef", "Hall", None, [CEILING_ID]),
+            SwitchSettings("1000999999", None, "a-device-key", [CEILING_ID, "light.porch"]),
+            SwitchSettings("1000555555", "Attic", None, []),
+        ]
+    ).validate_for_run()
+
+
+def test_without_switches_there_is_nothing_to_run() -> None:
+    with pytest.raises(ConfigError) as err:
+        EngineConfig().validate_for_run()
+
+    assert str(err.value) == "Invalid configuration:\n  - No switches configured. Add a switch."
+
+
 def test_a_device_id_is_configured_once_without_regard_to_case() -> None:
     config = EngineConfig(
-        PAIRED,
         [
-            SwitchSettings("1000abcdef", lights=["Ceiling"]),
-            SwitchSettings(" 1000ABCDEF ", "Hall", lights=["Desk"]),
-        ],
+            SwitchSettings("1000abcdef", targets=[CEILING]),
+            SwitchSettings(" 1000ABCDEF ", "Hall", targets=["light.desk"]),
+        ]
     )
 
     with pytest.raises(ConfigError) as err:
@@ -54,14 +74,18 @@ def test_a_device_id_is_configured_once_without_regard_to_case() -> None:
 
     assert str(err.value) == (
         "Invalid configuration:\n"
-        "  - switches[1] ('Hall'): deviceId ' 1000ABCDEF ' is configured more than once; put all its lights in one entry."
+        "  - switches[1] ('Hall'): deviceId ' 1000ABCDEF ' is configured more than once; put all its lights in one "
+        "switch."
     )
 
 
-def test_blank_values_are_empty_or_white_space() -> None:
+def test_every_switch_needs_a_device_id_and_no_blank_light() -> None:
+    """Blank is empty or Python's white space, for a name too; every problem is listed, switch by switch."""
     config = EngineConfig(
-        HueSettings(bridge_ip="\x1c", app_key="\u3000"),
-        [SwitchSettings(" ", lights=["\x1f", ""]), SwitchSettings("1000abcdef", "\x1e", groups=["\ufeff"])],
+        [
+            SwitchSettings(" ", "\x1e", targets=["\x1f", ""]),
+            SwitchSettings("1000999999", "Porch", targets=[CEILING, "\u3000"]),
+        ]
     )
 
     with pytest.raises(ConfigError) as err:
@@ -69,8 +93,7 @@ def test_blank_values_are_empty_or_white_space() -> None:
 
     assert str(err.value).splitlines() == [
         "Invalid configuration:",
-        "  - hue.bridgeIp is missing (pair the bridge).",
-        "  - hue.appKey is missing (pair the bridge).",
         "  - switches[0]: deviceId is missing.",
-        "  - switches[0]: empty light/group name.",
+        "  - switches[0]: empty light.",
+        "  - switches[1] ('Porch'): empty light.",
     ]

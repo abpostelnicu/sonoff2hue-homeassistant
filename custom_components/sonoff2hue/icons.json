@@ -26,7 +26,6 @@
       "status": {
         "default": "mdi:information-outline",
         "state": {
-          "connecting": "mdi:clock-outline",
           "error": "mdi:alert-circle-outline",
           "invalid_config": "mdi:alert-circle-outline",
           "running": "mdi:check-circle-outline"

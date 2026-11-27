@@ -1,5 +1,6 @@
 """The logbook (decision 26): Home Assistant's own entries for each press, the switch's Press and its Last action, and
-nothing for the runtime's bus events, in the real logbook on the recorder and on the switch's device page."""
+nothing for the runtime's bus events, in the real logbook on the recorder and on the switch's device page. The lights
+that a press switches are Home Assistant's (decision 40), with their own entries, as for whatever switches them."""
 
 from collections import Counter
 from typing import Any
@@ -11,24 +12,17 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
 import pytest
-from pytest_homeassistant.common import async_capture_events, mock_component
+from pytest_homeassistant.common import MockConfigEntry, async_capture_events, mock_component
 from pytest_homeassistant.components.recorder.common import async_wait_recording_done
 from pytest_homeassistant.typing import WebSocketGenerator
 
 from custom_components.sonoff2hue.const import DOMAIN, EVENT_PRESS, EVENT_TOGGLE
-from custom_components.sonoff2hue.engine import toggler
 
-from .fakes import DEVICE_ID, Bridge, Lan, paired, switch
-from .platforms import LAST_ACTION, ONLINE, PRESS, REACHABLE, settle, start, tick
+from .fakes import CEILING, DEVICE_ID, Lan, Lights, entry, switch
+from .platforms import LAST_ACTION, ONLINE, PRESS, settle, start, tick
 
 type Change = tuple[str, str]
 """A logbook entry: the entity whose state changed, and the new state, or for an event entity its event type."""
-
-
-@pytest.fixture(autouse=True)
-def no_retry_delay(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The toggler retries a failed request at once, instead of after 300 ms."""
-    monkeypatch.setattr(toggler, "RETRY_DELAY", 0)
 
 
 @pytest.fixture
@@ -38,11 +32,12 @@ async def logbook(recorder_mock: Recorder, hass: HomeAssistant) -> None:
     assert await async_setup_component(hass, "logbook", {})
 
 
-async def press(lan: Lan, freezer: FrozenDateTimeFactory, seq: int) -> None:
-    """A press a second after what came before, and the status that the entities show 500 ms later. The logbook lists
-    what happened after the time it is asked from, so the press comes after it."""
+async def press(lan: Lan, freezer: FrozenDateTimeFactory, *seqs: int) -> None:
+    """Presses a second after what came before, and the status that the entities show 500 ms later. The logbook lists
+    what happened after the time it is asked from, so the presses come after it."""
     await tick(freezer, 1)
-    lan.broadcast(seq)
+    for seq in seqs:
+        lan.broadcast(seq)
     await settle()
     await tick(freezer, 0.5)
 
@@ -79,8 +74,8 @@ class Logbook:
 
 def changes(entries: list[dict[str, Any]]) -> list[Change]:
     """The entries, each of them an entity's change; an event entity's shows its event type."""
-    assert all("entity_id" in entry for entry in entries), entries
-    return [(entry["entity_id"], entry.get("attributes", {}).get("event_type", entry["state"])) for entry in entries]
+    assert all("entity_id" in item for item in entries), entries
+    return [(item["entity_id"], item.get("attributes", {}).get("event_type", item["state"])) for item in entries]
 
 
 def moments(entries: list[dict[str, Any]]) -> list[Counter[Change]]:
@@ -90,10 +85,10 @@ def moments(entries: list[dict[str, Any]]) -> list[Counter[Change]]:
     moment come in no fixed order."""
     grouped: list[Counter[Change]] = []
     when: object = None
-    for entry, change in zip(entries, changes(entries), strict=True):
-        if not grouped or entry["when"] != when:
+    for item, change in zip(entries, changes(entries), strict=True):
+        if not grouped or item["when"] != when:
             grouped.append(Counter())
-            when = entry["when"]
+            when = item["when"]
         grouped[-1][change] += 1
     return grouped
 
@@ -103,14 +98,22 @@ def together(*changes: Change) -> Counter[Change]:
     return Counter(changes)
 
 
-@pytest.mark.usefixtures("logbook", "socket_enabled")
+def switch_device(hass: HomeAssistant, config_entry: MockConfigEntry) -> dr.DeviceEntry:
+    device = dr.async_get(hass).async_get_device_by_identifier((DOMAIN, DEVICE_ID), config_entry.entry_id)
+    assert device is not None
+    return device
+
+
+@pytest.mark.usefixtures("logbook")
 async def test_each_press_gives_the_logbook_press_and_last_action_and_nothing_else(
-    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, lan: Lan, lights: Lights, freezer: FrozenDateTimeFactory
 ) -> None:
-    """The user's choice: Home Assistant's own entries, two for each press, also on the switch's device page; the
-    runtime's bus events are there for automations and the entities, and the logbook has nothing for them."""
-    entry = paired(switch())
-    await start(hass, entry)
+    """The user's choice: Home Assistant's own entries, two for each press, also on the switch's device page, next to
+    the light's own; the runtime's bus events are there for automations and the entities, and the logbook has nothing
+    for them."""
+    lights.add("ceiling")
+    config_entry = entry(switch())
+    await start(hass, config_entry)
     logbook = Logbook(hass, hass_ws_client, freezer)
     presses = async_capture_events(hass, EVENT_PRESS)
     toggles = async_capture_events(hass, EVENT_TOGGLE)
@@ -121,62 +124,64 @@ async def test_each_press_gives_the_logbook_press_and_last_action_and_nothing_el
     await press(lan, freezer, 2)
     await press(lan, freezer, 3)
 
-    each_press = [(PRESS, "press"), (LAST_ACTION, "turned_on"), (PRESS, "press"), (LAST_ACTION, "turned_off")]
-    assert changes(await logbook.everything(since)) == each_press
-    device = dr.async_get(hass).async_get_device_by_identifier((DOMAIN, DEVICE_ID), entry.entry_id)
-    assert device is not None
-    assert changes(await logbook.device_page(since, device.id)) == each_press
-    assert changes(await logbook.everything(started)) == [(ONLINE, "on"), *each_press]
-    # The bus events were fired, and named the switch's device.
+    each_press = [
+        together((PRESS, "press"), (CEILING, "on")),
+        together((LAST_ACTION, "turned_on")),
+        together((PRESS, "press"), (CEILING, "off")),
+        together((LAST_ACTION, "turned_off")),
+    ]
+    assert moments(await logbook.everything(since)) == each_press
+    assert moments(await logbook.everything(started)) == [together((ONLINE, "on")), *each_press]
+    device = switch_device(hass, config_entry)
+    assert changes(await logbook.device_page(since, device.id)) == [
+        (PRESS, "press"),
+        (LAST_ACTION, "turned_on"),
+        (PRESS, "press"),
+        (LAST_ACTION, "turned_off"),
+    ]
+    # The bus events were fired, and named the switch's device; the presses toggled the light.
     assert [event.data["seq"] for event in presses] == [2, 3]
     assert [event.data["result"] for event in toggles] == ["toggled", "toggled"]
     assert {event.data["device_id"] for event in [*presses, *toggles]} == {device.id}
+    assert lights.turned() == [("turn_on", CEILING), ("turn_off", CEILING)]
 
 
-@pytest.mark.usefixtures("logbook", "socket_enabled")
+@pytest.mark.usefixtures("logbook")
 async def test_last_action_shows_only_when_its_state_changes(
-    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, lan: Lan, lights: Lights, freezer: FrozenDateTimeFactory
 ) -> None:
     """The logbook lists changes of a state, not of its attributes alone, and the entities show the status 500 ms after
-    a change: an outcome like the one before, or one that another replaces within the 500 ms, adds only the press. Last
-    action and the bridge's Reachable change at the same moment, from the same snapshot, in either order."""
-    entry = paired(switch())
-    await start(hass, entry)
+    a change: an outcome like the one before, or one that another replaces within the 500 ms, adds only the press."""
+    lights.add("ceiling")
+    config_entry = entry(switch())
+    await start(hass, config_entry)
     logbook = Logbook(hass, hass_ws_client, freezer)
     await press(lan, freezer, 1)
     since = dt_util.utcnow().isoformat()
 
-    # The bridge can't be read twice: the second outcome is the first one again. The first one also shows on the
-    # bridge's device, as Reachable goes off.
-    bridge.fail("/clip/v2/resource/light", 503)
+    # The switch's light disabled: each press fails, and the second outcome is the first one again.
+    registry = er.async_get(hass)
+    registry.async_update_entity(CEILING, disabled_by=er.RegistryEntryDisabler.USER)
+    await settle()
     await press(lan, freezer, 2)
     await press(lan, freezer, 3)
-    # Two presses at once: the bridge takes 6 s to toggle for the first, and the second is dropped, as it waited more
-    # than 5 s. The toggle and the dropped press come together, and Last action shows the newer.
-    bridge.heal()
-    held = bridge.hold("/clip/v2/resource/light")
-    await tick(freezer, 1)
-    lan.broadcast(4)
-    lan.broadcast(5)
+    # Enabled again, and two presses at once: the light turns on, then off, and Last action shows the newer.
+    registry.async_update_entity(CEILING, disabled_by=None)
     await settle()
-    await tick(freezer, 6)
-    held.set()
-    await settle()
-    await tick(freezer, 0.5)
+    await press(lan, freezer, 4, 5)
 
+    assert lights.turned() == [("turn_on", CEILING), ("turn_off", CEILING)]
     assert moments(await logbook.everything(since)) == [
         together((PRESS, "press")),
-        together((REACHABLE, "off"), (LAST_ACTION, "failed")),
+        together((LAST_ACTION, "failed")),
         together((PRESS, "press")),
-        together((PRESS, "press"), (PRESS, "press")),
-        together((REACHABLE, "on"), (LAST_ACTION, "dropped")),
+        together((PRESS, "press"), (PRESS, "press"), (CEILING, "on"), (CEILING, "off")),
+        together((LAST_ACTION, "turned_off")),
     ]
-    device = dr.async_get(hass).async_get_device_by_identifier((DOMAIN, DEVICE_ID), entry.entry_id)
-    assert device is not None
-    assert moments(await logbook.device_page(since, device.id)) == [
+    assert moments(await logbook.device_page(since, switch_device(hass, config_entry).id)) == [
         together((PRESS, "press")),
         together((LAST_ACTION, "failed")),
         together((PRESS, "press")),
         together((PRESS, "press"), (PRESS, "press")),
-        together((LAST_ACTION, "dropped")),
+        together((LAST_ACTION, "turned_off")),
     ]

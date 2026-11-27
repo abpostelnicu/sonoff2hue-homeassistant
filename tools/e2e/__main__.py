@@ -18,17 +18,13 @@ MARKER = ".sonoff2hue-e2e"
 """Marks the work folder as the test's own, which it may delete."""
 
 
-def free_ports(count: int) -> list[int]:
-    """Ports on 127.0.0.1 that nothing listens on, all different: each run takes new ones, so the test runs next to a
-    development Home Assistant and fake bridge of ``scripts/develop``."""
-    sockets = [socket.socket() for _ in range(count)]
-    try:
-        for sock in sockets:
-            sock.bind(("127.0.0.1", 0))
-        return [sock.getsockname()[1] for sock in sockets]
-    finally:
-        for sock in sockets:
-            sock.close()
+def free_port() -> int:
+    """A port on 127.0.0.1 that nothing listens on: each run takes a new one, so the test runs next to a development
+    Home Assistant of ``scripts/develop``."""
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port: int = sock.getsockname()[1]
+        return port
 
 
 def prepare(work: Path) -> None:
@@ -42,7 +38,7 @@ def prepare(work: Path) -> None:
 
 
 async def run(settings: Settings) -> bool:
-    # CI cancels a job with SIGINT, then SIGTERM: either way, Home Assistant and the fake bridge are stopped first.
+    # CI cancels a job with SIGINT, then SIGTERM: either way, Home Assistant is stopped first.
     task = asyncio.current_task()
     if task is not None:
         asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, task.cancel)
@@ -51,12 +47,12 @@ async def run(settings: Settings) -> bool:
 
 
 def main() -> int:
-    hass_port, fake_hue_port = free_ports(2)
+    hass_port = free_port()
     prepare(WORK)
     try:
-        passed = asyncio.run(run(Settings(ROOT, WORK, hass_port, fake_hue_port)))
+        passed = asyncio.run(run(Settings(ROOT, WORK, hass_port)))
     except KeyboardInterrupt, asyncio.CancelledError:
-        print(f"\nInterrupted. Home Assistant and the fake Hue bridge were stopped; the logs are in {WORK}.")
+        print(f"\nInterrupted. Home Assistant was stopped; the logs are in {WORK}.")
         return 130
     if passed:
         shutil.rmtree(WORK)

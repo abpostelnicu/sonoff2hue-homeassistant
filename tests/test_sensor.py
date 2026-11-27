@@ -1,98 +1,72 @@
-"""The sensors (decision 25): Status and eWeLink devices seen on the bridge's device, and each switch's Last action,
-with the LAN on a fake network and the Hue bridge in memory."""
-
-from datetime import timedelta
+"""The sensors (decision 25): Status and eWeLink devices seen on the service device, and each switch's Last action,
+with the LAN on a fake network and the lights in Home Assistant's state machine."""
 
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.components.sensor import ATTR_OPTIONS, SensorDeviceClass
+from homeassistant.config_entries import ConfigSubentryData
 from homeassistant.const import ATTR_DEVICE_CLASS, ATTR_UNIT_OF_MEASUREMENT, STATE_UNKNOWN, EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 import pytest
-from pytest_homeassistant.common import MockConfigEntry
 
-from custom_components.sonoff2hue.engine import toggler
-from custom_components.sonoff2hue.engine.runner import NO_TARGETS
+from custom_components.sonoff2hue import runtime
+from custom_components.sonoff2hue.engine.config import EngineConfig
+from custom_components.sonoff2hue.engine.runner import NO_TARGETS, SwitchBinding
 from custom_components.sonoff2hue.engine.status import PRESS_DROPPED
-from custom_components.sonoff2hue.engine.supervisor import KEY_REJECTED, NO_SWITCHES, NOT_PAIRED
+from custom_components.sonoff2hue.engine.supervisor import NO_SWITCHES
 
-from .fakes import BRIDGE_ADDRESS, OTHER_DEVICE_ID, Bridge, Lan, paired, switch
-from .platforms import (
-    BRIDGE_DOWN,
-    DEVICES_SEEN,
-    LAST_ACTION,
-    RUNNING,
-    STATUS,
-    UNAUTHORIZED,
-    settle,
-    start,
-    state_of,
-    tick,
-)
+from .fakes import CEILING, OTHER_DEVICE_ID, Lan, Lights, entry, switch
+from .platforms import DEVICES_SEEN, LAST_ACTION, RUNNING, STATUS, settle, start, state_of, tick
 
 HALL = "Hall (1000abcdef)"
-LIGHTS_DOWN = "Hue bridge returned 503 Service Unavailable for GET /clip/v2/resource/light"
+DESK = "light.desk"
+REMOVED = "0123456789abcdef0123456789abcdef"
+"""A light's entity registry id that the registry doesn't have."""
 
 
-@pytest.fixture(autouse=True)
-def no_retry_delay(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The toggler retries a failed request at once, instead of after 300 ms."""
-    monkeypatch.setattr(toggler, "RETRY_DELAY", 0)
+def disable(hass: HomeAssistant, *entity_ids: str) -> None:
+    registry = er.async_get(hass)
+    for entity_id in entity_ids:
+        registry.async_update_entity(entity_id, disabled_by=er.RegistryEntryDisabler.USER)
 
 
 # Status.
 
 
 @pytest.mark.parametrize(
-    ("entry", "fault", "state", "message", "problems"),
+    ("switches", "state", "message", "problems"),
     [
-        (paired(switch()), None, "running", RUNNING, []),
+        ([switch()], "running", RUNNING, []),
         (
-            paired(switch()),
-            (503, "{}"),
-            "connecting",
-            f"Waiting for the Hue bridge at {BRIDGE_ADDRESS}: {BRIDGE_DOWN}",
-            [],
-        ),
-        (paired(switch()), (403, UNAUTHORIZED), "error", KEY_REJECTED, []),
-        (
-            paired(switch(lights=["Ceiling", "Kitchen"])),
-            None,
+            [switch(targets=[CEILING, REMOVED])],
             "running",
-            "1 wall switch toggles 1 Hue light, room or zone; 1 is missing.",
-            [f"{HALL}: no Hue light named 'Kitchen'. Known lights: 'Ceiling', 'Desk'"],
+            "1 wall switch toggles 1 light; 1 is missing.",
+            [f"{HALL}: a light was removed from Home Assistant."],
         ),
         (
-            paired(switch(lights=[" "])),
-            None,
+            [switch(targets=[" "])],
             "invalid_config",
             "The configuration has errors.",
-            ["switches[0] ('Hall'): empty light/group name."],
+            ["switches[0] ('Hall'): empty light."],
         ),
-        (paired(), None, "not_configured", NO_SWITCHES, []),
-        (paired(switch(), app_key=None), None, "not_configured", NOT_PAIRED, []),
+        ([], "not_configured", NO_SWITCHES, []),
     ],
-    ids=["running", "connecting", "error", "running with a missing light", "invalid config", "no switch", "not paired"],
+    ids=["running", "running with a missing light", "invalid config", "no switch"],
 )
+@pytest.mark.usefixtures("lan", "lights")
 async def test_status_shows_the_service(
     hass: HomeAssistant,
-    lan: Lan,
-    bridge: Bridge,
     freezer: FrozenDateTimeFactory,
-    entry: MockConfigEntry,
-    fault: tuple[int, str] | None,
+    switches: list[ConfigSubentryData],
     state: str,
     message: str,
     problems: list[str],
 ) -> None:
-    if fault is not None:
-        bridge.fail("/clip/v2/resource/bridge", *fault)
     started = dt_util.utcnow()
 
-    await start(hass, entry)
+    await start(hass, entry(*switches))
     await tick(freezer, 0.5)
-    await hass.async_block_till_done()
 
     status = state_of(hass, STATUS)
     assert status.state == state
@@ -100,42 +74,80 @@ async def test_status_shows_the_service(
     assert status.attributes["problems"] == problems
     assert status.attributes["since"] == started
     assert status.attributes[ATTR_DEVICE_CLASS] == SensorDeviceClass.ENUM
-    assert status.attributes[ATTR_OPTIONS] == ["not_configured", "invalid_config", "connecting", "running", "error"]
+    assert status.attributes[ATTR_OPTIONS] == ["not_configured", "invalid_config", "running", "error"]
 
 
-async def test_status_moves_since_with_each_change(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+@pytest.mark.usefixtures("lan", "lights")
+async def test_status_shows_an_unexpected_failure(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    bridge.fail("/clip/v2/resource/bridge", 503)
-    started = dt_util.utcnow()
-    await start(hass, paired(switch()))
-    await tick(freezer, 0.5)
+    def resolve(_: HomeAssistant, config: EngineConfig) -> list[SwitchBinding]:
+        raise RuntimeError("the lights can't be looked up")
 
-    assert (state_of(hass, STATUS).state, state_of(hass, STATUS).attributes["since"]) == ("connecting", started)
+    monkeypatch.setattr(runtime, "resolve", resolve)
 
-    # Waiting again 10 seconds later, with the same message: since stays.
-    await tick(freezer, 10)
-    await tick(freezer, 0.5)
-
-    assert state_of(hass, STATUS).attributes["since"] == started
-
-    bridge.heal()
-    await tick(freezer, 10)
-    running = dt_util.utcnow()
+    await start(hass, entry(switch()))
     await tick(freezer, 0.5)
 
     status = state_of(hass, STATUS)
-    assert (status.state, status.attributes["message"]) == ("running", RUNNING)
-    assert running - timedelta(microseconds=1) <= status.attributes["since"] <= running
+    assert (status.state, status.attributes["message"], status.attributes["problems"]) == (
+        "error",
+        "The switches stopped unexpectedly: the lights can't be looked up",
+        [],
+    )
+
+
+async def test_status_moves_since_with_each_change(
+    hass: HomeAssistant, lan: Lan, lights: Lights, freezer: FrozenDateTimeFactory
+) -> None:
+    lights.add("ceiling")
+    started = dt_util.utcnow()
+    await start(hass, entry(switch()))
+    await tick(freezer, 0.5)
+
+    assert (state_of(hass, STATUS).state, state_of(hass, STATUS).attributes["since"]) == ("running", started)
+
+    # The switch's light disabled: it has nothing left to toggle.
+    await tick(freezer, 1)
+    disabled = dt_util.utcnow()
+    disable(hass, CEILING)
+    await settle()
+    await tick(freezer, 0.5)
+
+    status = state_of(hass, STATUS)
+    assert (status.state, status.attributes["message"], status.attributes["problems"]) == (
+        "running",
+        "1 wall switch toggles 0 lights; 1 is missing.",
+        [f"{HALL}: {CEILING} is disabled."],
+    )
+    assert status.attributes["since"] == disabled
+
+    # Another light, which the switches resolve again for, changes nothing: since stays.
+    await tick(freezer, 1)
+    lights.add("desk")
+    await settle()
+    await tick(freezer, 0.5)
+
+    assert state_of(hass, STATUS).attributes["since"] == disabled
+
+    await tick(freezer, 1)
+    enabled = dt_util.utcnow()
+    er.async_get(hass).async_update_entity(CEILING, disabled_by=None)
+    await settle()
+    await tick(freezer, 0.5)
+
+    status = state_of(hass, STATUS)
+    assert (status.state, status.attributes["message"], status.attributes["problems"]) == ("running", RUNNING, [])
+    assert status.attributes["since"] == enabled
 
 
 # eWeLink devices seen.
 
 
 async def test_ewelink_devices_seen_counts_every_device_at_once(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+    hass: HomeAssistant, lan: Lan, freezer: FrozenDateTimeFactory
 ) -> None:
-    data = await start(hass, paired(switch()))
+    data = await start(hass, entry(switch()))
 
     seen = state_of(hass, DEVICES_SEEN)
     assert (seen.state, seen.attributes["listening"], seen.attributes["last_packet_at"]) == ("0", True, None)
@@ -165,9 +177,9 @@ async def test_ewelink_devices_seen_counts_every_device_at_once(
 
 
 async def test_ewelink_devices_seen_shows_the_last_packet_every_30_seconds(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+    hass: HomeAssistant, lan: Lan, freezer: FrozenDateTimeFactory
 ) -> None:
-    await start(hass, paired(switch()))
+    await start(hass, entry(switch()))
     lan.broadcast(1, OTHER_DEVICE_ID)
     await settle()
     first = dt_util.utcnow()
@@ -195,12 +207,13 @@ def last_action(hass: HomeAssistant) -> tuple[str, dict[str, object]]:
     return state.state, attributes
 
 
-async def test_last_action_shows_each_toggle_and_what_went_wrong(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+async def test_last_action_shows_each_toggle_and_a_dropped_press(
+    hass: HomeAssistant, lan: Lan, lights: Lights, freezer: FrozenDateTimeFactory
 ) -> None:
-    await start(hass, paired(switch()))
+    lights.add("ceiling")
+    await start(hass, entry(switch()))
     await tick(freezer, 0.5)
-    targets = ["light 'Ceiling'"]
+    targets = [CEILING]
 
     action = state_of(hass, LAST_ACTION)
     assert action.state == STATE_UNKNOWN
@@ -218,6 +231,7 @@ async def test_last_action_shows_each_toggle_and_what_went_wrong(
     lan.broadcast(1)
     pressed = dt_util.utcnow()
     lan.broadcast(2)
+    await settle()
     await tick(freezer, 0.5)
 
     assert last_action(hass) == (
@@ -229,6 +243,7 @@ async def test_last_action_shows_each_toggle_and_what_went_wrong(
 
     # Turned off.
     lan.broadcast(3)
+    await settle()
     await tick(freezer, 0.5)
 
     assert last_action(hass) == (
@@ -236,27 +251,32 @@ async def test_last_action_shows_each_toggle_and_what_went_wrong(
         {"changed": 1, "unchanged": 0, "failed": 0, "targets": targets, "message": None},
     )
 
-    # Failed: the bridge couldn't say which lights are on.
-    bridge.fail("/clip/v2/resource/light", 503)
-    failed = dt_util.utcnow()
+    # The light doesn't answer: the toggle for seq 4 gives up on it after 5 seconds, while seq 5 and 6, a second
+    # later, wait for their turn.
+    held = lights.hold(CEILING)
     lan.broadcast(4)
     await settle()
-    await tick(freezer, 0.5)
-
-    assert last_action(hass) == (
-        "failed",
-        {"changed": None, "unchanged": None, "failed": None, "targets": targets, "message": LIGHTS_DOWN},
-    )
-    assert state_of(hass, LAST_ACTION).attributes["at"] == failed
-    assert state_of(hass, LAST_ACTION).attributes["elapsed_ms"] is None
-
-    # Dropped: the press waited more than 5 seconds for the bridge.
-    bridge.heal()
-    held = bridge.hold("/clip/v2/resource/light")
+    await tick(freezer, 1)
     lan.broadcast(5)
     lan.broadcast(6)
     await settle()
-    await tick(freezer, 6)
+    await tick(freezer, 4)
+    await tick(freezer, 0.5)
+
+    assert last_action(hass) == (
+        "turned_on",
+        {
+            "changed": 0,
+            "unchanged": 0,
+            "failed": 1,
+            "targets": targets,
+            "message": "1 of 1 lights could not be switched.",
+        },
+    )
+    assert state_of(hass, LAST_ACTION).attributes["elapsed_ms"] == 5000
+
+    # The light answers again as seq 5 turns it on, when seq 6 has waited more than 5 seconds: it is dropped.
+    await tick(freezer, 0.5)
     held.set()
     await settle()
     await tick(freezer, 0.5)
@@ -265,10 +285,12 @@ async def test_last_action_shows_each_toggle_and_what_went_wrong(
         "dropped",
         {"changed": None, "unchanged": None, "failed": None, "targets": targets, "message": PRESS_DROPPED},
     )
+    assert lights.is_on(CEILING)
 
-    # Seq 5 turned the light on before seq 6 was dropped, so seq 7 turns it off; the older error isn't this toggle's.
+    # So seq 7 turns it off; the older error isn't this toggle's.
     await tick(freezer, 1)
     lan.broadcast(7)
+    await settle()
     await tick(freezer, 0.5)
 
     assert last_action(hass) == (
@@ -277,15 +299,19 @@ async def test_last_action_shows_each_toggle_and_what_went_wrong(
     )
 
 
-async def test_last_action_shows_the_lights_a_toggle_could_not_switch(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+async def test_last_action_shows_the_lights_a_toggle_could_not_switch_until_a_later_error(
+    hass: HomeAssistant, lan: Lan, lights: Lights, freezer: FrozenDateTimeFactory
 ) -> None:
-    """The status tracker records the toggle and its error at the same time; the toggle shows, with the error."""
-    await start(hass, paired(switch(lights=["Ceiling"], groups=["Hall"])))
-    bridge.fail("/clip/v2/resource/grouped_light/g1", 503)
+    """The status tracker records the toggle and its error at the same time; the toggle shows, with the error. An error
+    that came later is the newer."""
+    lights.add("ceiling")
+    lights.add("desk")
+    lights.fail(DESK)
+    await start(hass, entry(switch(targets=[CEILING, DESK])))
 
     lan.broadcast(1)
     lan.broadcast(2)
+    await settle()
     await tick(freezer, 0.5)
 
     assert last_action(hass) == (
@@ -294,17 +320,32 @@ async def test_last_action_shows_the_lights_a_toggle_could_not_switch(
             "changed": 1,
             "unchanged": 0,
             "failed": 1,
-            "targets": ["light 'Ceiling'", "group 'Hall'"],
+            "targets": [CEILING, DESK],
             "message": "1 of 2 lights could not be switched.",
         },
     )
 
+    # Both lights disabled: the next press has nothing to toggle, and fails.
+    await tick(freezer, 1)
+    disable(hass, CEILING, DESK)
+    await settle()
+    failed = dt_util.utcnow()
+    lan.broadcast(3)
+    await settle()
+    await tick(freezer, 0.5)
 
-async def test_last_action_has_no_targets_while_the_bridge_does_not_run(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+    assert last_action(hass) == (
+        "failed",
+        {"changed": None, "unchanged": None, "failed": None, "targets": [], "message": NO_TARGETS},
+    )
+    assert state_of(hass, LAST_ACTION).attributes["at"] == failed
+
+
+@pytest.mark.usefixtures("lan", "lights")
+async def test_last_action_has_no_targets_while_the_switches_do_not_run(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
 ) -> None:
-    bridge.fail("/clip/v2/resource/bridge", 503)
-    await start(hass, paired(switch()))
+    await start(hass, entry(switch(targets=[" "])))
     await tick(freezer, 0.5)
 
     assert last_action(hass) == (
@@ -313,37 +354,17 @@ async def test_last_action_has_no_targets_while_the_bridge_does_not_run(
     )
 
 
-async def test_last_action_labels_a_target_whose_name_another_light_has_with_its_id(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
-) -> None:
-    bridge.names["l2"] = "Ceiling"
-    await start(hass, paired(switch(lights=["l1"], groups=["Hall"])))
-
-    lan.broadcast(1)
-    lan.broadcast(2)
-    await tick(freezer, 0.5)
-
-    assert last_action(hass) == (
-        "turned_on",
-        {
-            "changed": 2,
-            "unchanged": 0,
-            "failed": 0,
-            "targets": ["light 'Ceiling' (l1)", "group 'Hall'"],
-            "message": None,
-        },
-    )
-
-
+@pytest.mark.usefixtures("lights")
 async def test_last_action_fails_with_the_reason_for_a_switch_with_nothing_left_to_toggle(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+    hass: HomeAssistant, lan: Lan, freezer: FrozenDateTimeFactory
 ) -> None:
-    """None of its lights, rooms and zones is on the bridge (decision 32): each press fails, and says why."""
-    await start(hass, paired(switch(lights=["Kitchen"])))
+    """None of its lights is in Home Assistant (decision 32): each press fails, and says why."""
+    await start(hass, entry(switch(targets=[REMOVED])))
     pressed = dt_util.utcnow()
 
     lan.broadcast(1)
     lan.broadcast(2)
+    await settle()
     await tick(freezer, 0.5)
 
     assert last_action(hass) == (
@@ -351,3 +372,4 @@ async def test_last_action_fails_with_the_reason_for_a_switch_with_nothing_left_
         {"changed": None, "unchanged": None, "failed": None, "targets": [], "message": NO_TARGETS},
     )
     assert state_of(hass, LAST_ACTION).attributes["at"] == pressed
+    assert state_of(hass, LAST_ACTION).attributes["elapsed_ms"] is None

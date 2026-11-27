@@ -1,4 +1,4 @@
-"""The event entities (decision 25): each switch's Press, one event for each press that the bridge acts on."""
+"""The event entities (decision 25): each switch's Press, one event for each press that the switches act on."""
 
 from collections.abc import Mapping
 from typing import Any, Final
@@ -47,5 +47,7 @@ class PressEvent(WallSwitchEntity, EventEntity):
 
     @callback
     def _on_press(self, event: Event[Mapping[str, Any]]) -> None:
+        # The press's context, which its toggle's light actions carry too: the logbook shows their changes as its.
+        self.async_set_context(event.context)
         self._trigger_event(EVENT_TYPE_PRESS, {ATTR_SEQ: event.data[ATTR_SEQ]})
         self.async_write_ha_state()

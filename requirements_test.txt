@@ -3,4 +3,3 @@ pytest-homeassistant==2026.11.3
 pytest-cov==7.1.0
 ruff==0.17.6
 mypy==2.4.1
-types-PyYAML==6.0.12.20261122  # PyYAML's types for mypy; Home Assistant ships PyYAML 6.0.3

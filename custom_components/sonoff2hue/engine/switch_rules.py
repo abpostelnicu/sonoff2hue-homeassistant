@@ -1,38 +1,31 @@
-"""The rules a switch has to meet before it is saved, and the bridge's lights, rooms and zones for the picker.
+"""The rules a switch has to meet before it is saved.
 
 The form's own checks (``switch_form.py``) come first, and then these rules check the input again:
 
 - a name of at most 64 characters, without control characters, once stripped;
 - a device id of 4 to 40 ASCII letters and digits, once stripped and lowercased;
 - a device key of at most 128 characters, without white space or control characters, once stripped;
-- at most 50 entries in ``lights`` and in ``groups``, each of 1 to 200 characters without control characters once
-  stripped, with duplicates removed without regard to case;
-- at least one light, room or zone, and a device id that no other switch has.
+- at least one light and at most 50, each a reference of 1 to 255 characters without white space or control characters
+  once stripped, each kept once;
+- a device id that no other switch has.
 
-Their messages are reported by field (``name``, ``deviceId``, ``deviceKey``, ``lights``, ``groups`` and ``targets``), in
-that order. Then the entries are checked against the bridge when it is paired and can be reached, and only warned about
-otherwise, by ``targets.resolve`` (a parameter that tests can replace). A device key of ``None`` keeps the current key
-and ``""`` removes it, and a changed device id drops a kept key, because the key belongs to the device. The device id is
-checked again against the switches as they are after the bridge was asked (``current`` is called twice), because
-another flow could have added it meanwhile.
+Their messages are reported by field (``name``, ``deviceId``, ``deviceKey`` and ``targets``), in that order. A device
+key of ``None`` keeps the current key and ``""`` removes it, and a changed device id drops a kept key, because the key
+belongs to the device.
 """
 
-from collections.abc import Callable, Sequence
-from contextlib import AbstractAsyncContextManager
+from collections.abc import Sequence
 from dataclasses import dataclass
 import re
-from typing import Protocol
 import unicodedata
 
-from . import targets
-from .config import ConfigError, HueSettings, SwitchSettings
-from .hue_client import HueApiError, HueGroup, HueLight
-from .picker import Resources
+from .config import SwitchSettings
 
 MAX_NAME_LENGTH = 64
 MAX_DEVICE_KEY_LENGTH = 128
-MAX_REFERENCE_LENGTH = 200
-MAX_REFERENCES = 50
+MAX_TARGETS = 50
+MAX_TARGET_LENGTH = 255
+"""The longest light reference: Home Assistant's entity ids have at most 255 characters."""
 
 DEVICE_ID_PATTERN = re.compile(r"[A-Za-z0-9]{4,40}")
 """A device id: 4 to 40 ASCII letters and digits, for ``fullmatch``."""
@@ -40,22 +33,19 @@ DEVICE_ID_PATTERN = re.compile(r"[A-Za-z0-9]{4,40}")
 DEVICE_ID_EXAMPLE = "1000abcdef"
 """The made-up example in the message about a malformed device id."""
 
-NOT_PAIRED = "The Hue bridge is not paired yet, so the light names were not checked."
-PAIR_FIRST = "Pair the Hue bridge first."
-
 type Errors = dict[str, list[str]]
 """Messages by the field they belong to, in the order of the checks."""
 
 
 @dataclass(slots=True)
 class SwitchInput:
-    """A switch as the form gives it. ``device_key``: ``None`` keeps the current key, ``""`` removes it."""
+    """A switch as the form gives it. ``device_key``: ``None`` keeps the current key, ``""`` removes it. ``targets`` are
+    the lights, as the switch's settings store them."""
 
     name: str | None = None
     device_id: str | None = None
     device_key: str | None = None
-    lights: Sequence[str] = ()
-    groups: Sequence[str] = ()
+    targets: Sequence[str] = ()
 
 
 class SwitchError(Exception):
@@ -78,22 +68,13 @@ class SwitchNotFoundError(SwitchError):
     """The switch to change doesn't exist."""
 
 
-def _blank(value: str | None) -> bool:
-    return not value or value.isspace()
-
-
 def _has_control_characters(value: str) -> bool:
     return any(unicodedata.category(char) == "Cc" for char in value)
 
 
-def is_paired(hue: HueSettings) -> bool:
-    """Whether the bridge has an address and an application key."""
-    return not _blank(hue.bridge_ip) and not _blank(hue.app_key)
-
-
 def has_device_key(switch: SwitchSettings) -> bool:
     """Whether the switch has a device key, which the form then offers to keep, replace or remove."""
-    return not _blank(switch.device_key)
+    return bool(switch.device_key and not switch.device_key.isspace())
 
 
 def validate(switch: SwitchInput) -> tuple[Errors, SwitchSettings]:
@@ -120,135 +101,30 @@ def validate(switch: SwitchInput) -> tuple[Errors, SwitchSettings]:
     ):
         errors["deviceKey"] = [f"A device key has at most {MAX_DEVICE_KEY_LENGTH} characters and no spaces."]
 
-    lights = _clean_references(switch.lights, "lights", errors)
-    groups = _clean_references(switch.groups, "groups", errors)
-    if "lights" not in errors and "groups" not in errors and not lights and not groups:
-        errors["targets"] = ["Choose at least one light, room or zone."]
+    targets = list(dict.fromkeys(target.strip() for target in switch.targets))
+    if not targets:
+        errors["targets"] = ["Choose at least one light."]
+    elif len(targets) > MAX_TARGETS:
+        errors["targets"] = [f"Choose at most {MAX_TARGETS} lights."]
+    elif any(
+        not target
+        or len(target) > MAX_TARGET_LENGTH
+        or any(char.isspace() for char in target)
+        or _has_control_characters(target)
+        for target in targets
+    ):
+        errors["targets"] = [f"Each light needs 1 to {MAX_TARGET_LENGTH} characters without spaces."]
 
-    settings = SwitchSettings(
-        device_id=device_id, name=name or None, device_key=device_key or None, lights=lights, groups=groups
-    )
+    settings = SwitchSettings(device_id=device_id, name=name or None, device_key=device_key or None, targets=targets)
     return errors, settings
-
-
-def _clean_references(values: Sequence[str], field: str, errors: Errors) -> list[str]:
-    """The entries, stripped, each once: the first of those that are equal without regard to case. The limits are
-    checked before duplicates are removed."""
-    cleaned = [value.strip() for value in values]
-    if len(cleaned) > MAX_REFERENCES:
-        errors[field] = [f"Use at most {MAX_REFERENCES} entries."]
-    elif any(not value or len(value) > MAX_REFERENCE_LENGTH or _has_control_characters(value) for value in cleaned):
-        errors[field] = [f"Each entry needs 1 to {MAX_REFERENCE_LENGTH} characters."]
-
-    distinct: dict[str, str] = {}
-    for value in cleaned:
-        distinct.setdefault(targets.name_key(value), value)
-    return list(distinct.values())
-
-
-# The bridge
-
-
-class HueResources(Protocol):
-    """What the checks read from the bridge; :class:`~.hue_client.HueClient` has it."""
-
-    async def get_lights_and_groups(self) -> tuple[list[HueLight], list[HueGroup]]: ...
-
-
-type ConnectHue = Callable[[HueSettings], AbstractAsyncContextManager[HueResources]]
-"""Opens the bridge for the Hue settings: raises :class:`ConfigError` when the settings can't be used, and closes the
-client afterwards, if it is its own."""
-
-type ResolveTargets = Callable[[SwitchSettings, list[HueLight], list[HueGroup], list[str]], object]
-"""``targets.resolve``: adds a message to the list for each entry that doesn't resolve."""
-
-
-@dataclass(frozen=True, slots=True)
-class BridgeLists:
-    """The bridge's lights, and its rooms and zones with the lights each holds, as a check read them."""
-
-    lights: list[HueLight]
-    groups: list[HueGroup]
-
-
-@dataclass(frozen=True, slots=True)
-class TargetCheck:
-    errors: list[str]
-    warnings: list[str]
-    lists: BridgeLists | None = None
-    """What the bridge listed, which the entries were resolved against; ``None`` when it wasn't asked."""
-
-
-async def check_targets(
-    candidate: SwitchSettings, hue: HueSettings, connect: ConnectHue, resolve: ResolveTargets = targets.resolve
-) -> TargetCheck:
-    """Resolves the lights, rooms and zones against the bridge when it is paired and reachable; otherwise the switch is
-    saved with a warning."""
-    if not is_paired(hue):
-        return TargetCheck([], [NOT_PAIRED])
-    try:
-        async with connect(hue) as client:
-            lights, groups = await client.get_lights_and_groups()
-    except HueApiError as err:
-        return TargetCheck([], [f"The Hue bridge could not be reached, so the light names were not checked ({err})."])
-    except ConfigError as err:
-        return TargetCheck(
-            [], [f"The Hue settings in the config can't be used, so the light names were not checked ({err})."]
-        )
-    errors: list[str] = []
-    resolve(candidate, lights, groups, errors)
-    return TargetCheck(errors, [], BridgeLists(lights, groups))
-
-
-def hue_resources(lights: Sequence[HueLight], groups: Sequence[HueGroup]) -> Resources:
-    """The picker's lights, rooms and zones, each list ordered by name without regard to case; resources of the same
-    name stay in the bridge's order."""
-
-    def by_name[T: (HueLight, HueGroup)](items: Sequence[T]) -> list[T]:
-        return sorted(items, key=lambda item: item.name.casefold())
-
-    return Resources(
-        by_name(lights),
-        by_name([group for group in groups if group.kind == "room"]),
-        by_name([group for group in groups if group.kind == "zone"]),
-    )
-
-
-class ResourcesError(Exception):
-    """The picker's resources can't be loaded: ``status`` is 409 when the bridge isn't paired or its settings can't be
-    used, and 502 when it can't be reached. The lights can then be typed."""
-
-    def __init__(self, status: int, message: str) -> None:
-        super().__init__(message)
-        self.status = status
-
-
-async def load_resources(hue: HueSettings, connect: ConnectHue) -> Resources:
-    """The bridge's lights, rooms and zones for the picker."""
-    if not is_paired(hue):
-        raise ResourcesError(409, PAIR_FIRST)
-    try:
-        async with connect(hue) as client:
-            lights, groups = await client.get_lights_and_groups()
-    except HueApiError as err:
-        raise ResourcesError(502, str(err)) from err
-    except ConfigError as err:
-        raise ResourcesError(409, str(err)) from err
-    return hue_resources(lights, groups)
-
-
-# Adding and changing a switch
 
 
 @dataclass(frozen=True, slots=True)
 class SwitchWrite:
-    """A switch to save, with the warnings to show. ``index`` is the position of the switch it replaces, and ``lists``
-    are the bridge's lights, rooms and zones that the check read, ``None`` when it didn't ask the bridge."""
+    """A switch to save. ``index`` is the position of the switch it replaces."""
 
     switch: SwitchSettings
-    warnings: list[str]
     index: int | None = None
-    lists: BridgeLists | None = None
 
 
 def _position(switches: Sequence[SwitchSettings], device_id: str) -> int | None:
@@ -256,59 +132,30 @@ def _position(switches: Sequence[SwitchSettings], device_id: str) -> int | None:
     return next((index for index, switch in enumerate(switches) if switch.has_device_id(device_id)), None)
 
 
-async def create_switch(
-    current: Callable[[], Sequence[SwitchSettings]],
-    switch: SwitchInput,
-    hue: HueSettings,
-    connect: ConnectHue,
-    resolve: ResolveTargets = targets.resolve,
-) -> SwitchWrite:
-    """The switch to add. Raises :class:`SwitchError`."""
+def create_switch(switches: Sequence[SwitchSettings], switch: SwitchInput) -> SwitchWrite:
+    """The switch to add to ``switches``. Raises :class:`SwitchError`."""
     errors, candidate = validate(switch)
     if errors:
         raise SwitchValidationError(errors)
-    conflict = f"Device {candidate.device_id} is already configured. Edit that switch instead."
-    if _position(current(), candidate.device_id) is not None:
-        raise SwitchConflictError(conflict)
-
-    check = await check_targets(candidate, hue, connect, resolve)
-    if check.errors:
-        raise SwitchValidationError({"targets": check.errors})
-
-    if _position(current(), candidate.device_id) is not None:
-        raise SwitchConflictError(conflict)
-    return SwitchWrite(candidate, check.warnings, lists=check.lists)
+    if _position(switches, candidate.device_id) is not None:
+        raise SwitchConflictError(f"Device {candidate.device_id} is already configured. Edit that switch instead.")
+    return SwitchWrite(candidate)
 
 
-async def update_switch(
-    current: Callable[[], Sequence[SwitchSettings]],
-    device_id: str,
-    switch: SwitchInput,
-    hue: HueSettings,
-    connect: ConnectHue,
-    resolve: ResolveTargets = targets.resolve,
-) -> SwitchWrite:
-    """The switch that replaces the one with ``device_id``, and its position. Raises :class:`SwitchError`."""
+def update_switch(switches: Sequence[SwitchSettings], device_id: str, switch: SwitchInput) -> SwitchWrite:
+    """The switch that replaces the one of ``switches`` with ``device_id``, and its position. Raises
+    :class:`SwitchError`."""
     errors, candidate = validate(switch)
     if errors:
         raise SwitchValidationError(errors)
     current_id = device_id.strip().lower()
-    not_found = f"No switch with device id {current_id} is configured."
-    if _position(current(), current_id) is None:
-        raise SwitchNotFoundError(not_found)
-
-    check = await check_targets(candidate, hue, connect, resolve)
-    if check.errors:
-        raise SwitchValidationError({"targets": check.errors})
-
-    switches = current()
     index = _position(switches, current_id)
     if index is None:
-        raise SwitchNotFoundError(not_found)
+        raise SwitchNotFoundError(f"No switch with device id {current_id} is configured.")
     same_device = switches[index].has_device_id(candidate.device_id)
     if not same_device and _position(switches, candidate.device_id) is not None:
         raise SwitchConflictError(f"Device {candidate.device_id} is already configured by another switch.")
     # The device key belongs to the device, so it is only kept while the device stays the same.
     if switch.device_key is None and same_device:
         candidate.device_key = switches[index].device_key
-    return SwitchWrite(candidate, check.warnings, index, check.lists)
+    return SwitchWrite(candidate, index)

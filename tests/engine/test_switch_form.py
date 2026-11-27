@@ -1,30 +1,29 @@
 """The switch form's own checks (engine/switch_form.py), before the switch rules check a switch again."""
 
-from collections.abc import AsyncIterator
-from contextlib import AbstractAsyncContextManager, asynccontextmanager
-from dataclasses import dataclass
 from typing import Any
 
 import pytest
 
-from custom_components.sonoff2hue.engine import picker, switch_form, switch_rules
-from custom_components.sonoff2hue.engine.config import HueSettings, SwitchSettings
-from custom_components.sonoff2hue.engine.hue_client import HueGroup, HueLight
+from custom_components.sonoff2hue.engine import switch_form, switch_rules
+from custom_components.sonoff2hue.engine.config import SwitchSettings
 from custom_components.sonoff2hue.engine.switch_form import Problem
-from custom_components.sonoff2hue.engine.switch_rules import HueResources, SwitchInput
+from custom_components.sonoff2hue.engine.switch_rules import SwitchInput
 
 _DEVICE = "1000abcdef"
 _OTHER = "1000999999"
 _FREE = "1000aaaaaa"
+CEILING = "light.ceiling"
+CEILING_ID = "0123456789abcdef0123456789abcdef"
+"""How a switch's settings keep a light that the entity registry has: by its registry id."""
 SWITCHES = [SwitchSettings(" 1000ABCDEF ", "Hall"), SwitchSettings(_OTHER, "  ")]
 
 
 def _body(**kwargs: Any) -> SwitchInput:
-    return SwitchInput(**({"name": None, "device_id": _FREE, "lights": ["Ceiling"], "groups": []} | kwargs))
+    return SwitchInput(**({"name": None, "device_id": _FREE, "targets": [CEILING]} | kwargs))
 
 
 def _problems(body: SwitchInput, original_id: str | None = None, **kwargs: Any) -> list[Problem]:
-    options: dict[str, Any] = {"manual_device": False, "manual_targets": False, "key_mode": "set"} | kwargs
+    options: dict[str, Any] = {"manual_device": False, "key_mode": "set"} | kwargs
     return switch_form.form_problems(body, SWITCHES, original_id, **options)
 
 
@@ -35,7 +34,7 @@ def test_a_used_device_is_named_by_its_switch() -> None:
     assert switch_form.used_by(SWITCHES, "1000ABCDEF", None) == "Hall"
     assert switch_form.used_by(SWITCHES, _OTHER, None) == _OTHER
     assert switch_form.used_by(SWITCHES, _DEVICE, _DEVICE) is None
-    assert switch_form.used_by(SWITCHES, "1000aaaaaa", None) is None
+    assert switch_form.used_by(SWITCHES, _FREE, None) is None
     assert switch_form.used_by([], _DEVICE, None) is None
 
 
@@ -100,7 +99,7 @@ def test_the_edited_switch_may_keep_its_device() -> None:
 
 
 def test_identify_by_press_skips_devices_of_other_switches() -> None:
-    assert switch_form.identify(SWITCHES, None, "1000aaaaaa") == switch_form.Identified(
+    assert switch_form.identify(SWITCHES, None, _FREE) == switch_form.Identified(
         True, "Selected 1000aaaaaa: it reported a press."
     )
     assert switch_form.identify(SWITCHES, None, _DEVICE) == switch_form.Identified(
@@ -110,27 +109,24 @@ def test_identify_by_press_skips_devices_of_other_switches() -> None:
     assert switch_form.identify(SWITCHES, _DEVICE, _DEVICE).selected
 
 
-# The name, the targets and the key
+# The name, the lights and the key
 
 
 def test_the_name_is_stripped_and_counted_in_characters() -> None:
     emoji = "\U0001f600"
-    fits = switch_form.form_input("\u3000" + "x" * 63 + emoji + "\x85", _FREE, "set", "", ["Ceiling"], [])
-    too_long = switch_form.form_input("x" * 64 + emoji, _FREE, "set", "", ["Ceiling"], [])
+    fits = switch_form.form_input("\u3000" + "x" * 63 + emoji + "\x85", _FREE, "set", "", [CEILING])
+    too_long = switch_form.form_input("x" * 64 + emoji, _FREE, "set", "", [CEILING])
 
     assert fits.name == "x" * 63 + emoji
     assert _problems(fits) == []
     assert _problems(too_long) == [Problem("name", "Use at most 64 characters.")]
-    assert switch_form.form_input(" \u3000\x1c", _FREE, "set", "", ["Ceiling"], []).name is None
-    assert switch_form.form_input("\ufeffHall", _FREE, "set", "", ["Ceiling"], []).name == "\ufeffHall"
+    assert switch_form.form_input(" \u3000\x1c", _FREE, "set", "", [CEILING]).name is None
+    assert switch_form.form_input("\ufeffHall", _FREE, "set", "", [CEILING]).name == "\ufeffHall"
 
 
-def test_at_least_one_target() -> None:
-    assert _problems(_body(lights=[], groups=[])) == [Problem("targets", "Choose at least one light, room or zone.")]
-    assert _problems(_body(lights=[], groups=[]), manual_targets=True) == [
-        Problem("lights", "Choose at least one light, room or zone.")
-    ]
-    assert _problems(_body(lights=[], groups=["room:Hallway"])) == []
+def test_at_least_one_light() -> None:
+    assert _problems(_body(targets=[])) == [Problem("targets", "Choose at least one light.")]
+    assert _problems(_body(targets=[CEILING_ID])) == []
 
 
 @pytest.mark.parametrize(
@@ -142,7 +138,7 @@ def test_device_key_value(mode: switch_form.KeyMode, typed: str, expected: str |
 
 
 def test_replacing_the_key_needs_a_new_one() -> None:
-    body = switch_form.form_input("Hall", _FREE, "replace", " \u3000", ["Ceiling"], [])
+    body = switch_form.form_input("Hall", _FREE, "replace", " \u3000", [CEILING])
 
     assert _problems(body, key_mode="replace") == [
         Problem("deviceKey", "Enter the new device key, or keep or remove the current one.")
@@ -150,15 +146,15 @@ def test_replacing_the_key_needs_a_new_one() -> None:
 
 
 def test_the_key_warning_shows_when_a_kept_key_meets_another_device() -> None:
-    assert switch_form.key_warning("keep", True, "1000aaaaaa", _DEVICE) == switch_form.KEY_WARNING
+    assert switch_form.key_warning("keep", True, _FREE, _DEVICE) == switch_form.KEY_WARNING
     assert switch_form.key_warning("keep", True, "1000ABCDEF", _DEVICE) is None
     assert switch_form.key_warning("keep", True, "", _DEVICE) is None
-    assert switch_form.key_warning("replace", True, "1000aaaaaa", _DEVICE) is None
-    assert switch_form.key_warning("set", False, "1000aaaaaa", _DEVICE) is None
+    assert switch_form.key_warning("replace", True, _FREE, _DEVICE) is None
+    assert switch_form.key_warning("set", False, _FREE, _DEVICE) is None
 
 
 def test_all_problems_in_the_forms_order() -> None:
-    body = switch_form.form_input("x" * 65, "", "replace", "", [], [])
+    body = switch_form.form_input("x" * 65, "", "replace", "", [])
 
     assert [problem.field for problem in _problems(body, key_mode="replace")] == [
         "deviceId",
@@ -168,74 +164,37 @@ def test_all_problems_in_the_forms_order() -> None:
     ]
 
 
-def test_typed_entries_round_trip() -> None:
-    text = switch_form.join_list(["Ceiling", "room:Hallway"])
-
-    assert text == "Ceiling, room:Hallway"
-    assert picker.split_list(text) == ["Ceiling", "room:Hallway"]
-    assert switch_form.join_list([]) == ""
-
-
 # The switch rules' errors on the form's fields
 
 
-def test_field_errors_in_the_picker_join_the_target_lists() -> None:
+def test_the_rules_messages_go_to_their_fields_and_the_others_to_the_form() -> None:
+    """Joined by field, in order, with the keys matched without regard to case; empty messages are left out."""
     errors = {
         "deviceId": ["A device id has 4 to 40 letters and digits, e.g. 1000abcdef."],
-        "lights": ["Use at most 50 entries."],
-        "groups": ["Each entry needs 1 to 200 characters."],
+        "TARGETS": ["Choose at most 50 lights.", "Each light needs 1 to 255 characters without spaces."],
         "Other": ["Something else.", ""],
+        "devicekey": ["A device key has at most 128 characters and no spaces."],
+        "name": ["Use at most 64 characters."],
     }
 
-    assert switch_form.field_errors(errors, manual_targets=False) == (
+    assert switch_form.field_errors(errors) == (
         {
             "deviceId": "A device id has 4 to 40 letters and digits, e.g. 1000abcdef.",
-            "targets": "Use at most 50 entries. Each entry needs 1 to 200 characters.",
+            "targets": "Choose at most 50 lights. Each light needs 1 to 255 characters without spaces.",
+            "deviceKey": "A device key has at most 128 characters and no spaces.",
+            "name": "Use at most 64 characters.",
         },
         ["Something else."],
     )
-    assert switch_form.field_errors(errors, manual_targets=True)[0] == {
-        "deviceId": "A device id has 4 to 40 letters and digits, e.g. 1000abcdef.",
-        "lights": "Use at most 50 entries.",
-        "groups": "Each entry needs 1 to 200 characters.",
-    }
-    assert switch_form.field_errors({"DEVICEKEY": ["x"]}, manual_targets=False) == ({"deviceKey": "x"}, [])
 
 
 # The whole form
 
 
-@dataclass
-class Bridge:
-    lights: list[HueLight]
-    groups: list[HueGroup]
+def test_a_switch_from_the_form_is_saved_by_the_rules() -> None:
+    body = switch_form.form_input(" Kitchen ", "1000ABCDEF", "set", " a-device-key ", [CEILING_ID, "light.counter"])
 
-    async def get_lights_and_groups(self) -> tuple[list[HueLight], list[HueGroup]]:
-        return self.lights, self.groups
+    assert switch_form.form_problems(body, [], None, manual_device=True, key_mode="set") == []
+    write = switch_rules.create_switch([], body)
 
-    def connect(self, hue: HueSettings) -> AbstractAsyncContextManager[HueResources]:
-        @asynccontextmanager
-        async def opened() -> AsyncIterator[HueResources]:
-            yield self
-
-        return opened()
-
-
-async def test_a_switch_added_with_the_picker_is_saved_with_the_encoded_entries() -> None:
-    bridge = Bridge(
-        [HueLight("l1", "Ceiling", True), HueLight("l2", "Lamp", False), HueLight("l3", "lamp", False)],
-        [HueGroup("r1", "Kitchen", "room", "g1"), HueGroup("z1", "Kitchen", "zone", "g2")],
-    )
-    hue = HueSettings(bridge_ip="192.0.2.20", app_key="test-app-key")
-    resources = switch_rules.hue_resources(bridge.lights, bridge.groups)
-    selection = picker.create_selection(resources)
-    selection.light.update({"l1", "l3"})
-    selection.zone.add("z1")
-    targets = picker.selection_to_config(selection, resources)
-
-    body = switch_form.form_input(" Kitchen ", "1000ABCDEF", "set", "", targets.lights, targets.groups)
-    assert switch_form.form_problems(body, [], None, manual_device=True, manual_targets=False, key_mode="set") == []
-    write = await switch_rules.create_switch(list, body, hue, bridge.connect)
-
-    assert write.switch == SwitchSettings(_DEVICE, "Kitchen", None, ["Ceiling", "l3"], ["zone:Kitchen"])
-    assert write.warnings == []
+    assert write.switch == SwitchSettings(_DEVICE, "Kitchen", "a-device-key", [CEILING_ID, "light.counter"])

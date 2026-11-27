@@ -1,62 +1,45 @@
-"""Stand-ins for the network in the tests that run the integration in Home Assistant (decision 23): the config entry's LAN
-on a fake network, and a Hue bridge in memory. The ``lan`` and ``bridge`` fixtures make the runtime use them, in place
-of ``runtime.new_listener`` and ``runtime.create_hue_client``."""
+"""Stand-ins in the tests that run the integration in Home Assistant (decision 23): the config entry's LAN on a fake
+network, and lights in Home Assistant's state machine, switched by ``light`` actions of the tests' own (decision 40). The
+``lan`` and ``lights`` fixtures put them in place."""
 
 import asyncio
-from collections.abc import Awaitable, Callable
-from datetime import datetime
+from collections.abc import Iterable, Mapping
 import json
 from typing import Any
 
 from homeassistant.config_entries import ConfigSubentryData
+from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant.common import MockConfigEntry
 
 from custom_components.sonoff2hue.const import (
-    CONF_APP_KEY,
-    CONF_BRIDGE_ID,
-    CONF_BRIDGE_IP,
-    CONF_CERTIFICATE_SHA256,
     CONF_DEVICE_ID,
     CONF_DEVICE_KEY,
-    CONF_GROUPS,
-    CONF_LIGHTS,
     CONF_NAME,
+    CONF_TARGETS,
     DOMAIN,
     ENTRY_TITLE,
+    ENTRY_VERSION,
     SUBENTRY_SWITCH,
 )
 from custom_components.sonoff2hue.engine import ewelink
-from custom_components.sonoff2hue.engine.config import HueSettings
-from custom_components.sonoff2hue.engine.hue_address import BridgeUrl
-from custom_components.sonoff2hue.engine.hue_client import (
-    HttpAnswer,
-    HueApiError,
-    HueBridgeInfo,
-    HueClient,
-    TransportError,
-)
-from custom_components.sonoff2hue.engine.hue_setup import DiscoveredBridge
 from custom_components.sonoff2hue.engine.mdns import MdnsListener
-from custom_components.sonoff2hue.engine.supervisor import BridgeReader, BridgeSearch, HueClientFactory
 
 from .engine.fakes import FakeNetwork
 from .engine.packets import announcement
-from .hue import InMemoryBridge, RecordedRequest
 
 DEVICE_ID = "1000abcdef"
 """A made-up MINIR4M."""
 OTHER_DEVICE_ID = "1000999999"
 DEVICE_ADDRESS = "192.0.2.5"
-BRIDGE_ADDRESS = "bridge.test"
-BRIDGE_ID = "001788FFFE000001"
-APP_KEY = "app-key"
-PIN = "AB" * 32
 DEVICE_KEY = "test-device-key"
 ENCRYPTION_IV = bytes(range(16))
 """The IV of the broadcasts that :class:`Lan` encrypts. A device draws a random one; a fixed one makes a payload sent
 under another switch's key fail the same way in every run. Under a wrong key, about one IV in 265 decrypts to valid
 padding, and the decode error then says that the payload is not valid JSON instead of that decryption failed."""
-NO_ERRORS = '{"errors":[],"data":[]}'
+CEILING = "light.ceiling"
+"""The light of :func:`switch` by default, which :meth:`Lights.add` makes as ``lights.add("ceiling")``."""
 
 
 class Lan:
@@ -66,7 +49,7 @@ class Lan:
         self.network = FakeNetwork()
         self.listeners: list[MdnsListener] = []
 
-    def listener(self, clock: Callable[[], datetime]) -> MdnsListener:
+    def listener(self, clock: Any) -> MdnsListener:
         """``runtime.new_listener``: a listener on the fake network."""
         listener = MdnsListener(self.network.open, self.network.watch, clock=clock)
         self.listeners.append(listener)
@@ -100,206 +83,115 @@ def relay(detached: bool) -> dict[str, Any]:
     return {"switches": [{"outlet": 0, "switch": "off"}], "relaySeparation": 1 if detached else 0}
 
 
-class Bridge(InMemoryBridge):
-    """A Hue bridge in memory, with the lights Ceiling (l1) and Desk (l2) and the room Hall (r1), which switches both
-    through its grouped light g1, and the zones that ``POST /clip/v2/resource/zone`` creates, which it lists and gives
-    by id. ``names`` holds the names of l1, l2 and r1, which a test may change, and ``deleted`` the ones that a test
-    deleted, as the Hue app does: they aren't listed, nor among the zones' children, and their PUTs are answered 404. It
-    records the requests, and how many clients were made for it and closed. ``hold`` keeps the answers to requests for
-    a path until the test releases them. It answers at any address, but those of ``moved_from``, as a bridge that moved
-    away from them (decision 33): there, no request gets an answer."""
+class Lights:
+    """Lights in Home Assistant's state machine, with ``light.turn_on`` and ``light.turn_off`` actions of their own:
+    each call sets the state of the light that it names, keeping its attributes, and is recorded in :attr:`calls`, in
+    the order the calls came. A light can be made to fail, with Home Assistant's error, or to wait until the test lets
+    it go."""
 
-    def __init__(self) -> None:
-        super().__init__(self._answer)
-        self.on = {"l1": False, "l2": False}
-        self.names = {"l1": "Ceiling", "l2": "Desk", "r1": "Hall"}
-        self.deleted: set[str] = set()
-        self.moved_from: set[str] = set()
-        self.created = 0
-        self.closed = 0
-        self.zones: list[dict[str, Any]] = []
-        self._faults: list[list[Any]] = []
+    def __init__(self, hass: HomeAssistant) -> None:
+        self.hass = hass
+        self.calls: list[tuple[str, str]] = []
+        """Each call: ``turn_on`` or ``turn_off``, and the light's entity id."""
+        self._failing: dict[str, str] = {}
         self._held: dict[str, asyncio.Event] = {}
+        for service in ("turn_on", "turn_off"):
+            hass.services.async_register("light", service, self._handle)
 
-    def clients(self) -> HueClientFactory:
-        """``runtime.create_hue_client``: clients for the configured address, key and pin, which reach this bridge."""
-
-        def create(hue: HueSettings) -> HueClient:
-            client = HueClient(
-                hue.bridge_ip or "", hue.app_key or "", hue.certificate_sha256, lambda url, pin, report: At(self, url)
+    def add(
+        self,
+        object_id: str,
+        *,
+        on: bool = False,
+        name: str | None = None,
+        registered: bool = True,
+        platform: str = "test",
+        unique_id: str | None = None,
+        attributes: Mapping[str, Any] | None = None,
+    ) -> str:
+        """A light, ``light.<object_id>``, off unless ``on``, named ``name`` (else by its object id) and, unless
+        ``registered`` is false, in the entity registry under ``platform`` with ``unique_id`` (else its object id).
+        Returns its entity id."""
+        entity_id = f"light.{object_id}"
+        if registered:
+            entity_id = (
+                er.async_get(self.hass)
+                .async_get_or_create(
+                    "light", platform, unique_id or object_id, suggested_object_id=object_id, original_name=name
+                )
+                .entity_id
             )
-            self.created += 1
-            return client
+        self.hass.states.async_set(
+            entity_id, "on" if on else "off", {"friendly_name": name or object_id, **(attributes or {})}
+        )
+        return entity_id
 
-        return create
+    def target(self, entity_id: str) -> str:
+        """How a switch's settings keep the light: its entity registry id."""
+        entry = er.async_get(self.hass).async_get(entity_id)
+        assert entry is not None, f"{entity_id} isn't in the entity registry"
+        return entry.id
 
-    async def close(self) -> None:
-        self.closed += 1
+    def is_on(self, entity_id: str) -> bool:
+        state = self.hass.states.get(entity_id)
+        return state is not None and state.state == "on"
 
-    def fail(
-        self, path: str, status: int, body: str = "{}", count: int | None = None, method: str | None = None
-    ) -> None:
-        """Answers the next ``count`` requests for ``path``, or all of them, with ``status`` and ``body``; only those
-        with ``method``, when it is given."""
-        self._faults.append([path, status, body, count, method])
+    def turned(self) -> list[tuple[str, str]]:
+        """The calls so far, and forgets them."""
+        calls, self.calls = self.calls, []
+        return calls
+
+    def fail(self, entity_id: str, message: str = "Request failed: the light didn't answer") -> None:
+        """Makes the calls for the light raise Home Assistant's error with ``message``, as the Hue integration does
+        when the bridge refuses."""
+        self._failing[entity_id] = message
 
     def heal(self) -> None:
-        self._faults.clear()
+        self._failing.clear()
 
-    def hold(self, path: str) -> asyncio.Event:
-        """Keeps the answers to the requests for ``path`` until the event that it returns is set."""
-        self._held[path] = event = asyncio.Event()
+    def hold(self, entity_id: str) -> asyncio.Event:
+        """Keeps the calls for the light from ending until the event that it returns is set."""
+        self._held[entity_id] = event = asyncio.Event()
         return event
 
-    def puts(self) -> list[tuple[str, bool]]:
-        """Every PUT: the resource and the ``on`` it asked for."""
-        return [(request.path.rsplit("/", 1)[-1], request.on) for request in self.requests if request.method == "PUT"]
-
-    def _answer(self, request: RecordedRequest) -> tuple[int, str] | Awaitable[tuple[int, str]]:
-        held = self._held.get(request.path)
-        return self._now(request) if held is None or held.is_set() else self._later(held, request)
-
-    async def _later(self, held: asyncio.Event, request: RecordedRequest) -> tuple[int, str]:
-        await held.wait()
-        return self._now(request)
-
-    def _zones(self) -> list[dict[str, Any]]:
-        """The zones that it lists, and that a POST adds to."""
-        return self.zones
-
-    def _create_zone(self, request: RecordedRequest) -> str:
-        """Adds a zone of the POST's children, named as its metadata says, with a grouped light; its id is z1, z2, …"""
-        zones = self._zones()
-        zone_id = f"z{len(zones) + 1}"
-        body = json.loads(request.body or "")
-        zones.append(
-            {
-                "id": zone_id,
-                "type": "zone",
-                "metadata": body["metadata"],
-                "children": body["children"],
-                "services": [{"rid": f"grouped-{zone_id}", "rtype": "grouped_light"}],
-            }
-        )
-        return zone_id
-
-    def _listed(self, zone: dict[str, Any]) -> dict[str, Any]:
-        """A zone as it is listed: without the lights that a test deleted among its children."""
-        return {**zone, "children": [child for child in zone["children"] if child["rid"] not in self.deleted]}
-
-    def _now(self, request: RecordedRequest) -> tuple[int, str]:
-        for fault in self._faults:
-            path, status, body, count, method = fault
-            if path == request.path and count != 0 and method in (None, request.method):
-                fault[3] = None if count is None else count - 1
-                return status, body
-        if request.method == "POST" and request.path == "/clip/v2/resource/zone":
-            return 200, json.dumps({"errors": [], "data": [{"rid": self._create_zone(request), "rtype": "zone"}]})
-        if request.path.startswith("/clip/v2/resource/zone/"):
-            zone_id = request.path.rsplit("/", 1)[-1]
-            zones = [self._listed(zone) for zone in self._zones() if zone["id"] == zone_id]
-            return 200, json.dumps({"errors": [], "data": zones})
-        lights = [light for light in ("l1", "l2") if light not in self.deleted]
-        room = "r1" not in self.deleted
-        if request.method == "PUT":
-            target = request.path.rsplit("/", 1)[-1]
-            if target in self.deleted or (target == "g1" and not room):
-                return 404, '{"errors":[{"description":"not found"}],"data":[]}'
-            for light in lights if target == "g1" else [target]:
-                self.on[light] = request.on
-            return 200, NO_ERRORS
-        data: list[dict[str, Any]] = {
-            "/clip/v2/resource/bridge": [{"id": "b1", "type": "bridge"}],
-            "/clip/v2/resource/light": [
-                {"id": light, "metadata": {"name": self.names[light]}, "on": {"on": self.on[light]}} for light in lights
-            ],
-            "/clip/v2/resource/room": [
-                {
-                    "id": "r1",
-                    "metadata": {"name": self.names["r1"]},
-                    "services": [{"rid": "g1", "rtype": "grouped_light"}],
-                }
-            ]
-            if room
-            else [],
-            "/clip/v2/resource/zone": [self._listed(zone) for zone in self._zones()],
-            "/clip/v2/resource/grouped_light": [{"id": "g1", "on": {"on": any(self.on[light] for light in lights)}}]
-            if room
-            else [],
-        }[request.path]
-        return 200, json.dumps({"errors": [], "data": data})
+    async def _handle(self, call: ServiceCall) -> None:
+        for entity_id in _entity_ids(call.data.get("entity_id")):
+            self.calls.append((call.service, entity_id))
+            if (held := self._held.get(entity_id)) is not None:
+                await held.wait()
+            if (message := self._failing.get(entity_id)) is not None:
+                raise HomeAssistantError(message)
+            state = self.hass.states.get(entity_id)
+            attributes = {} if state is None else dict(state.attributes)
+            # As a light entity writes its new state, with the context of the action that changed it.
+            self.hass.states.async_set(
+                entity_id, "on" if call.service == "turn_on" else "off", attributes, context=call.context
+            )
 
 
-class At:
-    """The transport of a client of a :class:`Bridge` at an address: it reaches the bridge, unless the bridge moved
-    away from that address, where no request gets an answer."""
-
-    def __init__(self, bridge: Bridge, url: BridgeUrl) -> None:
-        self._bridge = bridge
-        self._host = url.host
-        self._where = f"{url.host}:{url.port}"
-
-    async def send(
-        self, method: str, path: str, body: bytes | None, headers: dict[str, str] | None = None
-    ) -> HttpAnswer:
-        if self._host in self._bridge.moved_from:
-            raise TransportError("network", f"No route to host ({self._where})")
-        return await self._bridge.send(method, path, body, headers)
-
-    async def close(self) -> None:
-        await self._bridge.close()
-
-
-class Finder:
-    """The network as the runtime's search for its bridge sees it (decision 33), in place of
-    ``runtime.new_bridge_search``: the bridges that each search lists, ``listed``, and what reading each address gives,
-    ``bridges``, unless a test reads the bridges over HTTPS with ``read``. It records the sources of each search."""
-
-    def __init__(self) -> None:
-        self.listed: list[DiscoveredBridge] = []
-        self.bridges: dict[str, HueBridgeInfo] = {}
-        self.read: BridgeReader = self._read
-        self.searches: list[tuple[bool, bool]] = []
-
-    def search(self, hass: Any) -> BridgeSearch:
-        """``runtime.new_bridge_search``."""
-        return BridgeSearch(self._find, self._read_now)
-
-    async def _find(self, *, mdns: bool, cloud: bool) -> list[DiscoveredBridge]:
-        self.searches.append((mdns, cloud))
-        return list(self.listed)
-
-    async def _read_now(self, address: str) -> HueBridgeInfo:
-        """Reads with ``read`` as it is then, which a test may set once the runtime runs."""
-        return await self.read(address)
-
-    async def _read(self, address: str) -> HueBridgeInfo:
-        if (info := self.bridges.get(address)) is None:
-            raise HueApiError(f"No Hue bridge answered at {address}: No route to host ({address}:443)")
-        return info
-
-
-def bridge_info(address: str, certificate: str = PIN, bridge_id: str = BRIDGE_ID) -> HueBridgeInfo:
-    """What reading the bridge at ``address`` gives: its id, as its config gives it, and its certificate's SHA-256."""
-    return HueBridgeInfo(address, bridge_id, "Hue Bridge", "BSB002", "1972004020", certificate)
+def _entity_ids(value: object) -> Iterable[str]:
+    if isinstance(value, str):
+        return [value]
+    return [str(entity_id) for entity_id in value] if isinstance(value, list | tuple) else []
 
 
 def switch(
     device_id: str = DEVICE_ID,
     name: str | None = "Hall",
     *,
-    lights: list[str] | None = None,
-    groups: list[str] | None = None,
+    targets: list[str] | None = None,
     key: str | None = None,
+    extra: Mapping[str, Any] | None = None,
 ) -> ConfigSubentryData:
-    """A ``switch`` subentry, as the switch flow and the import store it."""
+    """A ``switch`` subentry, as the switch flow stores it, with ``light.ceiling`` unless ``targets`` says otherwise;
+    ``extra`` adds to its data."""
     return ConfigSubentryData(
         data={
             CONF_DEVICE_ID: device_id,
             CONF_NAME: name,
             CONF_DEVICE_KEY: key,
-            CONF_LIGHTS: ["Ceiling"] if lights is None else lights,
-            CONF_GROUPS: [] if groups is None else groups,
+            CONF_TARGETS: [CEILING] if targets is None else targets,
+            **(extra or {}),
         },
         subentry_type=SUBENTRY_SWITCH,
         title=name or device_id,
@@ -307,18 +199,13 @@ def switch(
     )
 
 
-def paired(
-    *switches: ConfigSubentryData,
-    address: str = BRIDGE_ADDRESS,
-    app_key: str | None = APP_KEY,
-    pin: str | None = PIN,
-    bridge_id: str = BRIDGE_ID,
-) -> MockConfigEntry:
-    """The config entry of a paired bridge, with ``switches``."""
+def entry(*switches: ConfigSubentryData) -> MockConfigEntry:
+    """The config entry, with ``switches``."""
     return MockConfigEntry(
         domain=DOMAIN,
         title=ENTRY_TITLE,
-        unique_id=bridge_id,
-        data={CONF_BRIDGE_IP: address, CONF_BRIDGE_ID: bridge_id, CONF_APP_KEY: app_key, CONF_CERTIFICATE_SHA256: pin},
+        data={},
+        version=ENTRY_VERSION,
+        minor_version=1,
         subentries_data=list(switches),
     )

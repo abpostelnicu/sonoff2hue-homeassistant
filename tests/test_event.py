@@ -1,5 +1,5 @@
 """The event entities (decision 25): each switch's Press, from the runtime's press events, with the LAN on a fake
-network and the Hue bridge in memory."""
+network and the lights in Home Assistant's state machine."""
 
 from datetime import datetime
 
@@ -8,9 +8,10 @@ from homeassistant.components.event import ATTR_EVENT_TYPE, ATTR_EVENT_TYPES, Ev
 from homeassistant.const import ATTR_DEVICE_CLASS, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
+import pytest
 
-from .fakes import OTHER_DEVICE_ID, Bridge, Lan, paired, switch
-from .platforms import PRESS, settle, start, state_of, tick
+from .fakes import OTHER_DEVICE_ID, Lan, entry, switch
+from .platforms import PRESS, STATUS, settle, start, state_of, tick
 
 DESK_PRESS = "event.desk_press"
 
@@ -20,10 +21,11 @@ def fired(at: datetime) -> str:
     return at.isoformat(timespec="milliseconds")
 
 
+@pytest.mark.usefixtures("lights")
 async def test_press_fires_for_each_press_of_its_switch(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+    hass: HomeAssistant, lan: Lan, freezer: FrozenDateTimeFactory
 ) -> None:
-    await start(hass, paired(switch(), switch(OTHER_DEVICE_ID, "Desk", lights=["Desk"])))
+    await start(hass, entry(switch(), switch(OTHER_DEVICE_ID, "Desk", targets=["light.desk"])))
 
     press = state_of(hass, PRESS)
     assert press.state == STATE_UNKNOWN
@@ -69,12 +71,15 @@ async def test_press_fires_for_each_press_of_its_switch(
     assert press.attributes["seq"] == 3
 
 
-async def test_press_fires_only_while_the_bridge_runs(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+@pytest.mark.usefixtures("lights")
+async def test_press_fires_only_while_the_switches_run(
+    hass: HomeAssistant, lan: Lan, freezer: FrozenDateTimeFactory
 ) -> None:
-    """Its events are the presses that the runner acts on, as the toggle events have them."""
-    bridge.fail("/clip/v2/resource/bridge", 503)
-    await start(hass, paired(switch()))
+    """Its events are the presses that the runner acts on, as the toggle events have them: none while the configuration
+    has errors."""
+    await start(hass, entry(switch(targets=[" "])))
+    await tick(freezer, 0.5)
+    assert state_of(hass, STATUS).state == "invalid_config"
 
     lan.broadcast(1)
     lan.broadcast(2)

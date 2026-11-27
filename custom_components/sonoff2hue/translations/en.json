@@ -2,134 +2,9 @@
   "config": {
     "step": {
       "user": {
-        "title": "Pair a Hue bridge",
-        "description": "Search your network for Hue bridges, or enter the address of the bridge.",
-        "menu_options": {
-          "discover": "Find bridges",
-          "address": "Enter the bridge address",
-          "import_yaml": "Import sonoff2hue.yaml"
-        }
-      },
-      "reconfigure": {
-        "title": "Pair again or pair another bridge",
-        "description": "Search your network for Hue bridges, or enter the address of the bridge. Your switch mappings are kept.",
-        "menu_options": {
-          "discover": "Find bridges",
-          "address": "Enter the bridge address"
-        }
-      },
-      "discover": {
-        "title": "Find bridges"
-      },
-      "pick": {
-        "title": "Choose a bridge",
-        "description": "Choose the Hue bridge to pair, or another address. Each bridge shows its address, its bridge id and how it was found.",
-        "data": {
-          "bridge": "Bridge"
-        }
-      },
-      "no_bridges": {
-        "title": "No bridges found",
-        "description": "Make sure the bridge is powered on and connected to the same network as Home Assistant. Search again, or enter its address.",
-        "menu_options": {
-          "discover": "Search again",
-          "address": "Enter the bridge address"
-        }
-      },
-      "discovery_failed": {
-        "title": "The search failed",
-        "description": "{error}",
-        "menu_options": {
-          "discover": "Search again",
-          "address": "Enter the bridge address"
-        }
-      },
-      "address": {
-        "title": "Enter the bridge address",
-        "data": {
-          "address": "Bridge address"
-        },
-        "data_description": {
-          "address": "IP address or host name, optionally with :port."
-        }
-      },
-      "reauth_confirm": {
-        "title": "Pair the Hue bridge again",
-        "description": "The Hue bridge at {address} rejected the application key of sonoff2hue, which can't switch the lights until it is paired again. Select Submit, then press the round link button on top of the bridge within 60 seconds."
-      },
-      "link": {
-        "title": "Press the link button"
-      },
-      "link_timeout": {
-        "title": "The link button was not pressed in time",
-        "description": "{error}",
-        "menu_options": {
-          "retry": "Retry",
-          "user": "Choose another bridge",
-          "reconfigure": "Choose another bridge",
-          "import_pair": "Choose another bridge"
-        }
-      },
-      "link_failed": {
-        "title": "Pairing failed",
-        "description": "{error}",
-        "menu_options": {
-          "retry": "Retry",
-          "user": "Choose another bridge",
-          "reconfigure": "Choose another bridge",
-          "import_pair": "Choose another bridge"
-        }
-      },
-      "import_yaml": {
-        "title": "Import sonoff2hue.yaml",
-        "description": "Paste the whole sonoff2hue.yaml: the Hue bridge under hue, and the MINIR4Ms under switches. If something else already toggles the lights for these switches, stop it first: with both running, every press would toggle the lights twice.\n\nWith the bridge's bridgeIp and appKey, sonoff2hue connects to the bridge with them; without them, you pair the bridge next. Each switch in the file becomes a switch of the integration.",
-        "data": {
-          "config": "sonoff2hue.yaml"
-        },
-        "data_description": {
-          "config": "Its application key and device keys are kept by Home Assistant and not shown again, so after an error, paste the file again."
-        }
-      },
-      "import_pair": {
-        "title": "Pair the Hue bridge",
-        "description": "Pair the Hue bridge for the switches from the file: {switches}. Search your network for Hue bridges, or enter the address of the bridge.",
-        "menu_options": {
-          "discover": "Find bridges",
-          "address": "Enter the bridge address"
-        }
-      },
-      "import_failed": {
-        "title": "The bridge in the file can't be used",
-        "description": "{error}",
-        "menu_options": {
-          "import_check": "Try again",
-          "import_pair": "Pair the bridge again and keep the switches",
-          "import_yaml": "Paste the file again"
-        }
+        "title": "Set up sonoff2hue",
+        "description": "sonoff2hue toggles your lights in Home Assistant, such as those of the Philips Hue integration, from wall switches wired to Sonoff MINIR4Ms in detached relay mode.\n\nSubmit to set it up, then add a switch for each MINIR4M."
       }
-    },
-    "progress": {
-      "discover": "Searching the network… this takes about 5 seconds.",
-      "link": "Found {name} (model {model}, bridge id {bridge_id}, firmware {firmware}) at {address}.\nCertificate SHA-256 (pinned from now on): {certificate}\n\nPress the round link button on top of the bridge now. Waiting up to 60 seconds...",
-      "link_retrying": "Found {name} (model {model}, bridge id {bridge_id}, firmware {firmware}) at {address}.\nCertificate SHA-256 (pinned from now on): {certificate}\n\nPress the round link button on top of the bridge now. Waiting up to 60 seconds...\n\nThe bridge did not answer ({error}); still trying."
-    },
-    "error": {
-      "invalid_address": "{error}",
-      "cannot_connect": "{error}",
-      "unexpected": "Pairing didn't start: {error}",
-      "invalid_config": "{error}",
-      "unreadable_config": "The file can't be read: {error}"
-    },
-    "abort": {
-      "wrong_bridge": "The Hue bridge at {address} is not the paired bridge: its bridge id is {bridge_id}, not {expected}. To pair another bridge, reconfigure the sonoff2hue integration."
-    },
-    "create_entry": {
-      "paired": "Paired with {name} as {device_type}. Next, add your MINIR4M wall switches to the sonoff2hue integration.",
-      "imported": "Added the Hue bridge at {address} and the switches from the file: {switches}.",
-      "imported_unpinned": "Added the Hue bridge at {address} and the switches from the file: {switches}.\n\n{warning}",
-      "imported_other_id": "Added the Hue bridge at {address} and the switches from the file: {switches}.\n\nThe file gives the bridge id {file_bridge_id}, but the bridge at {address} has the id {bridge_id}, which sonoff2hue uses.",
-      "imported_other_id_unpinned": "Added the Hue bridge at {address} and the switches from the file: {switches}.\n\nThe file gives the bridge id {file_bridge_id}, but the bridge at {address} has the id {bridge_id}, which sonoff2hue uses.\n\n{warning}",
-      "paired_imported": "Paired with {name} as {device_type}, and added the switches from the file: {switches}."
     }
   },
   "config_subentries": {
@@ -200,21 +75,14 @@
         },
         "settings": {
           "title": "Switch settings",
-          "description": "{device}\n\nChoose what this switch toggles. If any of them is on, the switch turns them all off; otherwise it turns them all on.",
+          "description": "{device}\n\nChoose the lights that this switch toggles. If any of them is on, the switch turns them all off; otherwise it turns them all on.{missing}",
           "data": {
             "name": "Name",
-            "unresolved": "Entries that don't match the bridge",
-            "lights": "Lights",
-            "rooms": "Rooms",
-            "zones": "Zones",
-            "light_names": "Lights",
-            "group_names": "Rooms and zones"
+            "lights": "Lights"
           },
           "data_description": {
             "name": "Names the switch and its device, also in the log; without a name, the device id does. Up to 64 characters.",
-            "unresolved": "These entries of the current mapping don't match the bridge. Remove them, or fix the names on the bridge.",
-            "light_names": "Hue light names or ids, separated by commas, e.g. Ceiling, Floor lamp",
-            "group_names": "room:Name or zone:Name (or ids), separated by commas, e.g. room:Hallway"
+            "lights": "Any of Home Assistant's lights, such as the Hue integration's lights, rooms and zones. A room or zone switches all its lights with one command."
           },
           "sections": {
             "advanced": {
@@ -231,52 +99,12 @@
             }
           }
         },
-        "pair_first": {
-          "title": "Pair the Hue bridge first",
-          "description": "Then you can choose lights, rooms and zones from a list: reconfigure the sonoff2hue integration to pair the bridge. You can also enter them by hand, separated by commas.",
-          "menu_options": {
-            "settings": "Try again",
-            "typed": "Enter them by hand"
-          }
-        },
-        "lights_unavailable": {
-          "title": "Couldn't load the lights from the Hue bridge",
-          "description": "{error}\n\nYou can also enter them by hand, separated by commas.",
-          "menu_options": {
-            "settings": "Try again",
-            "typed": "Enter them by hand"
-          }
-        },
-        "unchecked": {
-          "title": "Save without checking?",
-          "description": "{warning}",
-          "menu_options": {
-            "save": "Save without checking",
-            "settings": "Try again"
-          }
-        },
         "group_offer": {
           "title": "Use a room or zone?",
-          "description": "\"{group}\" on the Hue bridge has exactly the lights you chose: {lights}.\n\nA room or zone switches all its lights at once, with one command, and also switches any light added to it later in the Hue app.",
+          "description": "\"{group}\" in the Hue integration has exactly the lights you chose: {lights}.\n\nA room or zone switches all its lights at once, with one command, and also switches any light added to it later in the Hue app.",
           "menu_options": {
             "use_room": "Use room \"{group}\"",
             "use_zone": "Use zone \"{group}\"",
-            "keep_lights": "Keep the lights"
-          }
-        },
-        "zone_offer": {
-          "title": "Create a zone?",
-          "description": "No room or zone on the Hue bridge has exactly the lights you chose: {lights}. sonoff2hue can create a zone of them on the bridge.\n\nA room or zone switches all its lights at once, with one command, and also switches any light added to it later in the Hue app.",
-          "menu_options": {
-            "create_zone": "Create zone \"{zone}\" on the bridge",
-            "keep_lights": "Keep the lights"
-          }
-        },
-        "zone_failed": {
-          "title": "Couldn't create the zone",
-          "description": "{error}",
-          "menu_options": {
-            "retry_zone": "Try again",
             "keep_lights": "Keep the lights"
           }
         }
@@ -288,11 +116,9 @@
       "error": {
         "invalid_device": "{error}",
         "not_saved": "{base_error}",
-        "unexpected": "The switch was not saved: {base_error}",
         "invalid_name": "{name_error}",
         "invalid_device_key": "{key_error}",
-        "invalid_light_names": "{light_names_error}",
-        "invalid_group_names": "{group_names_error}"
+        "invalid_lights": "{lights_error}"
       },
       "abort": {
         "entry_not_loaded": "The sonoff2hue integration isn't loaded, so its switches can't be changed. Reload it, then try again.",
@@ -307,11 +133,6 @@
     }
   },
   "selector": {
-    "bridge": {
-      "options": {
-        "other": "Another address"
-      }
-    },
     "key_mode": {
       "options": {
         "keep": "Keep it",
@@ -321,51 +142,6 @@
     }
   },
   "issues": {
-    "certificate_not_pinned": {
-      "title": "The Hue bridge's certificate is not pinned",
-      "fix_flow": {
-        "step": {
-          "confirm": {
-            "title": "Pin the Hue bridge's certificate",
-            "description": "hue.certificateSha256 is not set, so the bridge certificate is not verified. Pair the bridge again to pin it: select Submit to reconfigure the sonoff2hue integration."
-          }
-        },
-        "abort": {
-          "reconfigure": "Reconfigure the sonoff2hue integration to pair the bridge again.",
-          "not_loaded": "The sonoff2hue integration is no longer set up."
-        }
-      }
-    },
-    "certificate_changed": {
-      "title": "The Hue bridge's certificate changed",
-      "fix_flow": {
-        "step": {
-          "confirm": {
-            "title": "Pair the Hue bridge again",
-            "description": "The Hue bridge TLS certificate does not match the pinned certificateSha256. If the bridge was replaced or reset, pair the bridge again: select Submit to reconfigure the sonoff2hue integration."
-          }
-        },
-        "abort": {
-          "reconfigure": "Reconfigure the sonoff2hue integration to pair the bridge again.",
-          "not_loaded": "The sonoff2hue integration is no longer set up."
-        }
-      }
-    },
-    "bridge_moved": {
-      "title": "The Hue bridge answers at another address",
-      "fix_flow": {
-        "step": {
-          "confirm": {
-            "title": "Pair the Hue bridge at its new address",
-            "description": "The Hue bridge doesn't answer at {address}, but a bridge with its bridge id answers at {found}. Its certificate isn't pinned, so nothing proves that this is your bridge, and sonoff2hue doesn't use that address by itself. Pair the bridge there, which pins its certificate: select Submit to reconfigure the sonoff2hue integration, choose Find bridges, then the bridge at {found}, which is selected when it is found, and press its link button."
-          }
-        },
-        "abort": {
-          "reconfigure": "Reconfigure the sonoff2hue integration to pair the bridge at its new address.",
-          "not_loaded": "The sonoff2hue integration is no longer set up."
-        }
-      }
-    },
     "invalid_config": {
       "title": "The configuration has problems",
       "description": "{message}\n\n{problems}\n\nReview the switches of the sonoff2hue integration."
@@ -379,8 +155,36 @@
       "description": "{name}: cannot read the LAN payload ({error}); falling back to sequence numbers only."
     },
     "missing_targets": {
-      "title": "Some lights, rooms or zones of {name} are missing",
-      "description": "{name} can't toggle these, so its presses toggle only its other lights, rooms and zones:\n\n{problems}\n\nEdit the switch to choose them again, or fix them in the Hue app: sonoff2hue notices that within a minute."
+      "title": "Some lights of {name} are missing",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Some lights of {name} are missing",
+            "description": "{name} can't toggle these, so its presses toggle only its other lights:\n\n{problems}\n\nSelect Submit to edit the switch and choose its lights again. A light that comes back to Home Assistant, or is enabled again, is toggled again at once."
+          }
+        },
+        "abort": {
+          "edit_switch": "Edit the switch to choose its lights.",
+          "not_found": "The switch is no longer configured.",
+          "not_loaded": "The sonoff2hue integration isn't loaded, so its switches can't be changed. Reload it, then try again."
+        }
+      }
+    },
+    "unmigrated": {
+      "title": "Choose the lights of {name} again",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Choose the lights of {name} again",
+            "description": "sonoff2hue now toggles your lights in Home Assistant instead of pairing the Hue bridge itself. When it was updated, it found no light in Home Assistant for these lights, rooms or zones of {name}:\n\n{entries}\n\nSelect Submit to edit the switch and choose their lights. Until then, its presses toggle only its other lights."
+          }
+        },
+        "abort": {
+          "edit_switch": "Edit the switch to choose its lights.",
+          "not_found": "The switch is no longer configured.",
+          "not_loaded": "The sonoff2hue integration isn't loaded, so its switches can't be changed. Reload it, then try again."
+        }
+      }
     }
   },
   "entity": {
@@ -415,24 +219,6 @@
           },
           "seq": {
             "name": "Sequence number"
-          }
-        }
-      },
-      "reachable": {
-        "name": "Reachable",
-        "state": {
-          "off": "Unreachable",
-          "on": "Reachable"
-        },
-        "state_attributes": {
-          "address": {
-            "name": "Address"
-          },
-          "checked_at": {
-            "name": "Checked"
-          },
-          "message": {
-            "name": "Message"
           }
         }
       }
@@ -505,7 +291,6 @@
       "status": {
         "name": "Status",
         "state": {
-          "connecting": "Connecting",
           "error": "Error",
           "invalid_config": "Invalid configuration",
           "not_configured": "Not configured",

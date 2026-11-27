@@ -1,26 +1,18 @@
-"""The binary sensors (decision 25): Reachable on the bridge's device, and each switch's Online, with the LAN on a fake
-network and the Hue bridge in memory."""
+"""The binary sensors (decision 25): each switch's Online, with the LAN on a fake network."""
 
 from datetime import timedelta
 
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
-from homeassistant.const import (
-    ATTR_DEVICE_CLASS,
-    EVENT_STATE_CHANGED,
-    STATE_OFF,
-    STATE_ON,
-    STATE_UNKNOWN,
-    EntityCategory,
-)
+from homeassistant.const import ATTR_DEVICE_CLASS, EVENT_STATE_CHANGED, STATE_OFF, STATE_ON, EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 import pytest
 from pytest_homeassistant.common import async_capture_events
 
-from .fakes import BRIDGE_ADDRESS, DEVICE_ADDRESS, DEVICE_KEY, Bridge, Lan, paired, relay, switch
-from .platforms import BRIDGE_DOWN, ONLINE, REACHABLE, settle, start, state_of, tick
+from .fakes import DEVICE_ADDRESS, DEVICE_KEY, Lan, entry, relay, switch
+from .platforms import ONLINE, settle, start, state_of, tick
 
 NOT_HEARD = {
     "address": None,
@@ -34,72 +26,16 @@ NOT_HEARD = {
 }
 
 
-# Reachable.
-
-
-async def test_reachable_shows_the_bridges_last_check(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
-) -> None:
-    checked = dt_util.utcnow()
-    await start(hass, paired(switch()))
-    await tick(freezer, 0.5)
-
-    reachable = state_of(hass, REACHABLE)
-    assert reachable.state == STATE_ON
-    assert reachable.attributes[ATTR_DEVICE_CLASS] == BinarySensorDeviceClass.CONNECTIVITY
-    assert {key: reachable.attributes[key] for key in ("address", "message", "checked_at")} == {
-        "address": BRIDGE_ADDRESS,
-        "message": None,
-        "checked_at": checked,
-    }
-    registry_entry = er.async_get(hass).async_get(REACHABLE)
-    assert registry_entry is not None
-    assert registry_entry.entity_category is EntityCategory.DIAGNOSTIC
-
-    # The runner's keep-alive, every 45 seconds, finds the bridge down, then up again.
-    bridge.fail("/clip/v2/resource/bridge", 503)
-    await tick(freezer, 45)
-    checked = dt_util.utcnow()
-    await tick(freezer, 0.5)
-
-    reachable = state_of(hass, REACHABLE)
-    assert reachable.state == STATE_OFF
-    assert (reachable.attributes["message"], reachable.attributes["checked_at"]) == (BRIDGE_DOWN, checked)
-
-    bridge.heal()
-    await tick(freezer, 45)
-    await tick(freezer, 0.5)
-
-    reachable = state_of(hass, REACHABLE)
-    assert (reachable.state, reachable.attributes["message"]) == (STATE_ON, None)
-
-
-async def test_reachable_is_unknown_while_the_bridge_is_not_paired(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge
-) -> None:
-    await start(hass, paired(switch(), app_key=None))
-
-    reachable = state_of(hass, REACHABLE)
-    assert reachable.state == STATE_UNKNOWN
-    assert {key: reachable.attributes[key] for key in ("address", "message", "checked_at")} == {
-        "address": BRIDGE_ADDRESS,
-        "message": None,
-        "checked_at": None,
-    }
-
-
-# Online.
-
-
 def online(hass: HomeAssistant) -> tuple[str, dict[str, object]]:
     state = state_of(hass, ONLINE)
     return state.state, {key: state.attributes[key] for key in NOT_HEARD}
 
 
+@pytest.mark.usefixtures("lights")
 async def test_online_means_heard_within_the_last_5_minutes(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+    hass: HomeAssistant, lan: Lan, freezer: FrozenDateTimeFactory
 ) -> None:
-    await start(hass, paired(switch()))
+    await start(hass, entry(switch()))
 
     # Never heard: offline.
     assert online(hass) == (STATE_OFF, NOT_HEARD)
@@ -163,10 +99,11 @@ async def test_online_means_heard_within_the_last_5_minutes(
     assert online(hass)[0] == STATE_OFF
 
 
+@pytest.mark.usefixtures("lights")
 async def test_online_shows_the_relay_mode_the_key_and_a_payload_it_cannot_decode(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+    hass: HomeAssistant, lan: Lan, freezer: FrozenDateTimeFactory
 ) -> None:
-    await start(hass, paired(switch(key=DEVICE_KEY)))
+    await start(hass, entry(switch(key=DEVICE_KEY)))
 
     assert online(hass) == (STATE_OFF, NOT_HEARD | {"has_device_key": True})
 
@@ -189,20 +126,22 @@ async def test_online_shows_the_relay_mode_the_key_and_a_payload_it_cannot_decod
 
 
 @pytest.mark.parametrize("key", ["", " \t"])
-async def test_online_counts_a_blank_key_as_none(hass: HomeAssistant, lan: Lan, bridge: Bridge, key: str) -> None:
+@pytest.mark.usefixtures("lan", "lights")
+async def test_online_counts_a_blank_key_as_none(hass: HomeAssistant, key: str) -> None:
     """A key that is empty or only white space is no key."""
-    await start(hass, paired(switch(key=key)))
+    await start(hass, entry(switch(key=key)))
 
     assert online(hass)[1]["has_device_key"] is False
 
 
+@pytest.mark.usefixtures("lights")
 async def test_online_stays_on_when_two_answers_in_a_row_are_lost(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, freezer: FrozenDateTimeFactory
+    hass: HomeAssistant, lan: Lan, freezer: FrozenDateTimeFactory
 ) -> None:
     """The switch answers each query, as a MINIR4M does, until two answers in a row are lost. With a query every 2
     minutes, its last answer was then 6 minutes old, and Online was off for a minute; once the switch is late, the
     LAN monitor asks every 30 seconds (decision 36)."""
-    await start(hass, paired(switch()))
+    await start(hass, entry(switch()))
     transport = lan.network.transports[-1]
     send = transport.send
     lost = 0

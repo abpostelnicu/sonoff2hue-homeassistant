@@ -1,6 +1,6 @@
 {
-    // The setup for the launch configurations in launch.json, the simulated wall switch and the fake Hue bridge's
-    // state, all through scripts/develop. See "Development" in README.md.
+    // The setup for the launch configuration in launch.json, and the simulated wall switch, through scripts/develop.
+    // See "Development" in README.md.
     "version": "2.0.0",
     "tasks": [
         {
@@ -18,16 +18,6 @@
             "type": "process",
             "command": "${workspaceFolder}/scripts/develop",
             "args": ["press"],
-            "options": { "cwd": "${workspaceFolder}" },
-            "problemMatcher": [],
-            "presentation": { "reveal": "always", "clear": true }
-        },
-        {
-            "label": "Show the fake Hue bridge's lights",
-            "detail": "Its lights, rooms and zones, on or off, and every PUT it received",
-            "type": "process",
-            "command": "${workspaceFolder}/scripts/develop",
-            "args": ["lights"],
             "options": { "cwd": "${workspaceFolder}" },
             "problemMatcher": [],
             "presentation": { "reveal": "always", "clear": true }

@@ -24,8 +24,8 @@ async def async_setup_entry(
 
 
 class SwitchTestButton(WallSwitchEntity, ButtonEntity):
-    """Toggles the switch's lights, rooms and zones once. The runtime logs the result; the reason it couldn't toggle is
-    the action's error, translated as ``test_toggle_failed`` with the switch test's message (decision 36)."""
+    """Toggles the switch's lights once. The runtime logs the result; the reason it couldn't toggle is the action's
+    error, translated as ``test_toggle_failed`` with the switch test's message (decision 36)."""
 
     _attr_entity_category = EntityCategory.CONFIG
 
@@ -34,7 +34,8 @@ class SwitchTestButton(WallSwitchEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         try:
-            await self._data.async_test_toggle(self._switch.normalized_device_id)
+            # The lights' changes then show as the button press's, with the user who pressed it.
+            await self._data.async_test_toggle(self._switch.normalized_device_id, self._context)
         except SwitchTestError as err:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,

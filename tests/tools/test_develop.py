@@ -10,13 +10,22 @@ from homeassistant import components
 from homeassistant.auth.mfa_modules import notify, totp
 from homeassistant.components.http import config as http_config
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers import entity_registry as er, issue_registry as ir
+from homeassistant.setup import async_setup_component
+from homeassistant.util.yaml import load_yaml_dict
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
+import pytest
 
 from tools import develop
 
 ROOT = Path(__file__).parents[2]
+
+
+@pytest.fixture
+def hass_config_dir(hass_tmp_config_dir: str) -> str:
+    """A configuration folder of each test's own: the template integration writes its blueprints into it."""
+    return hass_tmp_config_dir
 
 
 async def test_home_assistant_serves_on_127_0_0_1_from_the_prepared_store(
@@ -48,6 +57,26 @@ def test_prepare_keeps_the_configuration_and_writes_a_given_port_again(tmp_path:
     assert develop.prepare(folder, 18123) == 18123
     assert develop.prepare(folder) == 18123
     assert configuration.read_text(encoding="utf-8") == "homeassistant:\n"
+
+
+async def test_the_development_lights_are_registered_and_switch_their_input_booleans(hass: HomeAssistant) -> None:
+    """The lights that a developer's switch toggles: in the entity registry, so a switch keeps them by their registry
+    ids, and switched by the light actions as the integration calls them."""
+    config = load_yaml_dict(develop.CONFIGURATION)
+    assert await async_setup_component(hass, "input_boolean", config)
+    assert await async_setup_component(hass, "template", config)
+    await hass.async_block_till_done()
+
+    lights = sorted(state.entity_id for state in hass.states.async_all("light"))
+    assert lights == ["light.hallway", "light.living_room", "light.porch"]
+    registry = er.async_get(hass)
+    for light in lights:
+        assert registry.async_get(light) is not None, light
+        boolean = light.replace("light.", "input_boolean.")
+        for action, state in (("turn_on", "on"), ("turn_off", "off")):
+            await hass.services.async_call("light", action, {"entity_id": light}, blocking=True)
+            shown = [hass.states.get(entity_id) for entity_id in (light, boolean)]
+            assert [None if item is None else item.state for item in shown] == [state, state], (light, action)
 
 
 def test_a_port_with_a_listener_is_not_free(socket_enabled: None) -> None:

@@ -1,4 +1,4 @@
-"""The sensors (decision 25): Status and eWeLink devices seen on the bridge's device, and each switch's Last action."""
+"""The sensors (decision 25): Status and eWeLink devices seen on the service device, and each switch's Last action."""
 
 from datetime import datetime, timedelta
 from typing import Any, Final
@@ -12,7 +12,7 @@ from homeassistant.helpers.event import async_track_time_interval
 
 from .engine.registry import LanDevice
 from .engine.status import PRESS_DROPPED, ServiceState, StatusSnapshot, SwitchStatus
-from .entity import BridgeEntity, WallSwitchEntity, async_add_switch_entities
+from .entity import ServiceEntity, WallSwitchEntity, async_add_switch_entities
 from .runtime import Sonoff2HueConfigEntry, Sonoff2HueData
 
 PARALLEL_UPDATES = 0
@@ -39,7 +39,7 @@ async def async_setup_entry(
     async_add_switch_entities(hass, entry, async_add_entities, create)
 
 
-class StatusSensor(BridgeEntity, SensorEntity):
+class StatusSensor(ServiceEntity, SensorEntity):
     """The service's state, with its message, its problems, and since when."""
 
     _attr_device_class = SensorDeviceClass.ENUM
@@ -59,7 +59,7 @@ class StatusSensor(BridgeEntity, SensorEntity):
         }
 
 
-class DevicesSeenSensor(BridgeEntity, SensorEntity):
+class DevicesSeenSensor(ServiceEntity, SensorEntity):
     """How many eWeLink devices the LAN has shown, whether the listener runs, and when the last packet came. It follows
     the LAN registry, which the status tracker publishes only for the configured switches' devices: a new device shows
     at once, and the last packet every 30 seconds."""
@@ -103,7 +103,7 @@ class DevicesSeenSensor(BridgeEntity, SensorEntity):
 
 class LastActionSensor(WallSwitchEntity, SensorEntity):
     """A switch's last action, or its last error when that came later: turned on or off, with the toggle's counts and
-    time, or failed or dropped, with the message. Its targets are the ones it toggles while the bridge runs."""
+    time, or failed or dropped, with the message. Its targets are the lights that it toggles while the switches run."""
 
     _attr_device_class = SensorDeviceClass.ENUM
 

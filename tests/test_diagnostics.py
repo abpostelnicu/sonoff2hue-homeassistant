@@ -1,7 +1,9 @@
 """The config entry's diagnostics (decision 26): the configuration, the status, the LAN's devices and the activity,
-without the application key, the certificate pin or the device keys, also in the file that Home Assistant serves."""
+without the device keys, also in the file that Home Assistant serves."""
 
+import base64
 from datetime import UTC, datetime, timedelta
+import hashlib
 from http import HTTPStatus
 import json
 import logging
@@ -14,39 +16,29 @@ import pytest
 from pytest_homeassistant.typing import ClientSessionGenerator
 
 from custom_components.sonoff2hue import diagnostics
-from custom_components.sonoff2hue.const import CONF_APP_KEY, CONF_CERTIFICATE_SHA256
-from custom_components.sonoff2hue.engine import toggler
-from custom_components.sonoff2hue.engine.hue_client import CERTIFICATE_MISMATCH
-from custom_components.sonoff2hue.engine.status import ServiceState
+from custom_components.sonoff2hue.const import CONF_DEVICE_KEY
 from custom_components.sonoff2hue.runtime import INTEGRATION_LOGGER
-from tools.fake_hue.bridge import BRIDGE_ID as FAKE_BRIDGE_ID
 
-from .engine.fakes import until
 from .fakes import (
-    BRIDGE_ADDRESS,
-    BRIDGE_ID,
+    CEILING,
+    DEVICE_ADDRESS,
     DEVICE_ID,
     DEVICE_KEY,
     OTHER_DEVICE_ID,
-    Bridge,
     Lan,
-    paired,
+    Lights,
+    entry,
     relay,
     switch,
 )
-from .hue import FakeHueHost
-from .test_runtime import issues, reauth_flows, settle, start, tick
+from .platforms import settle, start, tick
 
 REDACTED = "**REDACTED**"
 UNCONFIGURED_DEVICE_ID = "1000fedcba"
 """A made-up MINIR4M that no switch maps."""
-LIGHTS_DOWN = "Hue bridge returned 503 Service Unavailable for GET /clip/v2/resource/light"
-
-
-@pytest.fixture(autouse=True)
-def no_retry_delay(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The toggler retries a failed request at once, instead of after 300 ms."""
-    monkeypatch.setattr(toggler, "RETRY_DELAY", 0)
+DESK = "light.desk"
+REMOVED = "0123456789abcdef0123456789abcdef"
+"""A light's entity registry id that the registry doesn't have."""
 
 
 async def download(hass: HomeAssistant, hass_client: ClientSessionGenerator, entry_id: str) -> str:
@@ -60,16 +52,21 @@ async def download(hass: HomeAssistant, hass_client: ClientSessionGenerator, ent
 
 
 async def test_the_diagnostics_hold_the_configuration_the_status_the_lan_and_the_activity(
-    hass: HomeAssistant, lan: Lan, bridge: Bridge, caplog: pytest.LogCaptureFixture, freezer: FrozenDateTimeFactory
+    hass: HomeAssistant, lan: Lan, lights: Lights, caplog: pytest.LogCaptureFixture, freezer: FrozenDateTimeFactory
 ) -> None:
-    """In plain JSON, which the downloaded file holds as it is. The platform is called directly: Home Assistant's HTTP
-    API refuses the test client's token once the clock is moved past its 30 minutes, and while the clock is frozen,
-    aiohttp's access log fails."""
+    """In plain JSON, which the downloaded file holds as it is. The configuration keeps the lights as stored, and the
+    status has their entity ids. The platform is called directly: Home Assistant's HTTP API refuses the test client's
+    token once the clock is moved past its 30 minutes, and while the clock is frozen, aiohttp's access log fails."""
     caplog.set_level(logging.INFO, logger=INTEGRATION_LOGGER.name)
     started = datetime(2026, 11, 25, 8, 0, tzinfo=UTC)
     freezer.move_to(started)
-    entry = paired(switch(key=DEVICE_KEY), switch(OTHER_DEVICE_ID, None, lights=["Desk"]))
-    await start(hass, entry)
+    lights.add("ceiling")
+    lights.add("desk")
+    ceiling = lights.target(CEILING)
+    config_entry = entry(
+        switch(key=DEVICE_KEY, targets=[ceiling]), switch(OTHER_DEVICE_ID, None, targets=[DESK, REMOVED])
+    )
+    await start(hass, config_entry)
     lan.broadcast(1, params=relay(True), key=DEVICE_KEY)
     lan.broadcast(1, OTHER_DEVICE_ID)
     lan.broadcast(7, UNCONFIGURED_DEVICE_ID)
@@ -77,45 +74,30 @@ async def test_the_diagnostics_hold_the_configuration_the_status_the_lan_and_the
     # The unmapped MINIR4M stays silent for more than the 5 minutes that a device counts as online.
     await tick(freezer, 6 * 60)
     pressed = started + timedelta(minutes=6, microseconds=1)
+    lights.fail(DESK)
     lan.broadcast(2, params=relay(True), key=DEVICE_KEY)
-    bridge.fail("/clip/v2/resource/light", 503)
     lan.broadcast(2, OTHER_DEVICE_ID)
     await settle()
 
-    result = await diagnostics.async_get_config_entry_diagnostics(hass, entry)
+    result = await diagnostics.async_get_config_entry_diagnostics(hass, config_entry)
 
     assert json.loads(json.dumps(result)) == result
     at, then = started.isoformat(), pressed.isoformat()
+    missing = "1000999999: a light was removed from Home Assistant."
     assert result == {
         "config": {
-            "hue": {
-                "bridge_ip": BRIDGE_ADDRESS,
-                "bridge_id": BRIDGE_ID,
-                "app_key": REDACTED,
-                "certificate_sha256": REDACTED,
-            },
             "switches": [
-                {"device_id": DEVICE_ID, "name": "Hall", "device_key": REDACTED, "lights": ["Ceiling"], "groups": []},
-                {"device_id": OTHER_DEVICE_ID, "name": None, "device_key": None, "lights": ["Desk"], "groups": []},
+                {"device_id": DEVICE_ID, "name": "Hall", "device_key": REDACTED, "targets": [ceiling]},
+                {"device_id": OTHER_DEVICE_ID, "name": None, "device_key": None, "targets": [DESK, REMOVED]},
             ],
         },
         "status": {
             "started_at": at,
             "service": {
                 "state": "running",
-                "message": "2 wall switches toggle 2 Hue lights, rooms and zones.",
-                "problems": [],
+                "message": "2 wall switches toggle 2 lights; 1 is missing.",
+                "problems": [missing],
                 "since": at,
-            },
-            "hue": {
-                "paired": True,
-                "bridge_ip": BRIDGE_ADDRESS,
-                "bridge_id": BRIDGE_ID,
-                "certificate_pinned": True,
-                "reachable": False,
-                "message": LIGHTS_DOWN,
-                "checked_at": then,
-                "found_at": None,
             },
             "lan": {"listening": True, "devices_seen": 3, "last_packet_at": then},
             "switches": [
@@ -123,12 +105,12 @@ async def test_the_diagnostics_hold_the_configuration_the_status_the_lan_and_the
                     "name": "Hall",
                     "device_id": DEVICE_ID,
                     "online": True,
-                    "address": "192.0.2.5",
+                    "address": DEVICE_ADDRESS,
                     "last_seen_at": then,
                     "last_press_at": then,
                     "detached": True,
                     "decode_error": None,
-                    "targets": ["light 'Ceiling'"],
+                    "targets": [CEILING],
                     "problems": [],
                     "last_action": {
                         "at": then,
@@ -144,22 +126,29 @@ async def test_the_diagnostics_hold_the_configuration_the_status_the_lan_and_the
                     "name": None,
                     "device_id": OTHER_DEVICE_ID,
                     "online": True,
-                    "address": "192.0.2.5",
+                    "address": DEVICE_ADDRESS,
                     "last_seen_at": then,
                     "last_press_at": then,
                     "detached": None,
                     "decode_error": None,
-                    "targets": ["light 'Desk'"],
-                    "problems": [],
-                    "last_action": None,
-                    "last_error": {"at": then, "message": LIGHTS_DOWN},
+                    "targets": [DESK],
+                    "problems": [missing],
+                    "last_action": {
+                        "at": then,
+                        "turned_on": True,
+                        "changed": 0,
+                        "unchanged": 0,
+                        "failed": 1,
+                        "elapsed_ms": 0,
+                    },
+                    "last_error": {"at": then, "message": "1 of 1 lights could not be switched."},
                 },
             ],
         },
         "lan_devices": [
             {
                 "device_id": OTHER_DEVICE_ID,
-                "address": "192.0.2.5",
+                "address": DEVICE_ADDRESS,
                 "device_type": "plug",
                 "encrypted": True,
                 "seq": 2,
@@ -175,7 +164,7 @@ async def test_the_diagnostics_hold_the_configuration_the_status_the_lan_and_the
             },
             {
                 "device_id": DEVICE_ID,
-                "address": "192.0.2.5",
+                "address": DEVICE_ADDRESS,
                 "device_type": "plug",
                 "encrypted": True,
                 "seq": 2,
@@ -191,7 +180,7 @@ async def test_the_diagnostics_hold_the_configuration_the_status_the_lan_and_the
             },
             {
                 "device_id": UNCONFIGURED_DEVICE_ID,
-                "address": "192.0.2.5",
+                "address": DEVICE_ADDRESS,
                 "device_type": "plug",
                 "encrypted": True,
                 "seq": 7,
@@ -207,29 +196,32 @@ async def test_the_diagnostics_hold_the_configuration_the_status_the_lan_and_the
             },
         ],
         "activity": [
-            {"id": entry_id, "at": when, "level": level, "category": "runner", "message": message, "exception": None}
-            for entry_id, (when, level, message) in enumerate(
+            {"id": entry_id, "at": when, "level": level, "category": category, "message": message, "exception": None}
+            for entry_id, (when, level, category, message) in enumerate(
                 [
-                    (at, "information", "Hall (1000abcdef) -> light 'Ceiling'"),
-                    (at, "information", "1000999999 -> light 'Desk'"),
+                    (at, "warning", "supervisor", missing),
+                    (at, "information", "runner", f"Hall (1000abcdef) -> {CEILING}"),
+                    (at, "information", "runner", f"1000999999 -> {DESK}"),
                     (
                         at,
                         "information",
+                        "runner",
                         "1000999999: no deviceKey configured, so every new state broadcast counts as a press "
                         "(relay/setting changes cannot be filtered).",
                     ),
-                    (at, "information", "Listening for wall switch presses."),
+                    (at, "information", "runner", "Listening for wall switch presses."),
                     (
                         at,
                         "information",
+                        "runner",
                         "Hall (1000abcdef): online at 192.0.2.5 (seq 1; relay0=off relaySeparation=1).",
                     ),
-                    (at, "information", "1000999999: online at 192.0.2.5 (seq 1; payload not decoded)."),
-                    (then, "information", "Hall (1000abcdef): wall switch operated (seq 2)."),
-                    (then, "information", "Hall (1000abcdef): turned ON light 'Ceiling' in 0 ms."),
-                    (then, "information", "1000999999: wall switch operated (seq 2)."),
-                    (then, "warning", f"Hue bridge unavailable: {LIGHTS_DOWN}"),
-                    (then, "error", f"1000999999: could not toggle the lights: {LIGHTS_DOWN}"),
+                    (at, "information", "runner", "1000999999: online at 192.0.2.5 (seq 1; payload not decoded)."),
+                    (then, "information", "runner", "Hall (1000abcdef): wall switch operated (seq 2)."),
+                    (then, "information", "runner", "1000999999: wall switch operated (seq 2)."),
+                    (then, "information", "runner", f"Hall (1000abcdef): turned ON {CEILING} in 0 ms."),
+                    (then, "error", "runner", f"Could not switch {DESK} on: Request failed: the light didn't answer"),
+                    (then, "information", "runner", f"1000999999: turned ON {DESK} in 0 ms (1 failed)."),
                 ],
                 start=1,
             )
@@ -237,18 +229,19 @@ async def test_the_diagnostics_hold_the_configuration_the_status_the_lan_and_the
     }
 
 
+@pytest.mark.usefixtures("lights")
 async def test_the_activity_is_the_last_1000_entries_as_the_buffer_has_them(
     hass: HomeAssistant, lan: Lan, caplog: pytest.LogCaptureFixture
 ) -> None:
     """Oldest first, with an exception's type and message."""
     caplog.set_level(logging.WARNING, logger=INTEGRATION_LOGGER.name)
-    entry = paired(switch(), app_key=None)
-    runtime_data = await start(hass, entry)
+    config_entry = entry()
+    runtime_data = await start(hass, config_entry)
     for number in range(1, 1006):
         INTEGRATION_LOGGER.warning("Line %d.", number)
     INTEGRATION_LOGGER.error("Line with an exception.", exc_info=ValueError("Not a number."))
 
-    result = await diagnostics.async_get_config_entry_diagnostics(hass, entry)
+    result = await diagnostics.async_get_config_entry_diagnostics(hass, config_entry)
 
     activity = result["activity"]
     assert [line["message"] for line in activity] == [f"Line {number}." for number in range(7, 1006)] + [
@@ -266,24 +259,16 @@ async def test_the_activity_is_the_last_1000_entries_as_the_buffer_has_them(
     }
 
 
-@pytest.mark.usefixtures("lan", "bridge")
+@pytest.mark.usefixtures("lan", "lights")
 async def test_an_entry_that_is_not_loaded_has_only_its_configuration(hass: HomeAssistant) -> None:
-    entry = paired(switch(key=DEVICE_KEY))
-    await start(hass, entry)
-    assert await hass.config_entries.async_unload(entry.entry_id)
-    assert entry.state is ConfigEntryState.NOT_LOADED
+    config_entry = entry(switch(key=DEVICE_KEY))
+    await start(hass, config_entry)
+    assert await hass.config_entries.async_unload(config_entry.entry_id)
+    assert config_entry.state is ConfigEntryState.NOT_LOADED
 
-    assert await diagnostics.async_get_config_entry_diagnostics(hass, entry) == {
+    assert await diagnostics.async_get_config_entry_diagnostics(hass, config_entry) == {
         "config": {
-            "hue": {
-                "bridge_ip": BRIDGE_ADDRESS,
-                "bridge_id": BRIDGE_ID,
-                "app_key": REDACTED,
-                "certificate_sha256": REDACTED,
-            },
-            "switches": [
-                {"device_id": DEVICE_ID, "name": "Hall", "device_key": REDACTED, "lights": ["Ceiling"], "groups": []}
-            ],
+            "switches": [{"device_id": DEVICE_ID, "name": "Hall", "device_key": REDACTED, "targets": [CEILING]}],
         },
         "status": None,
         "lan_devices": None,
@@ -291,79 +276,66 @@ async def test_an_entry_that_is_not_loaded_has_only_its_configuration(hass: Home
     }
 
 
-@pytest.mark.usefixtures("socket_enabled")
-async def test_no_secret_reaches_the_diagnostics_or_the_log(
+async def test_no_device_key_reaches_the_diagnostics_or_the_log(
     hass: HomeAssistant,
     hass_client: ClientSessionGenerator,
     lan: Lan,
-    fake_hue_pressed: FakeHueHost,
+    lights: Lights,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Over HTTPS with the fake bridge, through the messages that name the bridge, a switch or a failure: a pin that isn't
-    the bridge's certificate, a key that the bridge rejects, pairing again, toggles, a payload that the device key can't
-    decrypt and the switch test. Neither the files downloaded along the way nor any line that the integration logs, at
-    any level, holds a key or a pin."""
+    """Through the messages that name a switch or a failure: the switches' broadcasts decrypted with their keys, a
+    payload that a key can't decrypt, a switch not in detached relay mode, toggles, a light that isn't switched, the
+    switch test and a key replaced. Neither the files downloaded along the way, through Home Assistant's HTTP API, nor
+    any line that the integration logs, at any level, holds a key or the AES key made of it."""
     caplog.set_level(1, logger=INTEGRATION_LOGGER.name)
-    rejected_key = "Sec7RejectedAppKey0123456789abcdefABCDEF"
-    wrong_pin = "C0FFEE" * 10 + "C0FE"
     device_key = "8f14e45f-ceea-467a-9575-b3a5d4ce5ec7"
     other_device_key = "45c48cce-2e2d-4fbd-8aa0-4c1b5c0ffee5"
-    entry = paired(
-        switch(lights=["Hallway"], key=device_key),
-        switch(OTHER_DEVICE_ID, "Desk", lights=["Ceiling"], key=other_device_key),
-        address=fake_hue_pressed.address,
-        app_key=rejected_key,
-        pin=wrong_pin,
-        bridge_id=FAKE_BRIDGE_ID,
+    new_device_key = "c9f0f895-fb98-4b91-99f5-1a5b2c0ffee6"
+    lights.add("ceiling")
+    lights.add("desk")
+    config_entry = entry(
+        switch(key=device_key), switch(OTHER_DEVICE_ID, "Desk", targets=[DESK], key=f" {other_device_key} ")
     )
-    runtime_data = await start(hass, entry)
-    await until(lambda: "certificate_changed" in issues(hass))
-    pin_mismatch = await download(hass, hass_client, entry.entry_id)
+    runtime_data = await start(hass, config_entry)
+    started = await download(hass, hass_client, config_entry.entry_id)
 
-    # With the bridge's own pin, the bridge rejects the key.
-    hass.config_entries.async_update_entry(
-        entry, data={**entry.data, CONF_CERTIFICATE_SHA256: fake_hue_pressed.fingerprint}
-    )
-    await until(lambda: runtime_data.status.service.state is ServiceState.ERROR)
-    await hass.async_block_till_done()
-    key_rejected = await download(hass, hass_client, entry.entry_id)
-
-    # Pairing again in the reauthentication gives a new key, and the switches run.
-    (flow,) = reauth_flows(hass)
-    await hass.config_entries.flow.async_configure(flow["flow_id"], {})
-    await hass.async_block_till_done()
-    result = await hass.config_entries.flow.async_configure(flow["flow_id"])
-    assert result["reason"] == "reauth_successful"
-    await until(lambda: runtime_data.status.service.state is ServiceState.RUNNING)
     lan.broadcast(1, params=relay(True), key=device_key)
     lan.broadcast(2, params=relay(True), key=device_key)
     # Desk's payload under Hall's key, which Desk's key fails to decrypt: under the fake LAN's fixed IV, in every run.
     lan.broadcast(1, OTHER_DEVICE_ID, params=relay(True), key=device_key)
-    await until(lambda: runtime_data.status.snapshot().switches[0].last_action is not None)
+    lan.broadcast(2, OTHER_DEVICE_ID, params=relay(False), key=other_device_key)
+    lights.fail(DESK)
+    lan.broadcast(3, OTHER_DEVICE_ID, params=relay(False), key=other_device_key)
+    await settle()
     await runtime_data.async_test_toggle(DEVICE_ID)
-    await until(lambda: f"decode_error_{OTHER_DEVICE_ID}" in issues(hass))
-    running = await download(hass, hass_client, entry.entry_id)
+    running = await download(hass, hass_client, config_entry.entry_id)
 
-    assert CERTIFICATE_MISMATCH in pin_mismatch
-    assert "The Hue bridge rejected the application key (unauthorized user)" in key_rejected
-    assert "Paired with the Hue bridge" in running
-    assert "Hall (1000abcdef): test from Home Assistant turned OFF light 'Hallway'." in running
-    assert "cannot read the LAN payload (decryption failed, check the deviceKey)" in running
-    # The secrets are there, redacted: the key, the pin and the two device keys.
-    assert [text.count(REDACTED) for text in (pin_mismatch, key_rejected, running)] == [4, 4, 4]
-    pins = [wrong_pin, fake_hue_pressed.fingerprint]
+    desk = next(subentry for subentry in config_entry.subentries.values() if subentry.unique_id == OTHER_DEVICE_ID)
+    hass.config_entries.async_update_subentry(config_entry, desk, data={**desk.data, CONF_DEVICE_KEY: new_device_key})
+    await settle()
+    lan.broadcast(4, OTHER_DEVICE_ID, params=relay(True), key=new_device_key)
+    await settle()
+    replaced = await download(hass, hass_client, config_entry.entry_id)
+
+    assert "Hall (1000abcdef): turned ON light.ceiling in" in running
+    assert "Desk (1000999999): cannot read the LAN payload (decryption failed, check the deviceKey)" in running
+    assert "Desk (1000999999) is not in detached relay mode" in running
+    assert f"Could not switch {DESK} on: Request failed: the light didn't answer" in running
+    assert "Hall (1000abcdef): test from Home Assistant turned OFF light.ceiling." in running
+    assert "Configuration changed; restarting the switches." in replaced
+    # The keys are there, redacted.
+    assert [text.count(REDACTED) for text in (started, running, replaced)] == [2, 2, 2]
+    keys = [device_key, other_device_key, new_device_key]
+    # The AES key of each switch's payloads, which the engine makes of its device key.
+    aes_keys = [hashlib.md5(key.encode(), usedforsecurity=False).digest() for key in keys]
     secrets = [
-        rejected_key,
-        entry.data[CONF_APP_KEY],
-        device_key,
-        other_device_key,
-        *pins,
-        *(pin.lower() for pin in pins),
-        *(":".join(pin[i : i + 2] for i in range(0, len(pin), 2)) for pin in pins),
-        *(repr(bytes.fromhex(pin)) for pin in pins),
+        *keys,
+        *(aes_key.hex() for aes_key in aes_keys),
+        *(repr(aes_key) for aes_key in aes_keys),
+        *(base64.b64encode(aes_key).decode() for aes_key in aes_keys),
     ]
     formatter = logging.Formatter()
     logged = [formatter.format(record) for record in caplog.records if record.name.startswith(INTEGRATION_LOGGER.name)]
     for secret in secrets:
-        for text in (pin_mismatch, key_rejected, running, *logged):
+        for text in (started, running, replaced, *logged):
             assert secret not in text

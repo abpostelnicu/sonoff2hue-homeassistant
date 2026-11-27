@@ -74,7 +74,9 @@ def test_tracks_presses_from_lan_broadcasts() -> None:
 
 def test_keeps_what_earlier_broadcasts_showed() -> None:
     registry = DeviceRegistry(Clock())
-    tracker = SwitchTracker(EngineConfig(switches=[SwitchSettings(device_id=DEVICE, device_key=KEY, lights=["Lamp"])]))
+    tracker = SwitchTracker(
+        EngineConfig(switches=[SwitchSettings(device_id=DEVICE, device_key=KEY, targets=["light.lamp"])])
+    )
     changes: list[LanDevice] = []
     registry.add_changed_callback(changes.append)
 
@@ -134,7 +136,9 @@ def test_keeps_what_earlier_broadcasts_showed() -> None:
 
 def test_a_fresh_tracker_leaves_what_the_registry_knew() -> None:
     registry = DeviceRegistry(Clock())
-    keyed = SwitchTracker(EngineConfig(switches=[SwitchSettings(device_id=DEVICE, device_key=KEY, lights=["Lamp"])]))
+    keyed = SwitchTracker(
+        EngineConfig(switches=[SwitchSettings(device_id=DEVICE, device_key=KEY, targets=["light.lamp"])])
+    )
     feed(registry, keyed, encrypted(1, relay="on"), seconds=1)
 
     # As the LAN monitor's fresh tracker after a config change that removed the key: nothing can be decoded now.

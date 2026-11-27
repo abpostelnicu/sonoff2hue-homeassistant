@@ -4,12 +4,11 @@ The form shows every problem at once, and only a form without problems goes on t
 
 - the device: chosen from the list or typed, 4 to 40 ASCII letters and digits, and not used by another switch;
 - the name: at most 64 characters, once stripped;
-- at least one light, room or zone;
+- at least one light;
 - a new key, when the current one is to be replaced.
 
 It gives the rules the stripped name or ``None``; the device id, stripped if typed; the key ``None`` to keep it, ``""``
-to remove it, else the stripped input; and the picker's entries (``picker.selection_to_config``), or the typed ones
-split at commas (``picker.split_list``).
+to remove it, else the stripped input; and the lights.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
@@ -31,8 +30,7 @@ optional key."""
 
 @dataclass(frozen=True, slots=True)
 class Problem:
-    """A problem of the form, on its field: ``deviceId``, ``name``, ``targets`` (the picker), ``lights`` (the typed
-    entries) or ``deviceKey``."""
+    """A problem of the form, on its field: ``deviceId``, ``name``, ``targets`` or ``deviceKey``."""
 
     field: str
     message: str
@@ -82,23 +80,9 @@ def key_warning(mode: KeyMode, has_key: bool, device_id: str, original_id: str |
     return None
 
 
-def form_input(
-    name: str,
-    device_id: str,
-    key_mode: KeyMode,
-    key_text: str,
-    lights: Sequence[str],
-    groups: Sequence[str],
-) -> SwitchInput:
+def form_input(name: str, device_id: str, key_mode: KeyMode, key_text: str, targets: Sequence[str]) -> SwitchInput:
     """The switch the form gives the rules, from its inputs: the name stripped, or ``None`` if empty."""
-    return SwitchInput(
-        name.strip() or None, device_id, device_key_value(key_mode, key_text), list(lights), list(groups)
-    )
-
-
-def join_list(values: Sequence[str]) -> str:
-    """The typed entries' first text, when the bridge's lights can't be listed."""
-    return ", ".join(values)
+    return SwitchInput(name.strip() or None, device_id, device_key_value(key_mode, key_text), list(targets))
 
 
 def form_problems(
@@ -107,11 +91,9 @@ def form_problems(
     original_id: str | None,
     *,
     manual_device: bool,
-    manual_targets: bool,
     key_mode: KeyMode,
 ) -> list[Problem]:
-    """The form's problems, in the form's order. ``manual_device`` is set when the id was typed, and ``manual_targets``
-    when the entries were typed because the bridge's lights couldn't be listed."""
+    """The form's problems, in the form's order. ``manual_device`` is set when the id was typed."""
     problems: list[Problem] = []
     device_id = body.device_id or ""
     if not device_id:
@@ -123,8 +105,8 @@ def form_problems(
         problems.append(Problem("deviceId", f"This device is already used by {owner}."))
     if len(body.name or "") > MAX_NAME_LENGTH:
         problems.append(Problem("name", f"Use at most {MAX_NAME_LENGTH} characters."))
-    if not body.lights and not body.groups:
-        problems.append(Problem("lights" if manual_targets else "targets", "Choose at least one light, room or zone."))
+    if not body.targets:
+        problems.append(Problem("targets", "Choose at least one light."))
     if key_mode == "replace" and not body.device_key:
         problems.append(Problem("deviceKey", "Enter the new device key, or keep or remove the current one."))
     return problems
@@ -142,18 +124,10 @@ def identify(switches: Iterable[SwitchSettings], original_id: str | None, device
     return Identified(True, f"Selected {device_id}: it reported a press.")
 
 
-def field_errors(errors: Mapping[str, list[str]], manual_targets: bool) -> tuple[dict[str, str], list[str]]:
+def field_errors(errors: Mapping[str, list[str]]) -> tuple[dict[str, str], list[str]]:
     """The rules' messages on the form's fields: joined by field, in order, and the messages of keys that no field has.
-    The picker's field shows the errors of ``targets``, ``lights`` and ``groups`` together, and the typed entries have a
-    field each. Keys match without regard to case."""
-    fields = {
-        "name": "name",
-        "deviceid": "deviceId",
-        "devicekey": "deviceKey",
-        "targets": "targets",
-        "lights": "lights" if manual_targets else "targets",
-        "groups": "groups" if manual_targets else "targets",
-    }
+    Keys match without regard to case."""
+    fields = {"name": "name", "deviceid": "deviceId", "devicekey": "deviceKey", "targets": "targets"}
     by_field: dict[str, list[str]] = {}
     unmatched: list[str] = []
     for key, value in errors.items():

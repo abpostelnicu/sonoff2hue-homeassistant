@@ -1,22 +1,22 @@
-"""Wall switch presses in, Hue toggles out.
+"""Wall switch presses in, toggles of Home Assistant's lights out.
 
 The :class:`Runner` attaches to the config entry's :class:`MdnsListener`, which the LAN monitor runs too (decision 8):
 it adds a packet handler and a started callback, and removes them when it stops, while the listener goes on. Each time
 the socket (re)starts, the callback resets the switch tracker and asks the switches for their state, their baseline.
-The tracker then tells which broadcast is a press, and each press toggles the switch's Hue lights, rooms and zones.
+The tracker then tells which broadcast is a press, and each press toggles the switch's lights through the
+:class:`Toggler` (decision 40).
 
 Concurrency (decision 14): each toggle is a task, and the toggles of one switch take turns on its :class:`asyncio.Lock`
-in the order of the presses. The keep-alive is a task too. Tasks start eagerly (``eager_start=True``) and a delay of 0
-isn't awaited, so a task runs until it first waits before the code that started it goes on: a stale press is dropped,
-or a toggle that needs no I/O ends, before the next event of its packet is handled. Stopping tells everything to stop
-before it awaits anything, then waits for all of it to end.
+in the order of the presses. Tasks start eagerly (``eager_start=True``) and a delay of 0 isn't awaited, so a task runs
+until it first waits before the code that started it goes on: a stale press is dropped, or a toggle that needs no I/O
+ends, before the next event of its packet is handled. Stopping tells everything to stop before it awaits anything, then
+waits for all of it to end.
 """
 
 import asyncio
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
-from http import HTTPStatus
 import logging
 from operator import methodcaller
 import time
@@ -24,36 +24,32 @@ import time
 from .config import EngineConfig, SwitchSettings
 from .dns import DnsRecordType
 from .ewelink import SERVICE_TYPE
-from .hue_client import HueApiError, HueClient, HueGroup, HueLight, HueTarget
+from .lights import LightControl, Toggler, ToggleResult
 from .mdns import TRACE, MdnsListener, MdnsPacket
 from .press import SwitchEventKind, SwitchTracker, TrackedEvent, summarize
-from .targets import EntryKey, Remembered, RememberedResource, Renamed, keys_of, resolve_switch
-from .toggler import HueToggler, ToggleResult
 
 _LOGGER = logging.getLogger(__name__)
 
 MAX_PRESS_AGE = timedelta(seconds=5)
-"""A press that waited longer for the bridge is dropped rather than toggling the lights late."""
-KEEP_WARM_INTERVAL = 45.0
-"""Seconds between the keep-alive requests, which keep the connection to the bridge warm for a quick toggle."""
+"""A press that waited longer for the lights is dropped rather than toggling them late."""
 DISCOVERY_QUERY_DELAYS = (0.0, 1.0, 2.0)
 """Seconds before each of the first queries after the socket (re)starts, so queries at 0, 1 and 3 s."""
 MISSING_SWITCH_QUERY_INTERVAL = 30.0
 """Seconds between the queries while a switch hasn't been seen on the LAN."""
-RESOLVE_RETRY_DELAY = 10.0
-"""Seconds before the names are resolved again while the bridge isn't usable."""
-NO_TARGETS = "None of the lights, rooms and zones of this switch is on the Hue bridge."
-"""Why a press of a switch that has nothing left to toggle fails (decision 32)."""
+NO_TARGETS = "None of the lights of this switch is in Home Assistant."
+"""Why a press of a switch that has nothing to toggle fails: Home Assistant has none of its lights, or it has none, as
+a switch migrated from version 1 can be (decision 32)."""
 
 
 @dataclass(eq=False)
 class SwitchBinding:
-    """A switch with its resolved targets, and why its other entries resolve to nothing."""
+    """A switch with the lights it toggles, by their entity ids, and why its other lights are left out."""
 
     settings: SwitchSettings
-    targets: list[HueTarget]
+    targets: list[str]
     problems: list[str] = field(default_factory=list)
-    """The resolver's message for each entry that resolves to nothing; the switch toggles the others (decision 32)."""
+    """Why each of the switch's lights that Home Assistant doesn't have is left out; the switch toggles the others
+    (decision 32)."""
     gate: asyncio.Lock = field(default_factory=asyncio.Lock)
     """Serializes the toggles of one switch, so that a quick double press reads the state that the first one left."""
     warned_not_detached: bool = False
@@ -65,32 +61,17 @@ class RunnerObserver:
     observer overrides only what it needs. An exception raised by one is logged and otherwise ignored."""
 
     def on_press(self, binding: SwitchBinding, seq: int | None) -> None:
-        """The wall switch of ``binding`` was operated; a toggle of its targets follows."""
+        """The wall switch of ``binding`` was operated; a toggle of its lights follows."""
 
     def on_toggled(self, binding: SwitchBinding, result: ToggleResult, elapsed: timedelta) -> None:
-        """A toggle ran. ``result.failed`` counts targets the bridge didn't switch; a toggle cancelled because the
+        """A toggle ran. ``result.failed`` counts the lights that weren't switched; a toggle cancelled because the
         runner stopped is not reported at all."""
 
     def on_toggle_failed(self, binding: SwitchBinding, message: str) -> None:
-        """A toggle could not run at all, for example because the bridge was unreachable or rejected the key."""
+        """A toggle could not run at all, for example because none of the switch's lights is in Home Assistant."""
 
     def on_press_dropped(self, binding: SwitchBinding) -> None:
-        """A press waited more than 5 seconds for the bridge and was dropped instead of toggling late."""
-
-    def on_bridge_reachability(self, reachable: bool, message: str | None) -> None:
-        """The bridge became usable or unusable, or the reason it is unusable changed. The first report follows the
-        keep-alive request that :meth:`Runner.run` sends right away; toggle outcomes count too. These calls arrive in
-        the order the changes happened."""
-
-    def on_targets_gone(self, binding: SwitchBinding, targets: list[HueTarget]) -> None:
-        """A toggle of ``binding`` found these targets gone: the bridge answered 404 for them, as it has no such
-        resource any more. It comes right after :meth:`on_toggled`, so that the names are resolved again at once
-        (decision 32)."""
-
-    def on_key_rejected(self) -> None:
-        """The bridge rejected the application key (401 or 403): it ended a keep-alive request or a toggle. It comes
-        after each such failure, right after the reachability report, so that Home Assistant can offer to pair the
-        bridge again (decision 21)."""
+        """A press waited more than 5 seconds for the lights and was dropped instead of toggling late."""
 
 
 def bindings_by_device_id(bindings: Iterable[SwitchBinding]) -> dict[str, SwitchBinding]:
@@ -105,66 +86,9 @@ def bindings_by_device_id(bindings: Iterable[SwitchBinding]) -> dict[str, Switch
     return by_device_id
 
 
-@dataclass(frozen=True, slots=True)
-class ResolvedSwitches:
-    """A configuration's switches resolved against the bridge, each on its own (decision 32): their bindings; the
-    resource that each entry found, or the one remembered for an entry that found none, for the configuration's entries
-    only; and the entries whose resources were renamed."""
-
-    config: EngineConfig
-    bindings: list[SwitchBinding]
-    remembered: dict[EntryKey, RememberedResource]
-    renames: list[Renamed]
-
-
-def resolve_switches(
-    config: EngineConfig, lights: list[HueLight], groups: list[HueGroup], remembered: Remembered | None = None
-) -> ResolvedSwitches:
-    """Resolves each switch's light, room and zone names on its own, so that an entry that resolves to nothing never
-    stops another switch: each binding has the targets that resolve and a message for each entry that doesn't. An entry
-    that matches no resource, or several, resolves to its remembered resource while the bridge has that one."""
-    remembered = remembered or {}
-    bindings: list[SwitchBinding] = []
-    found: dict[EntryKey, RememberedResource] = {}
-    renames: list[Renamed] = []
-    for settings in config.switches:
-        resolution = resolve_switch(settings, lights, groups, remembered)
-        bindings.append(SwitchBinding(settings, resolution.targets, resolution.problems))
-        found |= resolution.found
-        renames += resolution.renamed
-
-    kept: dict[EntryKey, RememberedResource] = {}
-    for key in (key for settings in config.switches for key in keys_of(settings)):
-        if (resource := found.get(key, remembered.get(key))) is not None:
-            kept[key] = resource
-    return ResolvedSwitches(config, bindings, kept, renames)
-
-
-async def resolve_once(config: EngineConfig, hue: HueClient, remembered: Remembered | None = None) -> ResolvedSwitches:
-    """Resolves the switches with :func:`resolve_switches`, with the bridge's lights and groups as they are now. Raises
-    :class:`HueApiError` when the bridge can't list them."""
-    lights, groups = await hue.get_lights_and_groups()
-    return resolve_switches(config, lights, groups, remembered)
-
-
-async def resolve_bindings(
-    config: EngineConfig, hue: HueClient, logger: logging.Logger = _LOGGER, remembered: Remembered | None = None
-) -> ResolvedSwitches:
-    """Resolves the switches with :func:`resolve_once`, and waits for the bridge if it isn't usable yet, logging that
-    on ``logger``. Raises :class:`HueApiError` when the bridge refuses."""
-    while True:
-        try:
-            return await resolve_once(config, hue, remembered)
-        except HueApiError as err:
-            if not err.is_transient:
-                raise
-            logger.warning("Hue bridge at %s not usable yet (%s); retrying in 10s.", config.hue.bridge_ip, err)
-            await asyncio.sleep(RESOLVE_RETRY_DELAY)
-
-
-def labels(targets: Iterable[HueTarget]) -> str:
-    """The targets' labels, as the log lines list them, or ``(none)``."""
-    return ", ".join(map(str, targets)) or "(none)"
+def labels(targets: Iterable[str]) -> str:
+    """The lights, as the log lines list them, or ``(none)``."""
+    return ", ".join(targets) or "(none)"
 
 
 def _now() -> datetime:
@@ -178,27 +102,23 @@ class Runner:
         self,
         config: EngineConfig,
         bindings: list[SwitchBinding],
-        hue: HueClient,
+        control: LightControl,
         observer: RunnerObserver | None = None,
         clock: Callable[[], datetime] = _now,
     ) -> None:
         """Raises :class:`ValueError` when two of ``bindings`` have the same device id. ``clock`` tells the age of a
         press, and has to agree with the listener's, which stamps each packet with the time it was received."""
         self._bindings = bindings_by_device_id(bindings)
-        self._hue = hue
-        self._toggler = HueToggler(hue, _LOGGER)
+        self._toggler = Toggler(control, _LOGGER)
         self._tracker = SwitchTracker(config)
         self._observer = observer
         self._clock = clock
         self._reported_unknown: set[str] = set()
         self._toggles: set[asyncio.Task[None]] = set()
-        self._bridge_reachable: bool | None = None
-        self._bridge_error: str | None = None
 
     async def run(self, listener: MdnsListener) -> None:
         """Listens for presses on ``listener`` and toggles the lights until cancelled. When it ends, its packet handler
-        and started callback are gone, and the keep-alive and every toggle started so far have been stopped and have
-        ended, so the client can be closed."""
+        and started callback are gone, and every toggle started so far has been stopped and has ended."""
         for binding in self._bindings.values():
             settings = binding.settings
             _LOGGER.info("%s -> %s", settings.display_name, labels(binding.targets))
@@ -210,22 +130,19 @@ class Runner:
                 )
 
         loop = asyncio.get_running_loop()
-        # Eager: the first keep-alive request goes out before anything is awaited, and before the switches are asked
-        # for their state, which the started callback does as soon as it is added to an open socket.
-        keep_warm = loop.create_task(self._keep_bridge_warm(), eager_start=True)
         _LOGGER.info("Listening for wall switch presses.")
         remove_started = listener.add_started(self._discover_switches)
         remove_handler = listener.add_packet_handler(self.handle_packet)
         try:
             await loop.create_future()
         finally:
-            # Everything is told to stop before anything is awaited: no packet starts a toggle, and no request goes out,
-            # while the started callback is removed.
+            # Everything is told to stop before anything is awaited: no packet starts a toggle while the started
+            # callback is removed.
             remove_handler()
-            keep_warm.cancel()
             toggles = self._cancel_toggles()
             await remove_started()
-            await asyncio.wait([keep_warm, *toggles])
+            if toggles:
+                await asyncio.wait(toggles)
 
     async def _discover_switches(self, listener: MdnsListener) -> None:
         self._tracker.reset_all()
@@ -249,10 +166,10 @@ class Runner:
             listener.query(SERVICE_TYPE, DnsRecordType.PTR)
 
     def update_targets(self, bindings: Iterable[SwitchBinding]) -> None:
-        """Takes the targets and problems of a new resolution of the switches while the runner runs, without restarting
+        """Takes the lights and problems of a new resolution of the switches while the runner runs, without restarting
         it (decision 32): each switch keeps its turn for toggles, its warnings and its tracker's baseline, and a toggle
-        that a press started before goes on with the targets that it had. Logs the new targets of each switch whose
-        targets changed."""
+        that a press started before goes on with the lights that it had. Logs the new lights of each switch whose
+        lights changed."""
         for new in bindings:
             key = new.settings.normalized_device_id.casefold()
             current = self._bindings.get(key)
@@ -344,17 +261,6 @@ class Runner:
             toggle.cancel()
         return toggles
 
-    async def ping_bridge(self) -> None:
-        """One keep-alive request; its outcome also tells whether the bridge is usable."""
-        try:
-            await self._hue.ping()
-        except Exception as err:  # noqa: BLE001 - expected or not, the bridge isn't usable now; the keep-alive goes on
-            self._report_bridge_reachability(False, str(err))
-            if isinstance(err, HueApiError) and err.is_authentication_error:
-                self._notify(methodcaller("on_key_rejected"))
-        else:
-            self._report_bridge_reachability(True, None)
-
     def _start_toggle(self, binding: SwitchBinding, pressed_at: datetime) -> None:
         # Eager: the task runs until it first waits before this returns, so a stale press is dropped, and a toggle that
         # needs no I/O ends, before the next event of the packet is handled.
@@ -369,7 +275,7 @@ class Runner:
             try:
                 if self._clock() - pressed_at > MAX_PRESS_AGE:
                     _LOGGER.warning(
-                        "%s: dropped a press that waited more than %gs for the bridge.",
+                        "%s: dropped a press that waited more than %gs for the lights.",
                         name,
                         MAX_PRESS_AGE.total_seconds(),
                     )
@@ -377,7 +283,7 @@ class Runner:
                     return
 
                 if not binding.targets:
-                    # Every entry of the switch resolves to nothing, so the press is reported and its toggle fails.
+                    # The switch has no light to toggle, so the press is reported and its toggle fails.
                     _LOGGER.error("%s: could not toggle the lights: %s", name, NO_TARGETS)
                     self._notify(methodcaller("on_toggle_failed", binding, NO_TARGETS))
                     return
@@ -385,7 +291,6 @@ class Runner:
                 started = time.perf_counter()
                 result = await self._toggler.toggle(binding.targets)
                 elapsed = timedelta(seconds=time.perf_counter() - started)
-                self._report_bridge_reachability(True, None)
                 state = "on" if result.turned_on else "off"
                 notes = []
                 if result.unchanged > 0:
@@ -401,39 +306,9 @@ class Runner:
                     f" ({', '.join(notes)})" if notes else "",
                 )
                 self._notify(methodcaller("on_toggled", binding, result, elapsed))
-                if gone := [failure.target for failure in result.failures if failure.status == HTTPStatus.NOT_FOUND]:
-                    self._notify(methodcaller("on_targets_gone", binding, gone))
-            except HueApiError as err:
-                # The bridge state could not be read, so the bridge is unusable right now.
-                self._report_bridge_reachability(False, str(err))
-                if err.is_authentication_error:
-                    self._notify(methodcaller("on_key_rejected"))
-                _LOGGER.error("%s: could not toggle the lights: %s", name, err)  # noqa: TRY400 - no traceback needed
-                self._notify(methodcaller("on_toggle_failed", binding, str(err)))
             except Exception as err:
                 _LOGGER.exception("%s: unexpected error while toggling the lights.", name)
                 self._notify(methodcaller("on_toggle_failed", binding, str(err)))
-
-    async def _keep_bridge_warm(self) -> None:
-        # The first request goes out at once, so that the bridge's state is known from the start.
-        while True:
-            await self.ping_bridge()
-            await asyncio.sleep(KEEP_WARM_INTERVAL)
-
-    def _report_bridge_reachability(self, reachable: bool, message: str | None) -> None:
-        """Logs and reports changes only: usable or not, or a new reason while not usable."""
-        error = None if reachable else message
-        previous = self._bridge_reachable
-        if previous == reachable and error == self._bridge_error:
-            return
-
-        self._bridge_reachable = reachable
-        self._bridge_error = error
-        if reachable and previous is False:
-            _LOGGER.info("Hue bridge reachable again.")
-        elif not reachable and previous is not False:
-            _LOGGER.warning("Hue bridge unavailable: %s", error)
-        self._notify(methodcaller("on_bridge_reachability", reachable, error))
 
     def _notify(self, callback: Callable[[RunnerObserver], None]) -> None:
         if self._observer is None:

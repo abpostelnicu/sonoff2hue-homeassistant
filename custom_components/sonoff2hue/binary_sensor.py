@@ -1,4 +1,4 @@
-"""The binary sensors (decision 25): Reachable on the bridge's device, and each switch's Online."""
+"""The binary sensors (decision 25): each switch's Online."""
 
 from datetime import datetime, timedelta
 from typing import Final
@@ -12,7 +12,7 @@ from homeassistant.helpers.event import async_call_later, async_track_point_in_u
 
 from .engine.registry import ONLINE_WINDOW, LanDevice
 from .engine.status import StatusSnapshot
-from .entity import BridgeEntity, WallSwitchEntity, async_add_switch_entities
+from .entity import WallSwitchEntity, async_add_switch_entities
 from .runtime import Sonoff2HueConfigEntry, Sonoff2HueData
 
 PARALLEL_UPDATES = 0
@@ -25,35 +25,10 @@ changes nothing that the registry reports."""
 async def async_setup_entry(
     hass: HomeAssistant, entry: Sonoff2HueConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
-    data = entry.runtime_data
-    async_add_entities([ReachableSensor(data)])
-
     def create(data: Sonoff2HueData, subentry: ConfigSubentry) -> list[BinarySensorEntity]:
         return [OnlineSensor(data, subentry)]
 
     async_add_switch_entities(hass, entry, async_add_entities, create)
-
-
-class ReachableSensor(BridgeEntity, BinarySensorEntity):
-    """Whether the Hue bridge was usable when last checked, unknown until then and while it isn't paired, with its
-    address, the message while it isn't usable, and the time of the check."""
-
-    _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _unrecorded_attributes = frozenset({"checked_at"})
-
-    def __init__(self, data: Sonoff2HueData) -> None:
-        super().__init__(data, "reachable")
-
-    @callback
-    def _show(self, snapshot: StatusSnapshot) -> None:
-        hue = snapshot.hue
-        self._attr_is_on = hue.reachable
-        self._attr_extra_state_attributes = {
-            "address": hue.bridge_ip,
-            "message": hue.message,
-            "checked_at": hue.checked_at,
-        }
 
 
 class OnlineSensor(WallSwitchEntity, BinarySensorEntity):

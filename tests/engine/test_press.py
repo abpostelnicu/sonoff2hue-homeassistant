@@ -293,7 +293,7 @@ def test_relay_changes_are_written_as_json_writes_them() -> None:
 
 
 def test_tracker_probe_from_rebooted_device_rebaselines() -> None:
-    config = EngineConfig(switches=[SwitchSettings(device_id="1000ABCDEF", lights=["Lamp"])])
+    config = EngineConfig(switches=[SwitchSettings(device_id="1000ABCDEF", targets=["light.lamp"])])
     tracker = SwitchTracker(config)
 
     first = tracker.process(to_packet(announcement(DEVICE, 100, "abc", "iv1")))
@@ -315,7 +315,9 @@ def test_tracker_probe_from_rebooted_device_rebaselines() -> None:
 
 
 def test_tracker_decrypts_with_configured_key_and_filters_relay_changes() -> None:
-    tracker = SwitchTracker(EngineConfig(switches=[SwitchSettings(device_id=DEVICE, device_key=KEY, lights=["Lamp"])]))
+    tracker = SwitchTracker(
+        EngineConfig(switches=[SwitchSettings(device_id=DEVICE, device_key=KEY, targets=["light.lamp"])])
+    )
 
     def send(seq: int, params: dict[str, Any]) -> TrackerUpdate:
         data, iv = ewelink.encrypt(json.dumps(params, separators=(",", ":")), KEY)
@@ -330,7 +332,9 @@ def test_tracker_decrypts_with_configured_key_and_filters_relay_changes() -> Non
 
 
 def test_tracker_malformed_iv_still_counts_presses_by_sequence() -> None:
-    tracker = SwitchTracker(EngineConfig(switches=[SwitchSettings(device_id=DEVICE, device_key=KEY, lights=["Lamp"])]))
+    tracker = SwitchTracker(
+        EngineConfig(switches=[SwitchSettings(device_id=DEVICE, device_key=KEY, targets=["light.lamp"])])
+    )
     data, _ = ewelink.encrypt(json.dumps(minir4m_json()), KEY)
     short_iv = "AAAAAAAAAAA="  # 8 bytes
 

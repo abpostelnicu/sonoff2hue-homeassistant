@@ -2,18 +2,16 @@
 
 They hold four views of the running integration, as the runtime has them (decision 23):
 
-- ``config``: the configuration that the bridge supervisor runs, the entry's data and its switches as stored;
-- ``status``: the status tracker's snapshot, the service, the Hue bridge, the LAN and each switch with its resolved
-  targets;
+- ``config``: the configuration that the supervisor runs, the entry's switches as stored;
+- ``status``: the status tracker's snapshot, the service, the LAN and each switch with the lights it toggles;
 - ``lan_devices``: the LAN registry's devices, each with ``online``;
 - ``activity``: the activity buffer's entries, the last 1,000, as Home Assistant's log levels let them in.
 
 An entry that isn't loaded has no runtime, so its diagnostics hold only the configuration.
 
-Home Assistant's ``async_redact_data`` takes out the secrets by the keys that the entry and its subentries keep them
-under, so the application key, the certificate pin and the device keys show only whether they are set. The texts hold
-none of them: the engine sends the key only in the ``hue-application-key`` header, the pin only to aiohttp's check of the
-certificate and the device key only to the payload's decryption, and its messages and log lines don't name them.
+Home Assistant's ``async_redact_data`` takes out the secrets by the key that the subentries keep them under, so the
+device keys show only whether they are set. The texts hold none of them: the engine gives the device key only to the
+payload's decryption, and its messages and log lines don't name it.
 """
 
 from dataclasses import fields, is_dataclass
@@ -24,12 +22,12 @@ from typing import Any, Final
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_APP_KEY, CONF_CERTIFICATE_SHA256, CONF_DEVICE_KEY
+from .const import CONF_DEVICE_KEY
 from .engine.activity import CAPACITY
 from .runtime import Sonoff2HueConfigEntry, Sonoff2HueData, config_from_entry
 
-TO_REDACT: Final = {CONF_APP_KEY, CONF_CERTIFICATE_SHA256, CONF_DEVICE_KEY}
-"""The keys of the secrets in the entry's data and in its switches' subentries, which the engine's settings share."""
+TO_REDACT: Final = {CONF_DEVICE_KEY}
+"""The key of the secrets in the switches' subentries, which the engine's settings share."""
 
 
 async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: Sonoff2HueConfigEntry) -> dict[str, Any]:

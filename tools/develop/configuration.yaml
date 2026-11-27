@@ -14,3 +14,50 @@ logger:
   default: info
   logs:
     custom_components.sonoff2hue: debug
+
+# Lights for the switches to toggle, without hardware: template lights, each kept on or off by an input boolean of its
+# own, which keeps its state across restarts. Their unique ids put them in the entity registry, so a switch keeps them
+# by their registry ids and follows a new entity id. The end-to-end test (tools/e2e) toggles them too.
+input_boolean:
+  hallway:
+    name: Hallway state
+  living_room:
+    name: Living room state
+  porch:
+    name: Porch state
+
+template:
+  - light:
+      - name: Hallway
+        unique_id: sonoff2hue_development_hallway
+        state: "{{ is_state('input_boolean.hallway', 'on') }}"
+        turn_on:
+          action: input_boolean.turn_on
+          target:
+            entity_id: input_boolean.hallway
+        turn_off:
+          action: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.hallway
+      - name: Living room
+        unique_id: sonoff2hue_development_living_room
+        state: "{{ is_state('input_boolean.living_room', 'on') }}"
+        turn_on:
+          action: input_boolean.turn_on
+          target:
+            entity_id: input_boolean.living_room
+        turn_off:
+          action: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.living_room
+      - name: Porch
+        unique_id: sonoff2hue_development_porch
+        state: "{{ is_state('input_boolean.porch', 'on') }}"
+        turn_on:
+          action: input_boolean.turn_on
+          target:
+            entity_id: input_boolean.porch
+        turn_off:
+          action: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.porch

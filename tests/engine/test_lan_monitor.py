@@ -39,7 +39,9 @@ async def time() -> AsyncIterator[VirtualTime]:
 
 def switches(*device_ids: str) -> EngineConfig:
     """A configuration with a switch for each of ``device_ids``."""
-    return EngineConfig(switches=[SwitchSettings(device_id=device_id, lights=["Lamp"]) for device_id in device_ids])
+    return EngineConfig(
+        switches=[SwitchSettings(device_id=device_id, targets=["light.lamp"]) for device_id in device_ids]
+    )
 
 
 class Lan:
@@ -420,7 +422,7 @@ async def test_a_config_change_makes_a_fresh_tracker_with_the_new_device_keys(ti
     before = lan.registry.find(DEVICE)
 
     lan.monitor.config_changed(
-        EngineConfig(switches=[SwitchSettings(device_id=DEVICE, device_key=KEY, lights=["Lamp"])])
+        EngineConfig(switches=[SwitchSettings(device_id=DEVICE, device_key=KEY, targets=["light.lamp"])])
     )
     lan.broadcast_encrypted(3, relay="off")
     lan.broadcast_encrypted(4, relay="on")

@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
-# The end-to-end test (decision 27): a real Home Assistant with this checkout's integration, the fake Hue bridge and the
-# simulated wall switch, on this machine only. CI's End-to-end job runs it. See "Development" in README.md.
+# The end-to-end test (decision 27): a real Home Assistant with this checkout's integration, the lights of the
+# development configuration and the simulated wall switch, on this machine only. CI's End-to-end job runs it. See
+# "Development" in README.md.
 #
 # Usage: scripts/e2e
 #
 # It sets up the development Home Assistant (scripts/develop setup) in a throwaway configuration folder, .dev/e2e, and
-# starts it and the fake Hue bridge on 127.0.0.1, on free ports. Through Home Assistant's API it onboards a throwaway
-# user, sets up sonoff2hue with the setup flow, pairing the fake bridge with its link button pressed, and adds a switch
-# with the switch subentry flow, identified by a press of the simulated switch. The switch is pressed twice, and Home
-# Assistant restarted; then its last seq again must be no press, and the next one a press. It stops everything, prints
-# Home Assistant's log on a failure, and exits with 0 only if every check passed. A pass deletes .dev/e2e; a failure
-# keeps it, with the logs.
+# starts it on 127.0.0.1, on a free port. Through Home Assistant's API it onboards a throwaway user, sets up sonoff2hue
+# with the setup flow, and adds a switch of two template lights with the switch subentry flow, identified by a press of
+# the simulated switch. The switch is pressed; one light gets a new entity id and the other is disabled, and Home
+# Assistant is restarted; then its last seq again must be no press, and the next one a press. Last, with Home Assistant
+# stopped, the stored configuration becomes sonoff2hue 1.x's, which the next start migrates, and the repair that it
+# raises gives the switch its lights again. It stops everything, prints Home Assistant's log on a failure, and exits
+# with 0 only if every check passed. A pass deletes .dev/e2e; a failure keeps it, with the logs.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

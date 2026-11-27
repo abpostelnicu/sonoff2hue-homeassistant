@@ -1,37 +1,34 @@
 """The switch subentry flow: adds and changes the switches, one config subentry of type ``switch`` per MINIR4M. Its
-rules and messages are the engine's: the form's checks (``switch_form``), the rules a switch meets before it is saved
-(``switch_rules``) and the picker of lights, rooms and zones (``picker``); this module shows them in Home Assistant's
-dialogs.
+rules and messages are the engine's: the form's checks (``switch_form``) and the rules a switch meets before it is
+saved (``switch_rules``); this module shows them in Home Assistant's dialogs.
 
 The steps (decision 24): a menu (``user``, or ``reconfigure`` with ``keep`` first) chooses how to find the MINIR4M:
 ``identify``, a progress step that waits up to 60 seconds for a press; ``pick``, the devices seen on the LAN; or
-``manual``, its device id. ``settings`` then takes the name, the lights, rooms and zones, and the device key, and saves
-the switch. When the bridge's lights can't be listed, ``pair_first`` or ``lights_unavailable`` offers to try again or to
-enter them by hand (``typed``); ``unchecked`` asks before a switch is saved without its names checked. A switch of 2 or
-more single lights is first offered the room or zone that holds exactly them (``group_offer``), or a zone of them to
-create on the bridge (``zone_offer``, then ``zone_failed`` if the bridge doesn't create it), in their place (decision
-34). Home Assistant's own UI deletes a switch.
+``manual``, its device id. ``settings`` then takes the name, the lights, with Home Assistant's entity picker, and the
+device key, and saves the switch, its lights by their entity registry ids (decision 40). A switch of 2 or more single
+lights is first offered the Hue room or zone whose light switches exactly them (``group_offer``), in their place
+(decision 34). Home Assistant's own UI deletes a switch.
 
 The flow starts only while the config entry is loaded, as it needs the entry's runtime (decision 23): its registry of
-the devices seen on the LAN, and its factory of Hue clients. A saved switch reaches the runtime through the entry's
-update listener, which restarts the bridge supervisor.
+the devices seen on the LAN. A saved switch reaches the runtime through the entry's update listener, which restarts the
+supervisor.
 """
 
 import asyncio
-from collections import Counter
-from collections.abc import AsyncIterator, Callable, Mapping, Sequence
-from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
-import logging
 import math
 from typing import Any, Final
 
 from homeassistant import data_entry_flow
 from homeassistant.config_entries import ConfigEntryState, ConfigSubentryFlow, SubentryFlowResult
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import AbortFlow, UnknownFlow, section
+from homeassistant.data_entry_flow import AbortFlow, section
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.selector import (
+    EntitySelector,
+    EntitySelectorConfig,
     SelectOptionDict,
     SelectSelector,
     SelectSelectorConfig,
@@ -43,57 +40,33 @@ from homeassistant.helpers.selector import (
 from homeassistant.util import dt as dt_util
 import probatio
 
-from .const import (
-    CONF_DEVICE_ID,
-    CONF_DEVICE_KEY,
-    CONF_GROUPS,
-    CONF_LIGHTS,
-    CONF_NAME,
-    SUBENTRY_SWITCH,
-)
-from .engine import group_offer, picker, switch_form, switch_rules
-from .engine.config import ConfigError, HueSettings, SwitchSettings
-from .engine.group_offer import CreateZone, Offer, UseGroup
-from .engine.hue_client import HueApiError, HueClient, HueGroup, HueLight
-from .engine.picker import Entry, Kind, Resource, Resources, Selection
+from .const import CONF_DEVICE_ID, CONF_DEVICE_KEY, CONF_NAME, CONF_TARGETS, CONF_UNMIGRATED, SUBENTRY_SWITCH
+from .engine import switch_form, switch_rules
+from .engine.config import SwitchSettings
 from .engine.press import SwitchEventKind
 from .engine.registry import DeviceRegistry, LanDevice
-from .engine.supervisor import HueClientFactory, create_hue_client
 from .engine.switch_form import KeyMode
 from .engine.switch_rules import (
-    BridgeLists,
-    ResourcesError,
     SwitchConflictError,
     SwitchInput,
     SwitchNotFoundError,
     SwitchValidationError,
     SwitchWrite,
 )
-from .engine.targets import name_key
+from .lights import LIGHT_DOMAIN, GroupOffer, entity_ids_of, find_group, resolve_switch, target_of
 from .runtime import Sonoff2HueConfigEntry, config_from_entry
-
-_LOGGER = logging.getLogger(__name__)
 
 IDENTIFY_TIMEOUT: Final = 60.0
 """How long ``identify`` waits for a press."""
 
 DEVICE_MENU: Final = ["identify", "pick", "manual"]
 """The ways to the MINIR4M: press its wall switch, pick it from the devices seen on the LAN, or enter its device id."""
-RETRY_MENU: Final = ["settings", "typed"]
-"""When the bridge's lights can't be listed: try again, or enter them by hand."""
-ZONE_RETRY_MENU: Final = ["retry_zone", "keep_lights"]
-"""When the bridge doesn't create the zone: check the switch and offer again, or keep the lights."""
 
 # The fields of the dialogs.
 DEVICE: Final = "device"
 DEVICE_ID: Final = "device_id"
 NAME: Final = "name"
-UNRESOLVED: Final = "unresolved"
 LIGHTS: Final = "lights"
-ROOMS: Final = "rooms"
-ZONES: Final = "zones"
-LIGHT_NAMES: Final = "light_names"
-GROUP_NAMES: Final = "group_names"
 ADVANCED: Final = "advanced"
 KEY_MODE: Final = "key_mode"
 NEW_DEVICE_KEY: Final = "new_device_key"
@@ -101,16 +74,16 @@ DEVICE_KEY: Final = "device_key"
 
 KEY_MODES: Final[list[KeyMode]] = ["keep", "replace", "remove"]
 KEY_SELECTOR: Final = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD, autocomplete="off"))
+LIGHT_SELECTOR: Final = EntitySelector(EntitySelectorConfig(domain=LIGHT_DOMAIN, multiple=True))
 MANUAL_SCHEMA: Final = probatio.Schema({probatio.Optional(DEVICE_ID): TextSelector()})
 
 # The form's fields that the messages of the form's checks and of the switch rules go to, with their error keys and
-# placeholders. The device and the picker's lights, rooms and zones have no field of their own here: their messages go
-# to the form as a whole, with the messages of keys that no field has.
+# placeholders. The device has no field of its own here: its messages go to the form as a whole, with the messages of
+# keys that no field has.
 _FIELDS: Final = {
     "name": (NAME, "invalid_name", "name_error"),
     "deviceKey": (ADVANCED, "invalid_device_key", "key_error"),
-    "lights": (LIGHT_NAMES, "invalid_light_names", "light_names_error"),
-    "groups": (GROUP_NAMES, "invalid_group_names", "group_names_error"),
+    "targets": (LIGHTS, "invalid_lights", "lights_error"),
 }
 _PLACEHOLDERS: Final = ("base_error", *(placeholder for _, _, placeholder in _FIELDS.values()))
 
@@ -198,48 +171,16 @@ def device_label(device: LanDevice, online: bool, owner: str | None, now: dateti
     return " · ".join(parts)
 
 
-def resource_options(items: Sequence[Resource]) -> list[SelectOptionDict]:
-    """The picker's lights, rooms or zones: the name, else the id; the id too when another of the list has the same
-    name; and a light's state, or "no lights" for a room or zone without a grouped light. Their values are their
-    positions in the list."""
-    names = Counter(name_key(item.name) for item in items)
-    options: list[SelectOptionDict] = []
-    for index, item in enumerate(items):
-        label = item.name or item.id
-        if names[name_key(item.name)] > 1:
-            label += f" ({item.id})"
-        if isinstance(item, HueLight):
-            label += " — on" if item.on else " — off"
-        elif isinstance(item, HueGroup) and item.grouped_light_id is None:
-            label += " — no lights"
-        options.append(SelectOptionDict(value=str(index), label=label))
-    return options
-
-
-def unresolved_label(entry: Entry) -> str:
-    """An entry of the switch that doesn't match the bridge, with what is wrong with it."""
-    if entry.status == "ambiguous":
-        kinds = "lights" if entry.list_name == "lights" else "rooms/zones"
-        return f"{entry.value} — matches {entry.count} {kinds}"
-    return f"{entry.value} — not found on the bridge"
-
-
-def _light_names(lights: Sequence[HueLight]) -> str:
-    """The lights that a room or zone would take the place of, for the offer's text: their names, in the switch's
-    order."""
-    return ", ".join(light.name for light in lights)
-
-
-def _lists(resources: Resources) -> list[tuple[str, Kind, Sequence[Resource]]]:
-    """The picker's lists: each field, its kind and its items."""
-    return [(LIGHTS, "light", resources.lights), (ROOMS, "room", resources.rooms), (ZONES, "zone", resources.zones)]
-
-
-def _multiple(options: list[SelectOptionDict], *, chips: bool = False) -> SelectSelector:
-    """A choice of several; as chips that can be removed, or else as Home Assistant shows as many options."""
-    if chips:
-        return SelectSelector(SelectSelectorConfig(options=options, multiple=True, mode=SelectSelectorMode.DROPDOWN))
-    return SelectSelector(SelectSelectorConfig(options=options, multiple=True))
+def missing_text(removed: Sequence[str], unmigrated: Sequence[str]) -> str:
+    """What the settings form says about the switch's lights that it can't show: those that Home Assistant no longer
+    has, and those of sonoff2hue 1.x that the migration found no light for; empty when there are none."""
+    parts: list[str] = []
+    if removed:
+        parts.append("Not chosen, as Home Assistant no longer has them:\n" + "\n".join(f"- {r}" for r in removed))
+    if unmigrated:
+        names = ", ".join(f"`{entry}`" for entry in unmigrated)
+        parts.append(f"From sonoff2hue 1.x, without a light in Home Assistant: {names}. Choose their lights again.")
+    return "".join(f"\n\n{part}" for part in parts)
 
 
 def _ended(err: SwitchConflictError | SwitchNotFoundError) -> AbortFlow:
@@ -249,7 +190,7 @@ def _ended(err: SwitchConflictError | SwitchNotFoundError) -> AbortFlow:
 
 
 class SwitchSubentryFlow(ConfigSubentryFlow):
-    """Adds a switch, or changes one (``reconfigure``): a MINIR4M and the Hue lights, rooms and zones it toggles."""
+    """Adds a switch, or changes one (``reconfigure``): a MINIR4M and the lights it toggles."""
 
     def __init__(self) -> None:
         self._original: SwitchSettings | None = None
@@ -264,28 +205,16 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
         self._identify: asyncio.Task[_Press | None] | None = None
         self._identify_status: str | None = None
         """What the last press of a device that another switch uses said, while identify-by-press goes on."""
-        self._resources: Resources | None = None
-        """The bridge's lights, rooms and zones; ``None`` while they are typed."""
-        self._load_error = ""
-        """Why the bridge's lights, rooms and zones couldn't be listed."""
-        self._selection = Selection()
         self._lights: list[str] = []
-        self._groups: list[str] = []
+        """The lights chosen, by their entity ids."""
+        self._missing = ""
+        """What the form says about the lights of the switch being changed that it can't show."""
         self._values: dict[str, Any] = {}
         """What the form was given, which it suggests when it is shown again."""
         self._body: SwitchInput | None = None
-        """The switch that ``unchecked`` saves without checking its names, or that the room or zone offered would take
-        the lights of."""
-        self._warnings: list[str] = []
-        self._offer: Offer | None = None
-        """The room or zone offered for the switch's single lights, or the zone to create of them."""
-        self._lists = BridgeLists([], [])
-        """The bridge's lists that the offer came from."""
-        self._zone_error = ""
-        """Why the bridge didn't create the zone."""
-        self._removed = False
-        self._hue_clients: HueClientFactory = create_hue_client
-        """Makes the clients for the bridge: the runtime's factory (``hue_clients``), from the start of the flow."""
+        """The switch that the room or zone offered would take the lights of."""
+        self._offer: GroupOffer | None = None
+        """The room or zone offered for the switch's single lights."""
 
     @property
     def _original_id(self) -> str | None:
@@ -301,46 +230,34 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
         """The configured switches, in their order."""
         return list(_switches_by_subentry(self._get_entry()).values())
 
-    def _hue(self) -> HueSettings:
-        """The paired bridge, from the config entry's data."""
-        return config_from_entry(self._get_entry()).hue
-
-    @asynccontextmanager
-    async def _connect(self, hue: HueSettings) -> AsyncIterator[HueClient]:
-        """A fresh client for the paired bridge, made by the runtime's factory and closed afterwards. Raises the
-        engine's ``ConfigError`` when the settings can't be used."""
-        client = self._hue_clients(hue)
-        try:
-            yield client
-        finally:
-            await client.close()
-
-    def _start(self) -> bool:
-        """Whether the config entry is loaded, as the flow needs its runtime: the devices seen on the LAN, and the
-        factory of Hue clients, which the flow takes now, so that it can still ask the bridge while the entry reloads."""
-        entry = self._get_entry()
-        if entry.state is not ConfigEntryState.LOADED:
-            return False
-        self._hue_clients = entry.runtime_data.hue_clients
-        return True
+    def _loaded(self) -> bool:
+        """Whether the config entry is loaded, as the flow needs its runtime: the devices seen on the LAN."""
+        return self._get_entry().state is ConfigEntryState.LOADED
 
     # The ways in.
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         """Adds a switch: first its MINIR4M."""
-        if not self._start():
+        if not self._loaded():
             return self.async_abort(reason="entry_not_loaded")
         return self._device_menu("user")
 
     async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        """Changes a switch: its device stays unless another one is chosen."""
-        if not self._start():
+        """Changes a switch: its device stays unless another one is chosen, and its lights are the ones it has, by
+        their entity ids now."""
+        if not self._loaded():
             return self.async_abort(reason="entry_not_loaded")
-        original = self._original = _switches_by_subentry(self._get_entry())[
-            self._get_reconfigure_subentry().subentry_id
-        ]
+        subentry = self._get_reconfigure_subentry()
+        original = self._original = _switches_by_subentry(self._get_entry())[subentry.subentry_id]
         self._device_id = original.normalized_device_id
-        self._lights, self._groups = list(original.lights), list(original.groups)
+        registry = er.async_get(self.hass)
+        self._lights = entity_ids_of(registry, original.targets)
+        removed = [
+            problem.removeprefix(f"{original.display_name}: ")
+            for problem in resolve_switch(registry, original).problems
+            if not problem.endswith(" is disabled.")
+        ]
+        self._missing = missing_text(removed, list(subentry.data.get(CONF_UNMIGRATED) or ()))
         self._values[NAME] = original.name or ""
         return self._device_menu("reconfigure")
 
@@ -367,7 +284,6 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
             self._switches(),
             self._original_id,
             manual_device=manual,
-            manual_targets=False,
             key_mode="set",
         )
         return next((problem.message for problem in problems if problem.field == "deviceId"), None)
@@ -536,49 +452,13 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
             description_placeholders={"error": problem or ""},
         )
 
-    # The lights, rooms and zones, the name and the key.
+    # The lights, the name and the key.
 
     async def async_step_settings(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        """The switch's name, the lights, rooms and zones it toggles, and its device key. Shown anew, it lists the
-        bridge's lights, rooms and zones, with the switch's entries chosen."""
+        """The switch's name, the lights it toggles, and its device key."""
         if user_input is not None:
-            return await self._async_submit(user_input)
-        try:
-            resources = await switch_rules.load_resources(self._hue(), self._connect)
-        except ResourcesError as err:
-            if err.status == 409:
-                return await self.async_step_pair_first()
-            self._load_error = str(err)
-            return await self.async_step_lights_unavailable()
-        except Exception as err:
-            _LOGGER.exception("Listing the lights, rooms and zones of the Hue bridge failed.")
-            self._load_error = str(err)
-            return await self.async_step_lights_unavailable()
-        self._resources = resources
-        self._selection = picker.create_selection(resources, self._lights, self._groups)
+            return await self._submit(user_input)
         return self._show_settings()
-
-    async def async_step_pair_first(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        """The bridge isn't paired, or its settings can't be used (409): pair it, or enter the lights by hand."""
-        return self.async_show_menu(step_id="pair_first", menu_options=RETRY_MENU)
-
-    async def async_step_lights_unavailable(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        """The bridge couldn't be asked (502), or failed unexpectedly: try again, or enter the lights by hand."""
-        return self.async_show_menu(
-            step_id="lights_unavailable", menu_options=RETRY_MENU, description_placeholders={"error": self._load_error}
-        )
-
-    async def async_step_typed(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        """The lights, rooms and zones by hand, as names, ids and ``room:``/``zone:`` entries separated by commas."""
-        self._resources = None
-        self._values[LIGHT_NAMES] = switch_form.join_list(self._lights)
-        self._values[GROUP_NAMES] = switch_form.join_list(self._groups)
-        return self._show_settings()
-
-    def _unresolved(self) -> list[int]:
-        """The positions of the switch's entries that don't match the bridge and weren't removed."""
-        unresolved = picker.unresolved_entries(self._selection)
-        return [index for index, entry in enumerate(self._selection.entries) if entry in unresolved]
 
     def _key_mode(self) -> KeyMode:
         if not self._has_key:
@@ -592,26 +472,8 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
         """The form, with the given values suggested again; the device key's section is open when it has an error or
         the warning."""
         errors = errors or {}
-        fields: dict[Any, Any] = {probatio.Optional(NAME): TextSelector()}
-        suggested: dict[str, Any] = {NAME: self._values.get(NAME, "")}
-        if (resources := self._resources) is not None:
-            if unresolved := self._unresolved():
-                options = [
-                    SelectOptionDict(value=str(index), label=unresolved_label(self._selection.entries[index]))
-                    for index in unresolved
-                ]
-                # Chips, which can be removed one by one.
-                fields[probatio.Optional(UNRESOLVED)] = _multiple(options, chips=True)
-                suggested[UNRESOLVED] = [str(index) for index in unresolved]
-            for field, kind, items in _lists(resources):
-                chosen = self._selection.ids(kind)
-                fields[probatio.Optional(field)] = _multiple(resource_options(items))
-                suggested[field] = [str(index) for index, item in enumerate(items) if item.id in chosen]
-        else:
-            fields[probatio.Optional(LIGHT_NAMES)] = TextSelector()
-            fields[probatio.Optional(GROUP_NAMES)] = TextSelector()
-            suggested[LIGHT_NAMES] = self._values.get(LIGHT_NAMES, "")
-            suggested[GROUP_NAMES] = self._values.get(GROUP_NAMES, "")
+        fields: dict[Any, Any] = {probatio.Optional(NAME): TextSelector(), probatio.Optional(LIGHTS): LIGHT_SELECTOR}
+        suggested: dict[str, Any] = {NAME: self._values.get(NAME, ""), LIGHTS: list(self._lights)}
 
         mode = self._key_mode()
         warning = switch_form.key_warning(mode, self._has_key, self._device_id, self._original_id)
@@ -636,79 +498,49 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
             step_id="settings",
             data_schema=self.add_suggested_values_to_schema(probatio.Schema(fields), suggested),
             errors=errors,
-            description_placeholders={"device": device, "key_warning": warning or "", **placeholders},
+            description_placeholders={
+                "device": device,
+                "missing": self._missing,
+                "key_warning": warning or "",
+                **placeholders,
+            },
         )
 
-    def _read(self, user_input: Mapping[str, Any]) -> SwitchInput:
-        """The switch the form gives the rules (``form_input``): the name, the device, the key and the lights, rooms
-        and zones, from the picker's choices (``selection_to_config``) or split from the typed entries
-        (``split_list``)."""
-        self._values[NAME] = name = user_input.get(NAME, "")
-        self._values[ADVANCED] = keys = dict(user_input.get(ADVANCED) or {})
-        if (resources := self._resources) is not None:
-            for field, kind, items in _lists(resources):
-                chosen = self._selection.ids(kind)
-                chosen.clear()
-                chosen.update(items[int(index)].id for index in user_input.get(field, []))
-            kept = set(user_input.get(UNRESOLVED, []))
-            for index in self._unresolved():
-                self._selection.entries[index].removed = str(index) not in kept
-            targets = picker.selection_to_config(self._selection, resources)
-            self._lights, self._groups = targets.lights, targets.groups
-        else:
-            self._values[LIGHT_NAMES] = lights = user_input.get(LIGHT_NAMES, "")
-            self._values[GROUP_NAMES] = groups = user_input.get(GROUP_NAMES, "")
-            self._lights, self._groups = picker.split_list(lights), picker.split_list(groups)
-        mode = self._key_mode()
-        key = keys.get(NEW_DEVICE_KEY if self._has_key else DEVICE_KEY, "")
-        return switch_form.form_input(name, self._device_id, mode, key, self._lights, self._groups)
-
-    async def _async_submit(self, user_input: Mapping[str, Any]) -> SubentryFlowResult:
+    async def _submit(self, user_input: Mapping[str, Any]) -> SubentryFlowResult:
         """Checks the switch with the form's checks, then with the switch rules, and saves it, after offering a room or
         zone for its single lights."""
-        body = self._read(user_input)
+        self._values[NAME] = name = user_input.get(NAME, "")
+        self._values[ADVANCED] = keys = dict(user_input.get(ADVANCED) or {})
+        self._lights = list(dict.fromkeys(user_input.get(LIGHTS) or ()))
+        mode = self._key_mode()
+        key = keys.get(NEW_DEVICE_KEY if self._has_key else DEVICE_KEY, "")
+        body = switch_form.form_input(name, self._device_id, mode, key, self._lights)
         problems = switch_form.form_problems(
-            body,
-            self._switches(),
-            self._original_id,
-            manual_device=self._manual_device,
-            manual_targets=self._resources is None,
-            key_mode=self._key_mode(),
+            body, self._switches(), self._original_id, manual_device=self._manual_device, key_mode=mode
         )
         # The device was checked when it was chosen; another switch that took it since is the rules' conflict.
         if problems := [problem for problem in problems if problem.field != "deviceId"]:
             return self._show_errors({problem.field: problem.message for problem in problems}, [])
-        return await self._async_check(body, offer=True)
+        if (offer := find_group(self.hass, self._lights)) is not None:
+            self._body, self._offer = body, offer
+            return await self.async_step_group_offer()
+        return self._check(body)
 
-    async def _async_check(self, body: SwitchInput, *, offer: bool) -> SubentryFlowResult:
-        """Checks the switch with the switch rules and saves it; a switch whose names the bridge couldn't check waits
-        for ``unchecked``. With ``offer``, a switch of 2 or more single lights first gets the room or zone that holds
-        exactly them, or a zone of them to create, from the lists that the bridge gave its check (decision 34)."""
-        typed = self._resources is None
+    def _check(self, body: SwitchInput) -> SubentryFlowResult:
+        """Checks the switch with the switch rules, its lights as the settings keep them, and saves it."""
+        registry = er.async_get(self.hass)
+        stored = replace(body, targets=[target_of(registry, light) for light in body.targets])
         try:
-            write = await self._async_write(body, self._hue())
+            write = self._write(stored)
         except SwitchValidationError as err:
-            return self._show_errors(*switch_form.field_errors(err.errors, typed))
+            return self._show_errors(*switch_form.field_errors(err.errors))
         except (SwitchConflictError, SwitchNotFoundError) as err:
             raise _ended(err) from err
-        except Exception as err:
-            _LOGGER.exception("Checking the switch %s against the Hue bridge failed.", body.device_id)
-            return self._show_settings({"base": "unexpected"}, {"base_error": str(err)})
-        if write.warnings:
-            self._body, self._warnings = body, write.warnings
-            return await self.async_step_unchecked()
-        if offer and write.lists is not None:
-            found = group_offer.find_offer(write.switch, write.lists)
-            if found is not None:
-                self._body, self._lists, self._offer = body, write.lists, found
-                if isinstance(found, UseGroup):
-                    return await self.async_step_group_offer()
-                return await self.async_step_zone_offer()
         return self._save(write, body)
 
     def _show_errors(self, by_field: Mapping[str, str], unmatched: Sequence[str]) -> SubentryFlowResult:
-        """The form again, with the messages on their fields; the device's and those of the picker's lights, rooms and
-        zones, or of keys that no field has, on the form as a whole."""
+        """The form again, with the messages on their fields; the device's, and those of keys that no field has, on
+        the form as a whole."""
         errors: dict[str, str] = {}
         messages: dict[str, str] = {}
         base: list[str] = []
@@ -724,123 +556,61 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
             messages["base_error"] = " ".join(base)
         return self._show_settings(errors, messages)
 
-    async def _async_write(self, body: SwitchInput, hue: HueSettings) -> SwitchWrite:
+    def _write(self, body: SwitchInput) -> SwitchWrite:
         """The switch rules' check of a new switch, or of the switch being changed, by the id it had. Raises
         :class:`~.engine.switch_rules.SwitchError`."""
         if self._original is None:
-            return await switch_rules.create_switch(self._switches, body, hue, self._connect)
-        return await switch_rules.update_switch(
-            self._switches, self._original.normalized_device_id, body, hue, self._connect
-        )
+            return switch_rules.create_switch(self._switches(), body)
+        return switch_rules.update_switch(self._switches(), self._original.normalized_device_id, body)
 
     # A room or zone in place of many lights (decision 34).
 
-    def _offered[T: (UseGroup, CreateZone)](self, kind: type[T]) -> tuple[T, SwitchInput]:
-        """The offer shown, which is a ``kind``, and the switch that it is for."""
+    async def async_step_group_offer(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        """A Hue room or zone has exactly the switch's single lights: use it in their place, or keep the lights. Home
+        Assistant runs the step again when the frontend fetches the flow, which shows the offer again."""
+        offer, _ = self._offered()
+        return self.async_show_menu(
+            step_id="group_offer",
+            menu_options=["use_room" if offer.kind == "room" else "use_zone", "keep_lights"],
+            description_placeholders={"group": offer.name, "lights": ", ".join(offer.lights)},
+        )
+
+    def _offered(self) -> tuple[GroupOffer, SwitchInput]:
+        """The offer shown, and the switch that it is for."""
         offer, body = self._offer, self._body
-        assert isinstance(offer, kind)  # noqa: S101 - the steps of an offer come from its menu
+        assert offer is not None  # noqa: S101 - the steps of an offer come from its menu
         assert body is not None  # noqa: S101 - set with the offer
         return offer, body
 
-    async def async_step_group_offer(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        """A room or zone holds exactly the switch's single lights: use it in their place, or keep the lights."""
-        offer, _ = self._offered(UseGroup)
-        return self.async_show_menu(
-            step_id="group_offer",
-            menu_options=["use_room" if offer.group.kind == "room" else "use_zone", "keep_lights"],
-            description_placeholders={"group": offer.group.name, "lights": _light_names(offer.lights)},
-        )
-
-    async def async_step_zone_offer(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        """No room or zone holds exactly the switch's single lights: create a zone of them on the bridge, or keep the
-        lights."""
-        offer, _ = self._offered(CreateZone)
-        return self.async_show_menu(
-            step_id="zone_offer",
-            menu_options=["create_zone", "keep_lights"],
-            description_placeholders={"zone": offer.name, "lights": _light_names(offer.lights)},
-        )
-
     async def async_step_use_room(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         """Checks and saves the switch with the room in the place of its lights."""
-        return await self._async_use_group()
+        return self._use_group()
 
     async def async_step_use_zone(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         """Checks and saves the switch with the zone in the place of its lights."""
-        return await self._async_use_group()
+        return self._use_group()
 
-    async def _async_use_group(self) -> SubentryFlowResult:
-        offer, body = self._offered(UseGroup)
-        return await self._async_check(group_offer.with_group(body, offer.group, self._lists), offer=False)
-
-    async def async_step_create_zone(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        """Creates the zone on the bridge, then checks and saves the switch with it in the place of its lights. When
-        the bridge doesn't create it, ``zone_failed`` says why."""
-        offer, body = self._offered(CreateZone)
-        try:
-            async with self._connect(self._hue()) as client:
-                zone = await client.create_zone(offer.name, [light.id for light in offer.lights])
-        except (HueApiError, ConfigError) as err:
-            self._zone_error = str(err)
-            return await self.async_step_zone_failed()
-        except Exception as err:
-            _LOGGER.exception("Creating the zone %s on the Hue bridge failed.", offer.name)
-            self._zone_error = str(err)
-            return await self.async_step_zone_failed()
-        return await self._async_check(group_offer.with_group(body, zone, self._lists), offer=False)
-
-    async def async_step_zone_failed(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        """The bridge refused the zone, or failed: the bridge's message, and try again or keep the lights."""
-        return self.async_show_menu(
-            step_id="zone_failed", menu_options=ZONE_RETRY_MENU, description_placeholders={"error": self._zone_error}
-        )
-
-    async def async_step_retry_zone(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        """Checks the switch again, and offers what the bridge's lists give then: a zone that the failed attempt made
-        after all is offered for use, rather than made twice."""
-        body = self._body
-        assert body is not None  # noqa: S101 - set before the offer is shown
-        return await self._async_check(body, offer=True)
+    def _use_group(self) -> SubentryFlowResult:
+        offer, body = self._offered()
+        self._lights = [offer.entity_id]
+        return self._check(replace(body, targets=[offer.entity_id]))
 
     async def async_step_keep_lights(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         """Checks and saves the switch with its single lights, as they were chosen."""
-        body = self._body
-        assert body is not None  # noqa: S101 - set before the offer is shown
-        return await self._async_check(body, offer=False)
-
-    async def async_step_unchecked(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        """The bridge couldn't check the names: save the switch anyway, with the warning, or try again."""
-        return self.async_show_menu(
-            step_id="unchecked",
-            menu_options=["save", "settings"],
-            description_placeholders={"warning": "\n\n".join(self._warnings)},
-        )
-
-    async def async_step_save(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        """Saves the switch without checking its names. The rules' checks of the device id run again, for the switches
-        as they are now; an unpaired bridge leaves the names unchecked without asking the bridge again."""
-        body = self._body
-        assert body is not None  # noqa: S101 - set before unchecked offers to save
-        try:
-            write = await self._async_write(body, HueSettings())
-        except (SwitchConflictError, SwitchNotFoundError) as err:
-            raise _ended(err) from err
-        return self._save(write, body)
+        _, body = self._offered()
+        return self._check(body)
 
     def _save(self, write: SwitchWrite, body: SwitchInput) -> SubentryFlowResult:
         """Adds the subentry, or updates the one being changed, with the values that the rules give; its unique id is
-        the normalized device id, and its title the name, or that id. The texts name the switch by the name or the
-        device id that the form was given."""
-        if self._removed:
-            # Closed while the bridge was asked: the switch isn't saved, as Home Assistant drops what this step returns.
-            raise UnknownFlow
+        the normalized device id, and its title the name, or that id. Saving drops the leftovers of a migrated switch,
+        as its lights have been chosen again. The texts name the switch by the name or the device id that the form was
+        given."""
         switch = write.switch
         data = {
             CONF_DEVICE_ID: switch.device_id,
             CONF_NAME: switch.name,
             CONF_DEVICE_KEY: switch.device_key,
-            CONF_LIGHTS: list(switch.lights),
-            CONF_GROUPS: list(switch.groups),
+            CONF_TARGETS: list(switch.targets),
         }
         title = switch.name or switch.normalized_device_id
         placeholders = {"switch": body.name or body.device_id or ""}
@@ -860,9 +630,3 @@ class SwitchSubentryFlow(ConfigSubentryFlow):
             data=data,
         )
         return self.async_abort(reason="saved", description_placeholders=placeholders)
-
-    @callback
-    def async_remove(self) -> None:
-        """The dialog closed: a step that was still asking the bridge saves nothing. Home Assistant cancels
-        identify-by-press itself, as the task of the progress step shown."""
-        self._removed = True
