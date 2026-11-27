@@ -34,12 +34,13 @@ switches, for Home Assistant 2026.11 and later only. The user's choices, made wh
 - A Python custom integration, which runs in Home Assistant's own process.
 - Its own public repository, `abpostelnicu/sonoff2hue-homeassistant`, under the Apache-2.0 license.
 - Hue controlled directly: its own link-button pairing, the pinned certificate and a warm connection. Home Assistant's
-  Hue integration and its light entities aren't used.
+  Hue integration and its light entities aren't used. On 2026-11-27 the user chose Home Assistant's light entities
+  instead (decision 40).
 - Home Assistant's own UI:
   - a setup flow and one config subentry per switch;
   - entities, repairs, logbook entries and diagnostics;
   - no custom panel.
-- A one-time import of an existing `sonoff2hue.yaml`.
+- A one-time import of an existing `sonoff2hue.yaml`, which goes with decision 40.
 - The live test runs on the user's Home Assistant OS.
 
 > The interface must use Home Assistant components. (2026-11-24)
@@ -47,7 +48,8 @@ switches, for Home Assistant 2026.11 and later only. The user's choices, made wh
 Asked what that covers, the user chose Home Assistant's own UI only: dialogs built from Home Assistant's form controls,
 devices and entities, repairs, the logbook and diagnostics, and no custom panel or web page. The user didn't choose Home
 Assistant's entity and area pickers for the lights, its Hue integration for switching them, or SonoffLAN for reading
-the switches, so those stay as above.
+the switches, so those stay as above. On 2026-11-27 the user chose Home Assistant's entity picker and its Hue
+integration for the lights (decision 40); SonoffLAN still isn't used.
 
 On 2026-11-25 the user chose:
 
@@ -56,6 +58,22 @@ On 2026-11-25 the user chose:
   product rules kept and nothing that reproduces another platform's rules (decision 30);
 - an mDNS layer of the integration's own, which never relies on the mDNS that Home Assistant or Home Assistant OS
   provides, and keeps exactly its behavior (decision 30).
+
+On 2026-11-27 the user asked whether sonoff2hue could rely on Home Assistant's Hue integration, set up already, and
+toggle its light entities instead of pairing the bridge itself. The user's choices, made with the plan that day:
+
+- measure first, automatically on the user's Home Assistant through its MCP server, and switch only if a toggle after
+  idle stays within about 100 ms of the direct connection's;
+- a switch may toggle any light entity, the Hue integration's rooms and zones included;
+- existing entries migrate automatically, with a repair per switch for what is left over;
+- the import of a `sonoff2hue.yaml` goes;
+- the room or zone offer stays for the Hue integration's rooms and zones, and creating a zone goes;
+- following a bridge to a new address becomes the Hue integration's job, through Home Assistant's zeroconf, while
+  sonoff2hue's own listener keeps its own mDNS socket.
+
+The measurement missed that rule: a room after idle took 193 ms, against 59 ms over the direct connection, because of
+how the Hue integration's library handles its connections (Research findings). The user chose to switch anyway, as
+2.0.0 (decision 40), and asked for a draft of an issue about it for that library, aiohue.
 
 ## How to work in this repository
 
@@ -163,9 +181,8 @@ On 2026-11-25 the user chose:
   nobody answers. A dry run's pull request adds only the notes, so it releases nothing even if merged, and is closed
   unmerged. Change the procedure in the skill alone; the agent reads it.
   `.github/workflows/copilot-setup-steps.yml` prepares the cloud agent's environment, as `scripts/setup` does.
-- The Marketplace's catalog (decision 31): hacs/default#14951 adds sonoff2hue to it. While it waits, don't comment on
-  it, push to it or open another one, as `hacs-bot` asks. If a reviewer sets it to draft, fix what they ask in this
-  repository, and mark it ready for review again.
+- The Marketplace's catalog (decision 31) has listed sonoff2hue since hacs/default#14951 was merged on 2026-11-26.
+  New Releases need nothing more there.
 
 ## Layout
 
@@ -1381,6 +1398,69 @@ frontend 20261028.8 on GitHub, hassfest 2026.11.3 run from core's tag, and the c
   contributors blog of 2026-10-23, *Config entry functions now return None*, makes None the rule for core integrations
   from 2026.11.0, and lets custom integrations keep returning a bool, without a deprecation.
 
+Home Assistant's Hue integration and its lights, for decision 40, checked on 2026-11-27 in the installed 2026.11.3, in
+aiohue 4.9.0, the version that it pins, and in 4.9.2, the newest release (2026-11-16), and measured on the user's
+Home Assistant through its MCP server:
+
+- **Lights, rooms and zones.** A Hue light's entity has the light's id as its unique id and the translation key
+  `hue_light`, on the light's Hue device, which has the name from the Hue app. A room or zone is a light entity too
+  (`v2/group.py`, `GroupedHueLight`), enabled by default, with its grouped light's id as its unique id, the
+  translation key `hue_grouped_light` and the attributes `is_hue_group: true`, `hue_type` (`room` or `zone`) and
+  `entity_id`, its lights' entity ids. Its device is a service, identified by `("hue", <room or zone id>)`, with the
+  model `Room` or `Zone` and the name from the Hue app. A light is unavailable while its Zigbee connectivity says it
+  is disconnected. A device can have two light entities, such as a pendant with an up light and a down light, which
+  the Hue app names like the device.
+- **The connection.** `bridge.py` makes `HueBridgeV2(host, app_key)` without a session, so aiohue makes its own:
+  `TCPConnector(limit_per_host=3)`, with aiohttp's default idle timeout (`keepalive_timeout`, 15 s in 3.14.5) and its
+  default resolver, and `ssl=False`, so it checks no certificate. The event stream holds one of the 3 connections, and
+  its keep-alive is one request every 60 s (`KEEPALIVE_INTERVAL`, a geofence client renamed). So commands have the 2
+  others, which close after 15 s idle: a command after a pause opens a new TCP and TLS connection. 429 and 503 are
+  retried up to 25 times, 0.5 s, 0.75 s and so on apart. `set_state` always sends its PUT, also for a light that is in
+  that state already. A failure is `HomeAssistantError("Request failed: …")`. aiohue 4.9.2 and its `main` haven't
+  changed any of this, and Home Assistant 2026.12.0b0 pins 4.9.2.
+- **Light actions.** `light.turn_on` and `light.turn_off` on several entities call them side by side
+  (`asyncio.gather`) and raise only the first failure. Unavailable entities are skipped without an error
+  (`helpers/service.py`), and `turn_off` calls an entity whatever its state.
+- **Measured,** as Phase 0 of decision 40's plan, on the user's Home Assistant OS with a Hue Bridge v2 (BSB002), on
+  2026-11-27 from 10:11 to 10:21 local time:
+  - **How:** blocking `light.turn_off` actions on lights that were off already, through the MCP server's
+    `homeassistant__call_action`. That tool runs `hass.services.async_call(…, blocking=True)` and checks no exposure.
+  - **Timing:** with debug logging on for `homeassistant.components.mcp_server`, Home Assistant logs `Tool call: …`
+    before the tool runs and `Sending response: …` after it, with times in milliseconds, which `hassio__get_logs`
+    reads. Their difference, minus a 2 ms baseline (a target that renders no light), is the action's time in Home
+    Assistant.
+  - **Rounds:** 8. Each target was a template that rendered its lights only while all of them were off, so no light
+    could change.
+  - **Logging:** `logger.set_level` lasts until a restart, and `notset` gives a logger its inherited level back.
+
+  | Target | After 27 to 71 s without a Hue command: median (range) | 3 to 5 s after one |
+  |---|---|---|
+  | A room, one grouped light | 193 ms (69 to 215) | 29 ms |
+  | 10 lights in one action | 344 ms (218 to 353) | 140 ms |
+
+  The direct connection, warm and pinned, had switched the same room in 59 ms, and 10 single lights one after another
+  in 452 to 549 ms (Verification log, the live tests). A new TLS connection costs about 165 ms. The samples of 69, 71
+  and 218 ms found a connection that the keep-alive had left warm. aiohue logged no retry and no reconnect.
+- **Registries.**
+  - The entity registry keeps a removed entity in `deleted_entities`. When an entity with the same platform and unique
+    id is created again, it gets its registry id (`RegistryEntry.id`) back.
+  - `async_resolve_entity_id` gives a registry id's entity id, and returns a valid entity id as it is.
+  - `EVENT_ENTITY_REGISTRY_UPDATED` has the `action` `create`, `remove` or `update`. An update's `changes` hold the old
+    values, and a rename adds `old_entity_id`.
+  - In the device registry, `async_get_device(identifiers=…)` is deprecated, and an error for core integrations, until
+    2027.8.0. Its replacements are `async_get_device_by_identifier(identifier, config_entry_id)` and
+    `async_get_devices`.
+- **Flows.**
+  - A config flow can open a subentry flow next. `async_on_create_entry` starts it with
+    `hass.config_entries.subentries.async_init((entry_id, type), context=SubentryFlowContext(source=SOURCE_USER))` and
+    sets `result["next_flow"] = (FlowType.CONFIG_SUBENTRIES_FLOW, flow_id)`, as the setup flows of ntfy, scrape, smtp
+    and bayesian do.
+  - A repair flow's result can name a subentry flow the same way (`components/repairs/models.py`).
+  - An `EntitySelector` with the domain `light` and `multiple` gives entity ids.
+- **hassfest** allows an import of `homeassistant.components.light` only with `light` in `dependencies` or
+  `after_dependencies`, or in a platform named `light` (Diagnostics, above). So the integration writes the domain as
+  text, `"light"`, and calls the actions by name.
+
 ## Decisions
 
 | # | Decision | Why |
@@ -1424,6 +1504,7 @@ frontend 20261028.8 on GitHub, hassfest 2026.11.3 run from core's tag, and the c
 | 37 | **Releases from a merged release pull request** (the user's request of 2026-11-26), so that a Release agent that works on its own on GitHub, a Copilot cloud agent, can prepare a release that the owner merges. **The release pull request** raises `version` in the manifest to X.Y.Z and adds the release's notes, written for users, as `.github/release-notes/vX.Y.Z.md`, the file that marks a release commit: a raised version without it releases nothing by itself. **Tag the release** (`.github/workflows/tag.yml`) runs when *CI* completes on `main` (`workflow_run`, `branches: [main]`), one run at a time (concurrency group `tag`, which never cancels a run in progress). Its job *Check the release commit* runs only after CI passed on a push (`conclusion == 'success'`, `event == 'push'`), may only read, and checks out the commit that CI passed on (`workflow_run.head_sha`), with main's history and without credentials. It reads that commit's version (`release.sh manifest-version`, exactly X.Y.Z, else an error). Without that version's notes file the commit isn't a release commit: a notice, and nothing is tagged. If `vX.Y.Z` exists and names the commit or a commit before it, a notice, and nothing is tagged; if it names another commit, an error. Otherwise the commit must be on `main` (`release.sh check-main`) and X.Y.Z higher than every released version (`release.sh released` and `check-higher`). Its outputs are `version`, `sha` and `tag`. Its job *Tag and release* runs only when `tag` is `true`, has the workflow's only write permissions, `contents: write` and `actions: write`, and checks nothing out. It checks the outputs, then makes the annotated tag through the REST API: the tag object (`POST git/tags`, with the message "sonoff2hue X.Y.Z" and the tagger `github-actions[bot]`, its noreply address and the time), then `refs/tags/vX.Y.Z` (`POST git/refs`). If that fails because the tag was pushed meanwhile, it stops with a notice when the tag names the commit, as its push ran *Release*, and fails when it names another; any other failure fails it. Then it runs *Release* on the tag (`gh workflow run release.yml --ref vX.Y.Z`), and its summary shows the tag and links *Release*'s runs. **Release** (`release.yml`) also runs by hand (`workflow_dispatch`, without inputs); on anything but a tag, such as `main`, its check job fails with "… isn't a tag" (`release.sh version`). Its GitHub Release job reads the tagged commit's notes file through the contents API's raw media type, still without a checkout: the Release's notes are exactly that file (`--notes-file`, without `--generate-notes` and `--notes-start-tag`); on a 404 GitHub generates them, as before; any other failure is an error, and no Release is created. **By hand,** a pushed tag still releases, as decision 29 has it. **CI must pass on the release commit itself.** CI's concurrency group cancels its older run on `main` when a newer push lands, and CI can fail there, from a flaky test for example. Either way the release commit isn't tagged, and the next commit of `main` whose CI passes, which still has the notes file, gets the tag `vX.Y.Z` instead: the release then includes the changes merged after the release commit. So if CI fails or is cancelled on the release commit, re-run it (`gh run rerun <id>`, or *Re-run jobs*) before merging anything else: the re-run's success tags the release commit itself. `tag.yml`, the README and this file say so, and nothing else guards against it | The cloud agent can only push its own `copilot/…` branch and open a pull request: it can't merge, push tags or create Releases. So the owner's merge decides a release, and GitHub Actions publishes it. A tag that a workflow pushes with its `GITHUB_TOKEN` starts no workflow, so `release.yml`'s push trigger wouldn't run, but a dispatch does, and a run on a tag has the tag's ref and commit, as its push would, so *Release* keeps all of decision 29's checks (Research findings). The notes file marks the release in the pull request that the owner reviews, and its text becomes the notes that the Marketplace shows before an update, where generated notes would list the pull requests' titles. **A tag on a commit before this one is a notice, not an error:** the notes file stays on `main` after its release, so until the next version every later commit is a release commit by its file, and an error would fail the workflow after every merge. CI's success on a push to `main` gates the tag, as decision 29 releases only what passed CI; a pull request's CI runs on its own branch, which a fork may call `main`. The check job runs the repository's scripts, so it may only read, and the job that writes runs none of them, as the GitHub Release job doesn't. One run at a time, so that each run sees the tag that the one before it made. The tag is annotated, with decision 29's message, as `git tag -a` makes it, and the tagger's time is given, as the documentation doesn't say which time the API takes without one. The checks run before the tag, so that a commit that *Release* would refuse isn't tagged, and *Release* checks the tag again. Notes that can't be read stop the Release, instead of GitHub's notes in their place, and the job can be run again |
 | 38 | **The Release agent and `/release`** (the user's request of 2026-11-26: an agent that handles new releases, started with `/release` and a version, which also works on its own on GitHub). **The procedure** is one Agent Skill, `.github/skills/release/SKILL.md` (`name: release`, an `argument-hint`, and `disable-model-invocation: true`, so that it runs only when asked): `/release X.Y.Z`, `/release patch`, `minor` or `major`, or `/release` alone, each with an optional `--dry-run`, and `/release check X.Y.Z`, in VS Code's chat and in Copilot CLI. **The agent** is `.github/agents/release.agent.md`, *Release* (`disable-model-invocation: true`, all tools), which reads the skill and follows it: in VS Code's agent picker, with `--agent release` or `/agent` in Copilot CLI, and on GitHub as Copilot cloud agent, from the Agents tab of github.com or GitHub Mobile, an issue assigned to Copilot, or `gh agent-task create "/release X.Y.Z" --custom-agent release`. **The steps:** read the released versions and main's state; refuse a main whose *CI* or *Validate* failed; choose the version (exact, patch, minor or major, or proposed by what users of the previous release must do, can use or get fixed), higher than every released version and without a tag; collect the changes since the previous release; write the users' notes, `.github/release-notes/vX.Y.Z.md` (decision 37); open the pull request "Release X.Y.Z", whose one commit, `Release X.Y.Z`, raises the manifest's version and adds the notes, and nothing else. Locally, after the checks and the owner's yes, it merges by fast-forwarding main, follows *CI*, *Tag the release* and *Release*, checks the Release (its name, notes, immutability, Latest, tag, attestation and source archive) and records it in a pull request of its own, `Record release X.Y.Z`, with a Verification log entry and a Status item. On GitHub it stops at the draft pull request, which the owner approves, marks ready and merges with *Squash and merge*, which publishes the release (decision 37); `/release check X.Y.Z` then checks and records it, with the GitHub MCP server's tools where gh's token can't read the Releases, and names the checks that couldn't run. **On GitHub,** as its first dry run showed (Verification log), the agent lists the Releases with the GitHub MCP server's `list_releases`, as gh's token there gets HTTP 403, leaves out the one test of the mDNS socket that times out there, as multicast doesn't get through, and changes the pull request only with its progress reports, leaving its title to Copilot and the owner: a tool call that the session's safety review doesn't approve waits for the owner in the session's conversation. **A dry run** stops at a draft pull request "Release X.Y.Z (dry run)", which adds only the notes, in a commit `Draft the notes of release X.Y.Z`, and is closed unmerged. **The cloud agent's environment:** `.github/workflows/copilot-setup-steps.yml`, whose job `copilot-setup-steps` installs uv 0.13.7 and the tools of `scripts/setup`, as CI does, before a session on GitHub Actions starts, so that the agent can run `scripts/check`; it also runs on demand and when the file changes, and no ruleset requires it | The user asked for an agent that `/release` and a version start, and that also works remotely, on its own, on GitHub. A prompt file would have made `/release` only in VS Code's Local harness, which is deprecated and goes in February 2027; a skill is the slash command of VS Code's Copilot harness and of Copilot CLI. A custom agent is what Copilot cloud agent can be started with, from the web, a phone, an issue or gh, with no secret and no machine of the owner's. The procedure lives in the skill alone, which the agent reads, so that the two never differ. The cloud agent pushes only its own branch and can't merge or tag, and Actions' runs on its pull requests wait for the owner's approval unless a repository setting skips that: the owner's merge is the gate of a release that can't be undone, and decision 37 publishes it. *Squash and merge* makes the cloud agent's commits, among them its empty "Initial plan", the single commit that *Tag the release* tags. A release pull request of two files shows the owner exactly what is released, and the record follows the publication, which can fail or wait for *CI*. A dry run that leaves the version as it is releases nothing even if it is merged by mistake: *Tag the release* finds no notes for main's version. Cloud sessions ask the user about the tool calls that their safety review doesn't approve, which no file of the repository can change, so the procedure keeps to the calls that need no approval. A `/release` comment on an issue was left out: GitHub Agentic Workflows' `slash_command` trigger, and a workflow that assigns Copilot through the API, need a personal access token as a secret, as an App's installation token is refused |
 | 39 | **Ask a late switch directly** (the user's choice of 2026-11-26, after the proposal in Research findings). **The mDNS layer** gains one kind of query: `MdnsListener.query_directly(name, record_type, address)` sends the same query's bytes once by unicast to `address`, port 5353, from the socket's port, a direct unicast query (RFC 6762, section 5.5), through the transport's new `send_to`. Nothing else in the layer changes: its recorded cases and existing tests stay as they were, and new tests cover the addition. **The LAN monitor**, at each 30-s look (decision 36), also sends that query for `_ewelink._tcp.local` to each configured switch that is late (heard before, last heard more than 2 min 30 s ago, still online), at the address that the LAN registry last knew for it. It logs "…: not heard for more than 150 s; asking it directly at …." at debug level. A late switch without a known address is asked by multicast only, a device that no switch maps is never asked directly, and a switch that has gone offline isn't either, as it is no longer late | One of the user's MINIR4Ms misses the group's traffic for 5 to 14 minutes about once an hour, but still receives unicast, and on 2026-11-26 it answered a direct query from port 5353 by multicast, which the integration's socket heard (Research findings). The multicast catch-up queries can't reach it then. A query to its address can, at the moments that the catch-up queries already pick, so it stays *Online*, answering every 3 minutes, at no cost while the switches answer. Only the mapped switches, whose *Online* is shown, and only while they are late, so the LAN sees at most one unicast datagram per late switch every 30 s. The PTR query that the switches already answer, from port 5353, gets the MINIR4M's answer by multicast, which the socket bound to the group (decision 19) receives; on Linux that socket can send unicast, as the route gives it a source address. A device that answered such a query by unicast would go unheard by that socket, the price of decision 19 |
+| 40 | **Home Assistant's lights instead of the Hue bridge** (the user's choice of 2026-11-27, after the measurement), as 2.0.0. **What:** sonoff2hue no longer pairs a Hue bridge or connects to one. A switch toggles Home Assistant's light entities, any light, the Hue integration's lights, rooms and zones among them, with Home Assistant's actions `light.turn_on` and `light.turn_off` (`blocking=True`), one call per light, so the Hue integration switches the Hue lights. **The toggle** (`engine/lights.py`: the `Toggler`, on a `LightControl` that the Home Assistant layer's `HassLights` implements): if any available light is on, all go off, else all on; a light already in that state is skipped, an unavailable one counts as failed ("it is unavailable"), and the others are switched side by side, each within 5 s ("it didn't answer within 5 s"), a failure keeping the action's message. The runner keeps the presses, the baselines, the 5 s drop, the order of presses per switch and the outcome's counts; the keep-alive, the bridge's reachability and the rejected key go. **Configuration:** `EngineConfig` holds the switches only, and a switch's `targets` are its lights: entity registry ids, which follow a light to a new entity id, or entity ids for lights that the registry doesn't have. The switch dialog picks them with Home Assistant's entity picker (an `EntitySelector` of the domain `light`, several at once). **Missing lights:** a light that is removed or disabled is missing; the switch toggles the others, the status counts what is missing ("2 wall switches toggle 5 lights; 1 is missing."), and a fixable repair per switch, `missing_targets_<device id>`, opens *Edit switch* (`repairs.py`: the switch's reconfigure flow as the `next_flow`). The supervisor resolves the lights again whenever the entity registry creates, removes, renames, enables or disables a light (`async_track_targets`, `Supervisor.targets_changed`), without restarting the runner. **Room or zone:** with 2 or more single lights, the dialog offers the Hue integration's room or zone (`is_hue_group`) whose `entity_id` attribute is exactly those lights, a room before a zone; creating a zone on the bridge goes, as no action of Home Assistant creates one. **Setup:** one confirmation, after which *Add switch* opens as the next flow (`next_flow`, as ntfy's setup does); there is no reconfigure, reauthentication or import, and no secret but the device keys. **Devices and entities:** the "Hue bridge" device becomes a service, "sonoff2hue", identified by the entry id, with Status, whose states are `not_configured`, `invalid_config`, `running` and `error`, and eWeLink devices seen; Reachable goes. **Migration** to config entry version 2 (`migration.py`): each switch's `lights` and `groups` become entity registry ids of the Hue integration's lights, rooms and zones, through the Hue id that the remembered store (decision 32) last found for the entry, or the entry itself when it is such an id: a light's id names the `hue` light entity with that unique id, and a room's or zone's id its device, `("hue", <id>)`, and that device's grouped light. Without an id, a name maps only when exactly one light, or one room or zone, has it, without regard to case. What is left stays in the switch as `unmigrated`, with a fixable repair, `unmigrated_<device id>`, until the switch is saved again. The entry's data and unique id are cleared, the application key and the pin with them; the store is deleted; the bridge's device and its entities' unique ids move to the entry id, so the entities keep their entity ids; and Reachable is removed. A version newer than 2 is refused, so that an older sonoff2hue can't run a migrated entry. **Superseded:** the Goal's "Hue controlled directly" and its import; decisions 4, 11, 12 and 33; and the parts of decisions 5, 14, 18, 20 to 28, 30, 32 and 34 about the bridge, pairing, discovery, the bridge's address, the names and the picker, the remembered store, the bridge's device and Reachable, creating a zone, the fake bridge and the import. The mDNS part of Hue discovery (`_discover_mdns`) and its tests go with the discovery; the rest of the mDNS layer and its recorded cases, which hold no Hue packet, stay as they are | The user chose it on 2026-11-27, after the measurement had missed the go rule that the plan set, a toggle after idle within about 100 ms of the direct connection's: through the Hue integration, a room after idle took 193 ms against 59 ms, though 10 lights took 344 ms against 452 to 549 ms (Research findings). The cause is the Hue integration's library, whose connections close after 15 s idle while its keep-alive runs every 60 s; the draft of an issue for aiohue proposes a longer idle timeout, which would bring a press near the warm 29 ms. In return, the bridge is paired once, by the Hue integration, which also handles a new key, a new address and renames; lights are chosen with Home Assistant's own picker, with areas and search, and can be any light; sonoff2hue keeps no Hue secrets; thousands of lines of code, tests and tools go; and sonoff2hue builds on core's Hue integration instead of overlapping it. One call per light gives each light its own outcome and 5 s limit, where one action for all would report only its first failure, and an unavailable light counts as failed, where Home Assistant's actions skip it without a word. Registry ids keep a switch's lights through a rename. The catalog lists 1.x already, so its users' entries migrate: exactly where the store knows a Hue id, by name only when the name is unambiguous, as a Hue device can have two lights of its name, and with a repair for the rest |
 
 ## Record keeping
 
@@ -1468,6 +1549,18 @@ frontend 20261028.8 on GitHub, hassfest 2026.11.3 run from core's tag, and the c
   - leave out the live checks of a rename in the Hue app and of the room or zone offer;
   - wait for Home Assistant 2026.12.0 rather than prepare the upgrade against a beta;
   - build the direct query (decision 39, #55) and deploy it to the user's Home Assistant OS.
+- The plan of decision 40 was approved on 2026-11-27, in session dc2f9e29. Its phases:
+  - measure on the user's Home Assistant through its MCP server, which missed the go rule, after which the user chose
+    to go on;
+  - record the decision;
+  - the engine, then the Home Assistant layer, on light entities;
+  - the migration of 1.x entries;
+  - remove the direct connection;
+  - the tests and the tooling, with the end-to-end test on template lights and a migration step;
+  - the README and this file;
+  - validation, locally, as GitHub Actions isn't to be used;
+  - the live test on the user's Home Assistant OS;
+  - release 2.0.0 by hand.
 
 ## Environment observations
 
@@ -2650,6 +2743,25 @@ frontend 20261028.8 on GitHub, hassfest 2026.11.3 run from core's tag, and the c
   - **The Release:** neither a draft nor a pre-release; immutable and Latest; its notes match
     `.github/release-notes/v1.1.0.md`; `gh release verify v1.1.0` verified the attestation. The Marketplace's source
     archive holds the 40 files of `custom_components/sonoff2hue` at the tag, each with the same SHA-256.
+- 2026-11-26 and 2026-11-27: the Marketplace's catalog (decision 31). hacs/default#14951 was merged on 2026-11-26 at
+  23:13 UTC, and `hacs/default`'s list `integration` holds `abpostelnicu/sonoff2hue-homeassistant`. The catalog's
+  published data, `data-v2.hacs.xyz/integration/repositories.json`, was last made on 2026-11-26 at 20:27 UTC, before
+  the merge, so it didn't list sonoff2hue yet on 2026-11-27 at 09:03 UTC.
+- 2026-11-27: the measurement of decision 40's plan (Phase 0), on the user's Home Assistant OS (Core 2026.11.3, aiohue
+  4.9.0) through its MCP server, as Research findings describe.
+  - **Logging:** debug logging was on for `homeassistant.components.mcp_server` and `aiohue` from 10:10 to 10:20:55
+    local time only, then back at `notset`; no debug line came after that.
+  - **Safety:** every guard rendered its full list, so all 32 timed calls reached the bridge. No light changed: the
+    room and the 10 lights were off before and after.
+  - **Errors:** aiohue logged no retry and no reconnect of its event stream, and the log had no warning or error from
+    the calls.
+  - **Samples,** in milliseconds before the baseline's 2 ms is subtracted:
+    - the room after idle: 217, 171, 215, 71, 73, 213, 184 and 206;
+    - the 10 lights after idle: 341, 347, 220, 345, 310, 347, 355 and 351;
+    - warm, 29 to 32 for the room and 135 to 145 for the 10 lights;
+    - the baseline, 1 to 2.
+  - **Against the go rule:** the room after idle had to stay within about 160 ms, so the result was a no-go. The user
+    chose to switch anyway (decision 40).
 
 ## Status
 
@@ -2676,7 +2788,9 @@ frontend 20261028.8 on GitHub, hassfest 2026.11.3 run from core's tag, and the c
 - [x] Live test on the user's Home Assistant OS: `main` at 2bec130, with a real press (Verification log)
 - [x] Release 1.0.0: the tag `v1.0.0` on 7ba561f and its immutable GitHub Release "sonoff2hue 1.0.0", Latest
   (Verification log)
-- [ ] In the Marketplace's catalog: submitted on 2026-11-25 as hacs/default#14951, waiting for its review (decision 31)
+- [x] In the Marketplace's catalog: hacs/default#14951, submitted on 2026-11-25, was merged on 2026-11-26
+  (decision 31). The catalog's published data didn't list sonoff2hue yet on 2026-11-27 (Verification log), and the
+  user's Home Assistant still runs a copy installed by hand
 - [x] A canary for the next Home Assistant release (decision 35, part 1): *Beta* (`beta.yml`) tests the newest
   `pytest-homeassistant` weekly, and passed with 2026.12.0b0 on #43. Part 2, the pins at the latest release and a
   required job for the 2026.11.3 minimum, follows 2026.12.0
@@ -2713,3 +2827,7 @@ frontend 20261028.8 on GitHub, hassfest 2026.11.3 run from core's tag, and the c
   the minutes past the hour, and stayed *Online* (Verification log)
 - [x] Release 1.1.0: the tag `v1.1.0` on 839693b and its immutable GitHub Release "sonoff2hue 1.1.0", Latest
   (Verification log)
+- [ ] Home Assistant's lights instead of the Hue bridge (decision 40), as 2.0.0: measured on 2026-11-27, where the go
+  rule failed, and chosen anyway (Verification log). Then the engine and the Home Assistant layer on light entities,
+  the migration of 1.x entries, the tests and the tooling, the README and this file, the live test and release 2.0.0
+  by hand
